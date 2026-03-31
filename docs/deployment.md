@@ -85,9 +85,9 @@ The script will install everything and reboot the Pi.
 1. Installs Python 3.11, Chromium, git, openbox, unclutter.
 2. Creates the `bellforge` system user.
 3. Clones the repo into `/opt/bellforge`.
-4. Creates a virtualenv and installs updater dependencies.
+4. Creates a virtualenv and installs backend/updater dependencies.
 5. Writes `/opt/bellforge/config/settings.json` with your `SERVER_URL` and `DEVICE_ID`.
-6. Installs and enables `bellforge-updater.service`, `bellforge-client.service`, and `bellforge-file-server.service`.
+6. Installs and enables `bellforge-backend.service`, `bellforge-updater.service`, and `bellforge-client.service`.
 7. Configures autologin and Openbox autostart for kiosk mode.
 8. Reboots.
 
@@ -95,9 +95,12 @@ The script will install everything and reboot the Pi.
 
 | Service | Purpose |
 |---------|---------|
+| `bellforge-backend` | Serves API, status page, and settings page on port `8000` |
 | `bellforge-updater` | Polls backend for updates; self-healing |
-| `bellforge-file-server` | Serves `client/` on `localhost:8080` via Python http.server |
-| `bellforge-client` | Chromium kiosk pointing at `localhost:8080` |
+| `bellforge-client` | Chromium kiosk pointing at `http://127.0.0.1:8000/status` |
+
+On the kiosk dashboard, the Pi now displays a typed URL for Settings.
+Users on the same network can open that URL (for example, `http://192.168.1.42:8000/settings`) to reach the settings page.
 
 ---
 
@@ -160,4 +163,4 @@ curl -X POST http://YOUR_SERVER:8000/api/broadcast \
 |-----------|----------|------|---------|
 | Pi → Server | HTTP | 8000 | Update polling, schedule fetch |
 | Server → Pi | HTTP | 8765 | Broadcast trigger (optional) |
-| Pi internal | HTTP | 8080 | File server → Chromium |
+| User/IT → Pi | HTTP | 8000 | Status and settings pages |

@@ -61,6 +61,21 @@ run() {
   fi
 }
 
+run_as_service_user() {
+  log "(as ${SERVICE_USER}) $*"
+  if [[ "${EUID}" -eq 0 ]]; then
+    if command -v runuser >/dev/null 2>&1; then
+      runuser -u "${SERVICE_USER}" -- "$@"
+    else
+      sudo -u "${SERVICE_USER}" "$@"
+    fi
+  elif [[ -n "${SUDO}" ]]; then
+    ${SUDO} -u "${SERVICE_USER}" "$@"
+  else
+    "$@"
+  fi
+}
+
 friendly() {
   echo
   echo "==> $*"
@@ -102,6 +117,11 @@ ensure_user() {
 
 ensure_packages() {
   friendly "Installing required system packages"
+  local chromium_pkg="chromium-browser"
+  if apt-cache policy chromium-browser 2>/dev/null | grep -q "Candidate: (none)"; then
+    chromium_pkg="chromium"
+  fi
+
   run env DEBIAN_FRONTEND=noninteractive apt-get update -y
   run env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates \
@@ -110,10 +130,49 @@ ensure_packages() {
     python3 \
     python3-venv \
     python3-pip \
-    chromium-browser \
+    "${chromium_pkg}" \
+    openbox \
+    unclutter \
     systemd \
     xserver-xorg \
     xinit
+}
+
+configure_kiosk_boot() {
+  local autostart_dir="/home/${SERVICE_USER}/.config/openbox"
+  local autostart_file="${autostart_dir}/autostart"
+  local bashprofile="/home/${SERVICE_USER}/.bash_profile"
+
+  run mkdir -p "${autostart_dir}"
+  run bash -c "cat > '${autostart_file}' <<'EOF'
+# Disable screen blanking and power saving while in kiosk mode.
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide the cursor when idle.
+unclutter -idle 5 -root &
+EOF"
+
+  if [[ -n "${SUDO}" ]]; then
+    if ! ${SUDO} grep -Fq "startx -- -nocursor" "${bashprofile}" 2>/dev/null; then
+      run bash -c "echo '[[ -z \$DISPLAY && \$XDG_VTNR -eq 1 ]] && exec startx -- -nocursor' >> '${bashprofile}'"
+    fi
+  else
+    if ! grep -Fq "startx -- -nocursor" "${bashprofile}" 2>/dev/null; then
+      run bash -c "echo '[[ -z \$DISPLAY && \$XDG_VTNR -eq 1 ]] && exec startx -- -nocursor' >> '${bashprofile}'"
+    fi
+  fi
+
+  run mkdir -p /etc/systemd/system/getty@tty1.service.d
+  run bash -c "cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ${SERVICE_USER} --noclear %I \$TERM
+EOF"
+
+  run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "/home/${SERVICE_USER}/.config"
+  run chown "${SERVICE_USER}:${SERVICE_GROUP}" "${bashprofile}"
 }
 
 write_local_config() {
@@ -151,25 +210,42 @@ JSON
 
   if [[ ! -f "${client_env_path}" ]]; then
     run bash -c "cat > '${client_env_path}' <<EOF
-BELLFORGE_SERVER_IP=${SERVER_IP}
-BELLFORGE_DISPLAY_ID=${DISPLAY_ID}
+BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/status
 EOF"
   fi
 
   run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}/config"
 }
 
+setup_updater_log_file() {
+  local updater_log_file="/var/log/bellforge-updater.log"
+  run mkdir -p "$(dirname "${updater_log_file}")"
+  run touch "${updater_log_file}"
+  run chown "${SERVICE_USER}:${SERVICE_GROUP}" "${updater_log_file}"
+}
+
 sync_repo() {
   friendly "Synchronizing BellForge repository"
+
+  # Local-path repo URLs used by tests can be owned by another user.
+  # Register them as safe for the service user before git fetch/clone.
+  if [[ "${REPO_URL}" = /* ]] && [[ -d "${REPO_URL}" ]]; then
+    run_as_service_user git config --global --add safe.directory "${REPO_URL}" || true
+    if [[ -d "${REPO_URL}/.git" ]]; then
+      run_as_service_user git config --global --add safe.directory "${REPO_URL}/.git" || true
+    fi
+  fi
+
   run mkdir -p "${INSTALL_DIR}"
 
   if [[ -d "${INSTALL_DIR}/.git" ]]; then
-    run git -C "${INSTALL_DIR}" fetch --all --prune
-    run git -C "${INSTALL_DIR}" checkout "${BRANCH}"
-    run git -C "${INSTALL_DIR}" reset --hard "origin/${BRANCH}"
+    run_as_service_user git -C "${INSTALL_DIR}" fetch --all --prune
+    run_as_service_user git -C "${INSTALL_DIR}" checkout "${BRANCH}"
+    run_as_service_user git -C "${INSTALL_DIR}" reset --hard "origin/${BRANCH}"
   else
     run rm -rf "${INSTALL_DIR}"
-    run git clone --branch "${BRANCH}" --depth 1 "${REPO_URL}" "${INSTALL_DIR}"
+    run install -d -o "${SERVICE_USER}" -g "${SERVICE_GROUP}" "${INSTALL_DIR}"
+    run_as_service_user git clone --branch "${BRANCH}" --depth 1 "${REPO_URL}" "${INSTALL_DIR}"
   fi
 
   run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
@@ -180,9 +256,14 @@ setup_python() {
   if [[ ! -x "${INSTALL_DIR}/.venv/bin/python" ]]; then
     run python3 -m venv "${INSTALL_DIR}/.venv"
   fi
-  run "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip
-  run "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/backend/requirements.txt"
-  run "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/updater/requirements.txt"
+
+  if [[ ! -x "${INSTALL_DIR}/.venv/bin/pip" ]]; then
+    run "${INSTALL_DIR}/.venv/bin/python" -m ensurepip --upgrade
+  fi
+
+  run "${INSTALL_DIR}/.venv/bin/python" -m pip install --upgrade pip
+  run "${INSTALL_DIR}/.venv/bin/python" -m pip install -r "${INSTALL_DIR}/backend/requirements.txt"
+  run "${INSTALL_DIR}/.venv/bin/python" -m pip install -r "${INSTALL_DIR}/updater/requirements.txt"
 }
 
 install_services() {
@@ -238,7 +319,7 @@ run_uninstall() {
     fi
   else
     log "uninstall.sh missing; fallback uninstall"
-    for svc in bellforge-updater.service bellforge-client.service bellforge-backend.service; do
+    for svc in bellforge-updater.service bellforge-client.service bellforge-backend.service bellforge-file-server.service; do
       run systemctl stop "${svc}" || true
       run systemctl disable "${svc}" || true
       run rm -f "/etc/systemd/system/${svc}"
@@ -258,6 +339,8 @@ do_install() {
   sync_repo
   setup_python
   write_local_config
+  setup_updater_log_file
+  configure_kiosk_boot
   install_services
   NEEDS_REBOOT="true"
 }

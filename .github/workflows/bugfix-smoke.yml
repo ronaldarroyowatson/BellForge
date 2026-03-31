@@ -1,0 +1,84 @@
+name: Bugfix Smoke Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - "bugfix/**"
+      - "hotfix/**"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: Backend and Route Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r updater/requirements.txt
+
+      - name: Start backend
+        run: |
+          nohup uvicorn backend.main:app --host 127.0.0.1 --port 8000 > smoke-backend.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Backend failed to start"
+          tail -n 200 smoke-backend.log || true
+          exit 1
+
+      - name: Run smoke assertions
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          def get(path):
+              url = f"http://127.0.0.1:8000{path}"
+              with urllib.request.urlopen(url, timeout=10) as response:
+                  body = response.read().decode("utf-8")
+                  return response.status, body
+
+          status, body = get("/health")
+          assert status == 200 and json.loads(body).get("status") == "ok", "health check failed"
+
+          status, _ = get("/status")
+          assert status == 200, "status page check failed"
+
+          status, _ = get("/settings")
+          assert status == 200, "settings page check failed"
+
+          status, body = get("/api/version")
+          assert status == 200 and "version" in json.loads(body), "api/version check failed"
+
+          status, body = get("/api/manifest")
+          manifest = json.loads(body)
+          assert status == 200 and isinstance(manifest.get("files"), dict), "api/manifest check failed"
+
+          status, _ = get("/display/main")
+          assert status == 200, "display route check failed"
+
+          print("Smoke assertions passed")
+          PY
+
+      - name: Upload backend log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-backend-log
+          path: smoke-backend.log

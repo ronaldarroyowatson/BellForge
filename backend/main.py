@@ -13,6 +13,9 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+from backend.routes import broadcast, diagnostics, schedule, update
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
@@ -35,9 +38,15 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(update.router, prefix="/api")
+app.include_router(schedule.router, prefix="/api")
+app.include_router(broadcast.router, prefix="/api")
+app.include_router(diagnostics.router, prefix="/api")
+app.mount("/client", StaticFiles(directory=PROJECT_ROOT / "client"), name="client")
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -118,3 +127,19 @@ async def display_payload(display_id: str) -> JSONResponse:
 
     html = payload_file.read_text(encoding="utf-8") if payload_file.is_file() else "<h1>BellForge</h1>"
     return JSONResponse({"display_id": display_id, "html": html})
+
+
+@app.get("/status", response_class=FileResponse)
+async def status_page() -> FileResponse:
+    page = PROJECT_ROOT / "client" / "status.html"
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail="status.html not found")
+    return FileResponse(page)
+
+
+@app.get("/settings", response_class=FileResponse)
+async def settings_page() -> FileResponse:
+    page = PROJECT_ROOT / "client" / "settings.html"
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail="settings.html not found")
+    return FileResponse(page)

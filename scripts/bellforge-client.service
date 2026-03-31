@@ -1,8 +1,8 @@
 [Unit]
 Description=BellForge Signage Client (Chromium Kiosk)
 Documentation=https://github.com/YOUR_ORG/BellForge
-After=graphical.target bellforge-backend.service
-Wants=bellforge-backend.service
+After=graphical.target network-online.target bellforge-backend.service
+Wants=network-online.target bellforge-backend.service
 
 [Service]
 Type=simple
@@ -11,18 +11,11 @@ Group=bellforge
 
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/bellforge/.Xauthority
+Environment=BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/status
 EnvironmentFile=-/opt/bellforge/config/client.env
 
-# Open the backend-served signage page in full-screen kiosk mode.
-ExecStart=/usr/bin/chromium-browser \
-  --kiosk \
-  --noerrdialogs \
-  --disable-infobars \
-  --disable-session-crashed-bubble \
-  --disable-restore-session-state \
-  --disable-background-networking \
-  --disable-translate \
-  --app=http://${BELLFORGE_SERVER_IP}:8000/display/${BELLFORGE_DISPLAY_ID}
+# Open the status dashboard in full-screen kiosk mode.
+ExecStart=/bin/sh -lc 'BROWSER="${BELLFORGE_BROWSER_BIN:-$(command -v chromium-browser || command -v chromium)}"; exec "$BROWSER" --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --disable-restore-session-state --disable-background-networking --disable-translate --app="${BELLFORGE_KIOSK_URL}"'
 
 Restart=always
 RestartSec=10

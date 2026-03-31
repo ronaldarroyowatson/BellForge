@@ -30,27 +30,29 @@ class BroadcastResponse(BaseModel):
     response_model=BroadcastResponse,
 )
 async def broadcast_update(request: BroadcastRequest) -> BroadcastResponse:
-    results: dict[str, str] = {}
-
+    # Each coroutine returns its own (ip, status) pair instead of writing to a
+    # shared dict.  Passing a mutable dict into concurrent coroutines is
+    # error-prone: any future await added inside the write path would create a
+    # real race condition.
     async with httpx.AsyncClient(timeout=10.0) as client:
-        await asyncio.gather(
-            *[_notify_pi(client, ip, request.trigger_port, results) for ip in request.pi_ips],
-            return_exceptions=True,
+        pairs: list[tuple[str, str]] = await asyncio.gather(
+            *[_notify_pi(client, ip, request.trigger_port) for ip in request.pi_ips],
         )
 
-    return BroadcastResponse(triggered=results)
+    return BroadcastResponse(triggered=dict(pairs))
 
 
 async def _notify_pi(
-    client: httpx.AsyncClient, ip: str, port: int, results: dict[str, str]
-) -> None:
+    client: httpx.AsyncClient, ip: str, port: int
+) -> tuple[str, str]:
     url = f"http://{ip}:{port}/trigger-update"
     try:
         resp = await client.post(url)
-        results[ip] = "ok" if resp.status_code == 200 else f"error:{resp.status_code}"
+        status = "ok" if resp.status_code == 200 else f"error:{resp.status_code}"
     except httpx.ConnectError:
-        results[ip] = "unreachable"
+        status = "unreachable"
     except httpx.TimeoutException:
-        results[ip] = "timeout"
+        status = "timeout"
     except Exception as exc:
-        results[ip] = f"error:{exc}"
+        status = f"error:{exc}"
+    return ip, status

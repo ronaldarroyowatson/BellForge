@@ -108,6 +108,11 @@ class UpdateAgent:
         self.log = logger
         self.install_dir = settings.install_dir
         self.staging_dir = settings.staging_dir
+        # Gate that prevents two update cycles from running concurrently.
+        # This matters when both the poll loop and a broadcast /trigger-update
+        # request fire at the same time: without the lock the two coroutines
+        # would interleave _atomic_swap_roots and corrupt the install tree.
+        self._cycle_lock: asyncio.Lock = asyncio.Lock()
 
     def _local_version(self) -> str:
         version_path = self.install_dir / "config" / "version.json"
@@ -266,7 +271,12 @@ class UpdateAgent:
         config_dir = self.install_dir / "config"
         config_dir.mkdir(parents=True, exist_ok=True)
 
-        (config_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        # Write atomically via a sibling temp file + os.replace() so the
+        # backend /manifest endpoint never reads a partially-written file.
+        manifest_path = config_dir / "manifest.json"
+        tmp_path = manifest_path.with_suffix(".json.tmp")
+        tmp_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        tmp_path.replace(manifest_path)
 
     def _post_update_action(self, remote_version: dict[str, Any]) -> None:
         if bool(remote_version.get("reboot_required", False)):
@@ -281,6 +291,16 @@ class UpdateAgent:
                 self.log.warning(f"Failed to restart {service_name}: {result.stderr.strip()}")
 
     async def run_update_cycle(self) -> None:
+        # Fast, non-blocking guard: if a cycle is already in flight (e.g. a
+        # broadcast trigger arrived while the scheduler was mid-swap) skip
+        # rather than queue up a second concurrent run.
+        if self._cycle_lock.locked():
+            self.log.info("Update cycle already in progress; skipping concurrent trigger.")
+            return
+        async with self._cycle_lock:
+            await self._run_update_cycle_locked()
+
+    async def _run_update_cycle_locked(self) -> None:
         async with httpx.AsyncClient() as client:
             remote_version = await self._fetch_json(client, "config/version.json")
             remote_manifest = await self._fetch_json(client, "config/manifest.json")

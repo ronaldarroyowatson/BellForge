@@ -58,7 +58,7 @@ confirm() {
 }
 
 stop_and_remove_services() {
-  for svc in bellforge-updater.service bellforge-client.service bellforge-backend.service; do
+  for svc in bellforge-updater.service bellforge-client.service bellforge-backend.service bellforge-file-server.service; do
     run systemctl stop "${svc}" || true
     run systemctl disable "${svc}" || true
     run rm -f "/etc/systemd/system/${svc}"
