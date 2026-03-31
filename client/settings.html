@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BellForge Settings & Diagnostics</title>
+  <style>
+    :root {
+      --bg-a: #f8f2e5;
+      --bg-b: #d7e6ef;
+      --surface: #fffdfa;
+      --line: #d7ccc0;
+      --text: #1d2730;
+      --muted: #5c6974;
+      --good: #197a38;
+      --warn: #a56f19;
+      --bad: #be2f2f;
+      --accent: #134f78;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      color: var(--text);
+      background: linear-gradient(145deg, var(--bg-a) 0%, var(--bg-b) 100%);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.65rem;
+      color: #0d3f60;
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    button, select, input {
+      border: 1px solid #aabac8;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      background: #fff;
+      color: #1d2730;
+    }
+    button {
+      background: #1e648f;
+      color: #fff;
+      border-color: #175478;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #f2f4f6;
+      color: #22313f;
+      border-color: #b8c1c9;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(300px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 10px 20px rgba(10, 24, 37, 0.08);
+      padding: 14px;
+      min-height: 200px;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+      color: var(--accent);
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 8px 0;
+      font-size: 0.92rem;
+    }
+    .mono {
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      word-break: break-word;
+    }
+    .status {
+      border-radius: 999px;
+      padding: 2px 9px;
+      border: 1px solid transparent;
+      font-weight: 600;
+      font-size: 0.82rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .good { color: var(--good); background: #edf9f0; border-color: #91d1a4; }
+    .warn { color: var(--warn); background: #fff8ea; border-color: #e2c185; }
+    .bad { color: var(--bad); background: #fff1f1; border-color: #e7adad; }
+    .form-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .form-grid label {
+      font-size: 0.85rem;
+      color: #44505b;
+    }
+    .form-grid .full {
+      grid-column: 1 / -1;
+    }
+    .logs {
+      grid-column: 1 / -1;
+    }
+    #logOutput {
+      margin-top: 10px;
+      min-height: 240px;
+      max-height: 360px;
+      overflow: auto;
+      background: #0f151a;
+      color: #cfdbe8;
+      border-radius: 10px;
+      padding: 10px;
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      border: 1px solid #33414e;
+    }
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .logs {
+        grid-column: auto;
+      }
+      .head {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="head">
+      <h1>Settings & Diagnostics</h1>
+      <div class="controls">
+        <button id="manualRefresh" class="secondary">Refresh Now</button>
+        <span id="lastRefreshed">Auto-refresh every 5 seconds</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Network Settings</h2>
+        <div class="row"><span>Current SSID</span><strong id="ssid">-</strong></div>
+        <div class="row"><span>Signal Strength</span><strong id="signal">-</strong></div>
+        <div class="row"><span>IP Address</span><strong id="networkIp" class="mono">-</strong></div>
+        <div class="row"><span>Connection Type</span><strong id="connectionType">-</strong></div>
+
+        <form id="networkForm" class="form-grid">
+          <label class="full">Wi-Fi SSID
+            <input id="ssidInput" type="text" maxlength="128" placeholder="School Wi-Fi" />
+          </label>
+          <label class="full">Wi-Fi Password
+            <input id="passwordInput" type="password" maxlength="256" placeholder="Updated password" />
+          </label>
+          <label class="full">
+            <input id="ethernetInput" type="checkbox" /> Use Ethernet if available
+          </label>
+          <button class="full" type="submit">Apply Network Update</button>
+        </form>
+        <p id="networkUpdateMessage" class="mono"></p>
+      </article>
+
+      <article class="card">
+        <h2>Authentication</h2>
+        <div class="row"><span>Credentials (masked)</span><strong id="credentials" class="mono">-</strong></div>
+        <div class="row"><span>Authentication Status</span><span id="authStatus" class="status warn">Unknown</span></div>
+        <div class="row"><span>Last Attempt</span><strong id="lastAuth" class="mono">-</strong></div>
+      </article>
+
+      <article class="card">
+        <h2>Autoupdater Status</h2>
+        <div class="row"><span>Current Version</span><strong id="currentVersion" class="mono">-</strong></div>
+        <div class="row"><span>Latest Detected</span><strong id="latestVersion" class="mono">-</strong></div>
+        <div class="row"><span>Staging In Progress</span><span id="stagingStatus" class="status warn">Unknown</span></div>
+        <div class="row"><span>Reboot Pending</span><span id="rebootStatus" class="status warn">Unknown</span></div>
+        <div class="row"><span>Download Progress</span><strong id="downloadProgress" class="mono">-</strong></div>
+        <div class="row"><span>Last Update Attempt</span><strong id="lastUpdateAttempt" class="mono">-</strong></div>
+        <div class="row"><span>Last Update Result</span><strong id="lastUpdateResult">-</strong></div>
+      </article>
+
+      <article class="card logs">
+        <h2>Debug Service & Logger</h2>
+        <div class="controls">
+          <label>Service
+            <select id="serviceSelect">
+              <option value="backend">backend</option>
+              <option value="updater">updater</option>
+              <option value="client">client</option>
+              <option value="install-repair">install/repair</option>
+            </select>
+          </label>
+          <label>Filter
+            <input id="logFilter" type="text" placeholder="error" />
+          </label>
+          <button id="downloadLogs" class="secondary" type="button">Download Logs</button>
+        </div>
+        <div id="logMeta" class="mono"></div>
+        <div id="logOutput">Loading logs...</div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const REFRESH_MS = 5000;
+    const lastRefreshed = document.getElementById("lastRefreshed");
+
+    const elements = {
+      ssid: document.getElementById("ssid"),
+      signal: document.getElementById("signal"),
+      networkIp: document.getElementById("networkIp"),
+      connectionType: document.getElementById("connectionType"),
+      networkUpdateMessage: document.getElementById("networkUpdateMessage"),
+      credentials: document.getElementById("credentials"),
+      authStatus: document.getElementById("authStatus"),
+      lastAuth: document.getElementById("lastAuth"),
+      currentVersion: document.getElementById("currentVersion"),
+      latestVersion: document.getElementById("latestVersion"),
+      stagingStatus: document.getElementById("stagingStatus"),
+      rebootStatus: document.getElementById("rebootStatus"),
+      downloadProgress: document.getElementById("downloadProgress"),
+      lastUpdateAttempt: document.getElementById("lastUpdateAttempt"),
+      lastUpdateResult: document.getElementById("lastUpdateResult"),
+      logMeta: document.getElementById("logMeta"),
+      logOutput: document.getElementById("logOutput"),
+      serviceSelect: document.getElementById("serviceSelect"),
+      logFilter: document.getElementById("logFilter"),
+      downloadLogs: document.getElementById("downloadLogs"),
+      manualRefresh: document.getElementById("manualRefresh"),
+      networkForm: document.getElementById("networkForm"),
+      ssidInput: document.getElementById("ssidInput"),
+      passwordInput: document.getElementById("passwordInput"),
+      ethernetInput: document.getElementById("ethernetInput"),
+    };
+
+    let lastLogPayload = null;
+
+    function setStatus(el, ok) {
+      el.className = "status " + (ok === true ? "good" : ok === false ? "bad" : "warn");
+      el.textContent = ok === true ? "Healthy" : ok === false ? "Not Healthy" : "Unknown";
+    }
+
+    async function fetchJson(url, options) {
+      const response = await fetch(url, { cache: "no-store", ...(options || {}) });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    }
+
+    async function refreshNetwork() {
+      const data = await fetchJson("/api/network/info");
+      elements.ssid.textContent = data.ssid || "Unavailable";
+      elements.signal.textContent = data.signal_strength != null ? `${data.signal_strength}%` : "Unavailable";
+      elements.networkIp.textContent = data.ip_address || "Unavailable";
+      elements.connectionType.textContent = data.connection_type || "unknown";
+    }
+
+    async function refreshAuth() {
+      const data = await fetchJson("/api/auth/status");
+      const credentials = data.credentials || {};
+      elements.credentials.textContent = `${credentials.username || ""} / ${credentials.password || ""}`;
+      setStatus(elements.authStatus, data.authentication_succeeded);
+      elements.lastAuth.textContent = data.last_auth_attempt || "Unavailable";
+    }
+
+    async function refreshUpdater() {
+      const data = await fetchJson("/api/updater/status");
+      elements.currentVersion.textContent = data.current_device_version || "Unavailable";
+      elements.latestVersion.textContent = data.latest_detected_version || "Unavailable";
+      setStatus(elements.stagingStatus, data.staging_in_progress);
+      setStatus(elements.rebootStatus, data.reboot_pending);
+      const progress = data.download_progress || {};
+      elements.downloadProgress.textContent = `${progress.bytes_downloaded || 0} / ${progress.bytes_total || 0} bytes (${(progress.percent || 0).toFixed(2)}%)`;
+      elements.lastUpdateAttempt.textContent = data.last_update_attempt || "Unavailable";
+      elements.lastUpdateResult.textContent = data.last_update_result || "unknown";
+    }
+
+    async function refreshLogs() {
+      const service = elements.serviceSelect.value;
+      const contains = elements.logFilter.value.trim();
+      const query = new URLSearchParams({ lines: "200" });
+      if (contains) query.set("contains", contains);
+      const data = await fetchJson(`/api/logs/${encodeURIComponent(service)}?${query.toString()}`);
+      lastLogPayload = data;
+      elements.logMeta.textContent = `Source: ${data.log_path || "n/a"} | Lines: ${data.line_count}`;
+      elements.logOutput.textContent = (data.lines || []).join("\n") || "No logs available.";
+      elements.logOutput.scrollTop = elements.logOutput.scrollHeight;
+    }
+
+    async function refreshAll() {
+      try {
+        await Promise.all([refreshNetwork(), refreshAuth(), refreshUpdater(), refreshLogs()]);
+        lastRefreshed.textContent = `Last refresh: ${new Date().toLocaleTimeString()} (auto every 5s)`;
+      } catch (error) {
+        lastRefreshed.textContent = `Refresh failed at ${new Date().toLocaleTimeString()}`;
+      }
+    }
+
+    elements.networkForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      elements.networkUpdateMessage.textContent = "Applying network update...";
+      try {
+        const payload = {
+          ssid: elements.ssidInput.value.trim() || null,
+          password: elements.passwordInput.value || null,
+          use_ethernet: elements.ethernetInput.checked,
+        };
+        const result = await fetchJson("/api/network/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        elements.networkUpdateMessage.textContent = `${result.applied ? "Applied" : "Not applied"}: ${result.message}`;
+        elements.passwordInput.value = "";
+        await refreshNetwork();
+      } catch (error) {
+        elements.networkUpdateMessage.textContent = "Network update failed.";
+      }
+    });
+
+    elements.serviceSelect.addEventListener("change", refreshLogs);
+    elements.logFilter.addEventListener("input", () => {
+      clearTimeout(window.__logDebounce);
+      window.__logDebounce = setTimeout(refreshLogs, 300);
+    });
+
+    elements.downloadLogs.addEventListener("click", () => {
+      if (!lastLogPayload) return;
+      const content = (lastLogPayload.lines || []).join("\n");
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const service = elements.serviceSelect.value;
+      a.href = url;
+      a.download = `${service}-logs-${Date.now()}.log`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    elements.manualRefresh.addEventListener("click", refreshAll);
+
+    refreshAll();
+    setInterval(refreshAll, REFRESH_MS);
+  </script>
+</body>
+</html>

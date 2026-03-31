@@ -60,9 +60,14 @@ validate_python() {
   if [[ ! -x "${INSTALL_DIR}/.venv/bin/python" ]]; then
     run python3 -m venv "${INSTALL_DIR}/.venv"
   fi
-  run "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip
-  run "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/backend/requirements.txt"
-  run "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/updater/requirements.txt"
+
+  if [[ ! -x "${INSTALL_DIR}/.venv/bin/pip" ]]; then
+    run "${INSTALL_DIR}/.venv/bin/python" -m ensurepip --upgrade
+  fi
+
+  run "${INSTALL_DIR}/.venv/bin/python" -m pip install --upgrade pip
+  run "${INSTALL_DIR}/.venv/bin/python" -m pip install -r "${INSTALL_DIR}/backend/requirements.txt"
+  run "${INSTALL_DIR}/.venv/bin/python" -m pip install -r "${INSTALL_DIR}/updater/requirements.txt"
 }
 
 validate_services() {
@@ -85,11 +90,71 @@ validate_config_files() {
   fi
 }
 
+validate_log_targets() {
+  local updater_log_file="/var/log/bellforge-updater.log"
+  run mkdir -p "$(dirname "${updater_log_file}")"
+  run touch "${updater_log_file}"
+  run chown "${SERVICE_USER}:${SERVICE_GROUP}" "${updater_log_file}"
+}
+
 validate_chromium() {
   if ! command -v chromium-browser >/dev/null 2>&1; then
+    local chromium_pkg="chromium-browser"
+    if apt-cache policy chromium-browser 2>/dev/null | grep -q "Candidate: (none)"; then
+      chromium_pkg="chromium"
+    fi
+
     run env DEBIAN_FRONTEND=noninteractive apt-get update -y
-    run env DEBIAN_FRONTEND=noninteractive apt-get install -y chromium-browser
+    run env DEBIAN_FRONTEND=noninteractive apt-get install -y "${chromium_pkg}"
   fi
+
+  if ! command -v openbox >/dev/null 2>&1 || ! command -v unclutter >/dev/null 2>&1; then
+    run env DEBIAN_FRONTEND=noninteractive apt-get update -y
+    run env DEBIAN_FRONTEND=noninteractive apt-get install -y openbox unclutter xinit xserver-xorg
+  fi
+}
+
+validate_kiosk_boot() {
+  local autostart_dir="/home/${SERVICE_USER}/.config/openbox"
+  local autostart_file="${autostart_dir}/autostart"
+  local bashprofile="/home/${SERVICE_USER}/.bash_profile"
+  local client_env_path="${INSTALL_DIR}/config/client.env"
+
+  run mkdir -p "${autostart_dir}"
+  run bash -c "cat > '${autostart_file}' <<'EOF'
+# Disable screen blanking and power saving while in kiosk mode.
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide the cursor when idle.
+unclutter -idle 5 -root &
+EOF"
+
+  if [[ -n "${SUDO}" ]]; then
+    if ! ${SUDO} grep -Fq "startx -- -nocursor" "${bashprofile}" 2>/dev/null; then
+      run bash -c "echo '[[ -z \$DISPLAY && \$XDG_VTNR -eq 1 ]] && exec startx -- -nocursor' >> '${bashprofile}'"
+    fi
+  else
+    if ! grep -Fq "startx -- -nocursor" "${bashprofile}" 2>/dev/null; then
+      run bash -c "echo '[[ -z \$DISPLAY && \$XDG_VTNR -eq 1 ]] && exec startx -- -nocursor' >> '${bashprofile}'"
+    fi
+  fi
+
+  run mkdir -p /etc/systemd/system/getty@tty1.service.d
+  run bash -c "cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ${SERVICE_USER} --noclear %I \$TERM
+EOF"
+
+  if [[ ! -f "${client_env_path}" ]]; then
+    run bash -c "cat > '${client_env_path}' <<EOF
+BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/status
+EOF"
+  fi
+
+  run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
 }
 
 repair_from_manifest() {
@@ -163,8 +228,10 @@ main() {
 
   validate_structure
   validate_chromium
+  validate_kiosk_boot
   validate_python
   validate_config_files
+  validate_log_targets
   repair_from_manifest
   validate_services
 

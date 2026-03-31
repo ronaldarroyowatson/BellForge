@@ -16,9 +16,9 @@
 #   1. Installs system dependencies (Python 3.11, Chromium, git, etc.)
 #   2. Creates the bellforge system user.
 #   3. Clones (or updates) the BellForge repo into /opt/bellforge.
-#   4. Creates a Python virtualenv and installs updater dependencies.
+#   4. Creates a Python virtualenv and installs backend/updater dependencies.
 #   5. Writes /opt/bellforge/config/settings.json with overrides.
-#   6. Installs and enables bellforge-updater.service and bellforge-client.service.
+#   6. Installs and enables backend, updater, and kiosk client services.
 #   7. Starts services and reboots.
 
 set -euo pipefail
@@ -52,11 +52,16 @@ require_root() {
 # ---------------------------------------------------------------------------
 install_packages() {
   log "Updating package lists and installing dependencies…"
+  local chromium_pkg="chromium-browser"
+  if apt-cache policy chromium-browser 2>/dev/null | grep -q "Candidate: (none)"; then
+    chromium_pkg="chromium"
+  fi
+
   apt-get update -qq
   apt-get install -y --no-install-recommends \
     python3.11 python3.11-venv python3-pip \
     git \
-    chromium-browser \
+    "${chromium_pkg}" \
     xorg openbox \
     unclutter \
     curl \
@@ -105,16 +110,18 @@ setup_venv() {
   log "Setting up Python virtual environment…"
   python3.11 -m venv "$VENV_DIR"
   "${VENV_DIR}/bin/pip" install --quiet --upgrade pip
+  "${VENV_DIR}/bin/pip" install --quiet -r "${INSTALL_DIR}/backend/requirements.txt"
   "${VENV_DIR}/bin/pip" install --quiet -r "${INSTALL_DIR}/updater/requirements.txt"
   chown -R "${SERVICE_USER}:${SERVICE_USER}" "$VENV_DIR"
   ok "Virtual environment ready."
 }
 
 # ---------------------------------------------------------------------------
-# 5. Write settings.json
+# 5. Write settings.json and client.env
 # ---------------------------------------------------------------------------
 write_settings() {
   local settings_path="${INSTALL_DIR}/config/settings.json"
+  local client_env_path="${INSTALL_DIR}/config/client.env"
   log "Writing settings.json for device '${DEVICE_ID}'…"
   mkdir -p "${INSTALL_DIR}/config"
 
@@ -137,6 +144,12 @@ write_settings() {
 EOF
 
   chown "${SERVICE_USER}:${SERVICE_USER}" "$settings_path"
+
+  cat > "$client_env_path" <<EOF
+BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/status
+EOF
+
+  chown "${SERVICE_USER}:${SERVICE_USER}" "$client_env_path"
   ok "settings.json written."
 }
 
@@ -153,10 +166,11 @@ setup_log_dir() {
 # ---------------------------------------------------------------------------
 install_services() {
   log "Installing systemd services…"
+  cp "${INSTALL_DIR}/scripts/bellforge-backend.service" /etc/systemd/system/
   cp "${INSTALL_DIR}/scripts/bellforge-updater.service" /etc/systemd/system/
   cp "${INSTALL_DIR}/scripts/bellforge-client.service"  /etc/systemd/system/
   systemctl daemon-reload
-  systemctl enable bellforge-updater.service bellforge-client.service
+  systemctl enable bellforge-backend.service bellforge-updater.service bellforge-client.service
   ok "Services installed and enabled."
 }
 
@@ -175,14 +189,7 @@ xset s noblank
 # Hide cursor after 5 seconds of inactivity
 unclutter -idle 5 -root &
 
-# Launch Chromium in kiosk mode
-chromium-browser \
-  --kiosk \
-  --noerrdialogs \
-  --disable-infobars \
-  --disable-session-crashed-bubble \
-  --disable-restore-session-state \
-  --app=http://localhost:8080 &
+# Chromium kiosk launch is managed by bellforge-client.service
 EOF
   chown -R "${SERVICE_USER}:${SERVICE_USER}" "/home/${SERVICE_USER}/.config"
   ok "Openbox autostart configured."

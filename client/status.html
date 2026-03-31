@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BellForge Device Status</title>
+  <style>
+    :root {
+      --bg: #f3efe7;
+      --panel: #fffdf8;
+      --text: #1f2328;
+      --muted: #59636e;
+      --line: #d7cec0;
+      --good: #267d3f;
+      --warn: #b67a22;
+      --bad: #bf2e2e;
+      --accent: #155b8d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 16%, #f5e9d2 0%, transparent 42%),
+        radial-gradient(circle at 82% 4%, #dbe8f3 0%, transparent 36%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .title {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: 0.02em;
+      color: #0f3f60;
+    }
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 10px 22px rgba(15, 36, 54, 0.08);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      font-size: 0.95rem;
+    }
+    th {
+      width: 34%;
+      text-align: left;
+      color: #32414d;
+      background: #f9f2e6;
+      font-weight: 600;
+    }
+    tr:last-child th,
+    tr:last-child td {
+      border-bottom: none;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.85rem;
+      border: 1px solid transparent;
+    }
+    .ok {
+      color: var(--good);
+      border-color: #79c18b;
+      background: #edf8f0;
+    }
+    .warn {
+      color: var(--warn);
+      border-color: #e5b771;
+      background: #fff6e8;
+    }
+    .bad {
+      color: var(--bad);
+      border-color: #e9a2a2;
+      background: #fff0f0;
+    }
+    .mono {
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
+    @media (max-width: 760px) {
+      .title {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      th, td {
+        display: block;
+        width: 100%;
+      }
+      th {
+        border-bottom: none;
+        padding-bottom: 2px;
+      }
+      td {
+        padding-top: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="title">
+      <h1>Device Status Dashboard</h1>
+      <p class="sub" id="refreshLabel">Refreshing every 10 seconds</p>
+    </header>
+
+    <section class="panel">
+      <table>
+        <tbody>
+          <tr><th>Device Hostname</th><td id="hostname">-</td></tr>
+          <tr><th>IP Address (Local / External)</th><td id="ipAddress" class="mono">-</td></tr>
+          <tr><th>Device Access URL</th><td id="accessUrl" class="mono">-</td></tr>
+          <tr><th>Settings Page URL</th><td id="settingsUrl" class="mono">-</td></tr>
+          <tr><th>Network Connectivity</th><td id="networkStatus">-</td></tr>
+          <tr><th>Network Speed Test</th><td id="networkSpeed">-</td></tr>
+          <tr><th>Backend Reachable</th><td id="backendReachable">-</td></tr>
+          <tr><th>Autoupdater Running</th><td id="updaterRunning">-</td></tr>
+          <tr><th>Repair Service Running</th><td id="repairRunning">-</td></tr>
+          <tr><th>Other BellForge Devices</th><td id="otherDevices">-</td></tr>
+          <tr><th>Current Version</th><td id="versionValue" class="mono">-</td></tr>
+          <tr><th>Manifest Hash</th><td id="manifestHash" class="mono">-</td></tr>
+          <tr><th>System Uptime</th><td id="uptime">-</td></tr>
+          <tr><th>CPU Temperature</th><td id="cpuTemp">-</td></tr>
+          <tr><th>CPU Load</th><td id="cpuLoad">-</td></tr>
+          <tr><th>Disk Usage</th><td id="diskUsage">-</td></tr>
+          <tr><th>Memory Usage</th><td id="memoryUsage">-</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const REFRESH_MS = 10000;
+
+    const els = {
+      hostname: document.getElementById("hostname"),
+      ipAddress: document.getElementById("ipAddress"),
+      accessUrl: document.getElementById("accessUrl"),
+      settingsUrl: document.getElementById("settingsUrl"),
+      networkStatus: document.getElementById("networkStatus"),
+      networkSpeed: document.getElementById("networkSpeed"),
+      backendReachable: document.getElementById("backendReachable"),
+      updaterRunning: document.getElementById("updaterRunning"),
+      repairRunning: document.getElementById("repairRunning"),
+      otherDevices: document.getElementById("otherDevices"),
+      versionValue: document.getElementById("versionValue"),
+      manifestHash: document.getElementById("manifestHash"),
+      uptime: document.getElementById("uptime"),
+      cpuTemp: document.getElementById("cpuTemp"),
+      cpuLoad: document.getElementById("cpuLoad"),
+      diskUsage: document.getElementById("diskUsage"),
+      memoryUsage: document.getElementById("memoryUsage"),
+      refreshLabel: document.getElementById("refreshLabel"),
+    };
+
+    function pill(text, level) {
+      return `<span class="pill ${level}">${text}</span>`;
+    }
+
+    function percentDisplay(usage) {
+      if (!usage || usage.percent == null) {
+        return "Unavailable";
+      }
+      const total = usage.total_bytes ? (usage.total_bytes / (1024 * 1024 * 1024)).toFixed(2) : "?";
+      const used = usage.used_bytes ? (usage.used_bytes / (1024 * 1024 * 1024)).toFixed(2) : "?";
+      return `${usage.percent.toFixed(1)}% (${used} GB / ${total} GB)`;
+    }
+
+    function uptimeDisplay(seconds) {
+      if (seconds == null) {
+        return "Unavailable";
+      }
+      const total = Math.floor(seconds);
+      const d = Math.floor(total / 86400);
+      const h = Math.floor((total % 86400) / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      return `${d}d ${h}h ${m}m`;
+    }
+
+    function boolPill(value) {
+      if (value === true) return pill("Healthy", "ok");
+      if (value === false) return pill("Offline", "bad");
+      return pill("Unknown", "warn");
+    }
+
+    function buildUrls(localIp) {
+      const protocol = window.location.protocol || "http:";
+      const port = window.location.port || "8000";
+      const host = localIp || window.location.hostname;
+      if (!host) {
+        return { base: "Unavailable", settings: "Unavailable" };
+      }
+      const base = `${protocol}//${host}:${port}`;
+      return {
+        base,
+        settings: `${base}/settings`,
+      };
+    }
+
+    async function refresh() {
+      try {
+        const response = await fetch("/api/device/status", { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        els.hostname.textContent = data.hostname || "Unknown";
+        const localIp = data.ip_address?.local || null;
+        els.ipAddress.textContent = `${localIp || "n/a"} / ${data.ip_address?.external || "n/a"}`;
+        const urls = buildUrls(localIp);
+        els.accessUrl.textContent = urls.base;
+        els.settingsUrl.textContent = urls.settings;
+
+        const connectivity = data.network_connectivity || {};
+        const online = connectivity.online === true;
+        els.networkStatus.innerHTML = online ? pill("Online", "ok") : pill("Offline", "bad");
+
+        const ping = connectivity.ping_ms != null ? `${connectivity.ping_ms.toFixed(1)} ms` : "n/a";
+        const throughput = connectivity.throughput_mbps != null ? `${connectivity.throughput_mbps.toFixed(2)} Mbps` : "n/a";
+        els.networkSpeed.textContent = `Ping: ${ping} | Throughput: ${throughput}`;
+
+        els.backendReachable.innerHTML = boolPill(data.backend_reachable);
+        els.updaterRunning.innerHTML = boolPill(data.autoupdater_running);
+        els.repairRunning.innerHTML = boolPill(data.repair_service_running);
+
+        const devices = Array.isArray(data.other_bellforge_devices) ? data.other_bellforge_devices : [];
+        if (devices.length === 0) {
+          els.otherDevices.innerHTML = pill("None Detected", "warn");
+        } else {
+          els.otherDevices.textContent = devices.map((d) => d.ip).join(", ");
+        }
+
+        els.versionValue.textContent = data.version || "Unavailable";
+        els.manifestHash.textContent = data.manifest_hash || "Unavailable";
+        els.uptime.textContent = uptimeDisplay(data.uptime_seconds);
+        els.cpuTemp.textContent = data.cpu_temperature_c != null ? `${data.cpu_temperature_c.toFixed(1)} °C` : "Unavailable";
+        els.cpuLoad.textContent = data.cpu_load_1m != null ? data.cpu_load_1m.toFixed(2) : "Unavailable";
+        els.diskUsage.textContent = percentDisplay(data.disk_usage);
+        els.memoryUsage.textContent = percentDisplay(data.memory_usage);
+        els.refreshLabel.textContent = `Last refresh: ${new Date().toLocaleTimeString()} (auto every 10s)`;
+      } catch (error) {
+        els.networkStatus.innerHTML = pill("Fetch Failed", "bad");
+        els.accessUrl.textContent = "Unavailable";
+        els.settingsUrl.textContent = "Unavailable";
+        els.refreshLabel.textContent = `Last refresh failed at ${new Date().toLocaleTimeString()}`;
+      }
+    }
+
+    refresh();
+    setInterval(refresh, REFRESH_MS);
+  </script>
+</body>
+</html>

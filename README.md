@@ -25,6 +25,21 @@ BellForge is designed for real school operations:
 curl -sSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/install.sh | bash
 ```
 
+## Fresh Raspberry Pi Quick Start
+
+Use this single command on a brand-new Raspberry Pi OS install to install BellForge and start everything automatically:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/install.sh | sudo env BELLFORGE_REPO_OWNER=<YOUR_ORG_OR_USER> BELLFORGE_SERVER_IP=<YOUR_SERVER_IP> BELLFORGE_DISPLAY_ID=<PI_NAME_OR_ROOM> bash -s -- --install --yes
+```
+
+After install, BellForge will:
+- reboot the Pi,
+- auto-login,
+- launch Chromium in kiosk mode,
+- open the device status dashboard,
+- show the URL for the settings page so users can connect from another device.
+
 Common actions:
 
 ```bash
@@ -37,6 +52,38 @@ curl -sSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/in
 # Uninstall
 curl -sSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/install.sh | bash -s -- --uninstall
 ```
+
+## Bugfix Workflow
+
+Use this lightweight workflow for production bugfixes:
+
+1. Create a bugfix branch from `main` (`bugfix/<short-name>` or `hotfix/<short-name>`).
+2. Implement the fix and keep changes scoped to the issue.
+3. Run smoke tests locally.
+4. Open a pull request to `main`.
+5. Confirm the `Bugfix Smoke Test` GitHub Action passes.
+6. Merge to `main`.
+
+Patch releases are handled by the release workflow after merge.
+
+## Smoke Tests
+
+Raspberry Pi smoke test (installed device):
+
+```bash
+sudo bash tests/smoke_test.sh
+```
+
+Windows/dev smoke test:
+
+```bash
+python tests/smoke_test_windows.py
+```
+
+CI bugfix smoke test:
+- Runs automatically for pull requests to `main`.
+- Runs on pushes to `bugfix/**` and `hotfix/**` branches.
+- Workflow file: `.github/workflows/bugfix-smoke.yml`
 
 ## Screenshots
 
