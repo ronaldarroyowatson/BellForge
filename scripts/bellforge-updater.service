@@ -1,0 +1,30 @@
+[Unit]
+Description=BellForge Update Agent
+Documentation=https://github.com/YOUR_ORG/BellForge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bellforge
+Group=bellforge
+
+# Settings file location can be overridden here for multi-instance deployments.
+Environment=BELLFORGE_SETTINGS=/opt/bellforge/config/settings.json
+
+ExecStart=/opt/bellforge/.venv/bin/python /opt/bellforge/updater/agent.py
+
+# Always restart on failure so the Pi self-heals after crashes or reboots.
+Restart=always
+RestartSec=30
+
+# Give the network time to stabilise before the first update check.
+TimeoutStartSec=60
+
+# Write stdout/stderr to the systemd journal (viewable with journalctl -u bellforge-updater).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bellforge-updater
+
+[Install]
+WantedBy=multi-user.target

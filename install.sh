@@ -1,0 +1,359 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# BellForge unified installer and manager.
+# One-line usage:
+#   curl -sSL https://raw.githubusercontent.com/<USER>/BellForge/main/install.sh | bash
+#
+# Optional flags:
+#   --install       Force fresh install path
+#   --repair        Run repair path
+#   --reinstall     Reinstall (uninstall then install)
+#   --uninstall     Uninstall BellForge
+#   --purge         Used with --uninstall/--reinstall, removes extra user data
+#   --yes           Auto-confirm prompts
+#   --no-reboot     Complete action without reboot (for automated tests)
+
+INSTALL_DIR="/opt/bellforge"
+SERVICE_USER="bellforge"
+SERVICE_GROUP="bellforge"
+LOG_FILE="/var/log/bellforge-install.log"
+BRANCH="${BELLFORGE_BRANCH:-main}"
+REPO_OWNER="${BELLFORGE_REPO_OWNER:-<USER>}"
+REPO_URL="${BELLFORGE_REPO_URL:-https://github.com/${REPO_OWNER}/BellForge.git}"
+UPDATE_BASE_URL="${BELLFORGE_UPDATE_BASE_URL:-https://raw.githubusercontent.com/${REPO_OWNER}/BellForge/${BRANCH}}"
+SERVER_IP="${BELLFORGE_SERVER_IP:-127.0.0.1}"
+DISPLAY_ID="${BELLFORGE_DISPLAY_ID:-main}"
+
+ACTION="auto"
+PURGE="false"
+ASSUME_YES="false"
+NEEDS_REBOOT="false"
+NO_REBOOT="false"
+
+SUDO=""
+if [[ "${EUID}" -ne 0 ]]; then
+  if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+    SUDO="sudo -n"
+  else
+    echo "BellForge installer needs root privileges. Run as root or enable passwordless sudo." >&2
+    exit 1
+  fi
+fi
+
+if [[ -n "${SUDO}" ]]; then
+  exec > >(${SUDO} tee -a "${LOG_FILE}") 2>&1
+else
+  mkdir -p "$(dirname "${LOG_FILE}")"
+  exec > >(tee -a "${LOG_FILE}") 2>&1
+fi
+
+log() {
+  echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $*"
+}
+
+run() {
+  log "$*"
+  if [[ -n "${SUDO}" ]]; then
+    ${SUDO} "$@"
+  else
+    "$@"
+  fi
+}
+
+friendly() {
+  echo
+  echo "==> $*"
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --install) ACTION="install" ;;
+      --repair) ACTION="repair" ;;
+      --reinstall) ACTION="reinstall" ;;
+      --uninstall) ACTION="uninstall" ;;
+      --purge) PURGE="true" ;;
+      --yes|-y) ASSUME_YES="true" ;;
+      --no-reboot) NO_REBOOT="true" ;;
+      *)
+        echo "Unknown flag: $1" >&2
+        exit 2
+        ;;
+    esac
+    shift
+  done
+}
+
+confirm() {
+  local prompt="$1"
+  if [[ "${ASSUME_YES}" == "true" ]]; then
+    return 0
+  fi
+  read -r -p "${prompt} [y/N]: " reply
+  [[ "${reply}" =~ ^[Yy]$ ]]
+}
+
+ensure_user() {
+  if ! id -u "${SERVICE_USER}" >/dev/null 2>&1; then
+    run useradd --system --create-home --shell /bin/bash "${SERVICE_USER}"
+  fi
+}
+
+ensure_packages() {
+  friendly "Installing required system packages"
+  run env DEBIAN_FRONTEND=noninteractive apt-get update -y
+  run env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    ca-certificates \
+    curl \
+    git \
+    python3 \
+    python3-venv \
+    python3-pip \
+    chromium-browser \
+    systemd \
+    xserver-xorg \
+    xinit
+}
+
+write_local_config() {
+  local settings_path="${INSTALL_DIR}/config/settings.json"
+  local client_env_path="${INSTALL_DIR}/config/client.env"
+  local tmp
+
+  run mkdir -p "${INSTALL_DIR}/config"
+
+  if [[ ! -f "${settings_path}" ]]; then
+    tmp="$(mktemp)"
+    cat > "${tmp}" <<JSON
+{
+  "update_base_url": "${UPDATE_BASE_URL}",
+  "poll_interval_seconds": 300,
+  "install_dir": "${INSTALL_DIR}",
+  "staging_dir": "${INSTALL_DIR}/.staging",
+  "log_file": "/var/log/bellforge-updater.log",
+  "max_retries": 3,
+  "retry_delay_seconds": 20,
+  "device_id": "${DISPLAY_ID}",
+  "services_to_restart": [
+    "bellforge-backend.service",
+    "bellforge-client.service"
+  ],
+  "preserve_local_paths": [
+    "config/settings.json",
+    "config/client.env"
+  ]
+}
+JSON
+    run cp "${tmp}" "${settings_path}"
+    rm -f "${tmp}"
+  fi
+
+  if [[ ! -f "${client_env_path}" ]]; then
+    run bash -c "cat > '${client_env_path}' <<EOF
+BELLFORGE_SERVER_IP=${SERVER_IP}
+BELLFORGE_DISPLAY_ID=${DISPLAY_ID}
+EOF"
+  fi
+
+  run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}/config"
+}
+
+sync_repo() {
+  friendly "Synchronizing BellForge repository"
+  run mkdir -p "${INSTALL_DIR}"
+
+  if [[ -d "${INSTALL_DIR}/.git" ]]; then
+    run git -C "${INSTALL_DIR}" fetch --all --prune
+    run git -C "${INSTALL_DIR}" checkout "${BRANCH}"
+    run git -C "${INSTALL_DIR}" reset --hard "origin/${BRANCH}"
+  else
+    run rm -rf "${INSTALL_DIR}"
+    run git clone --branch "${BRANCH}" --depth 1 "${REPO_URL}" "${INSTALL_DIR}"
+  fi
+
+  run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
+}
+
+setup_python() {
+  friendly "Validating Python virtual environment"
+  if [[ ! -x "${INSTALL_DIR}/.venv/bin/python" ]]; then
+    run python3 -m venv "${INSTALL_DIR}/.venv"
+  fi
+  run "${INSTALL_DIR}/.venv/bin/pip" install --upgrade pip
+  run "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/backend/requirements.txt"
+  run "${INSTALL_DIR}/.venv/bin/pip" install -r "${INSTALL_DIR}/updater/requirements.txt"
+}
+
+install_services() {
+  friendly "Installing and starting BellForge services"
+  run install -m 0644 "${INSTALL_DIR}/scripts/bellforge-backend.service" /etc/systemd/system/bellforge-backend.service
+  run install -m 0644 "${INSTALL_DIR}/scripts/bellforge-client.service" /etc/systemd/system/bellforge-client.service
+  run install -m 0644 "${INSTALL_DIR}/scripts/bellforge-updater.service" /etc/systemd/system/bellforge-updater.service
+
+  run systemctl daemon-reload
+  run systemctl enable bellforge-backend.service bellforge-client.service bellforge-updater.service
+  run systemctl restart bellforge-backend.service bellforge-client.service bellforge-updater.service
+}
+
+is_installed() {
+  [[ -d "${INSTALL_DIR}" ]] && [[ -f "${INSTALL_DIR}/config/version.json" ]]
+}
+
+is_healthy() {
+  [[ -d "${INSTALL_DIR}" ]] || return 1
+  [[ -x "${INSTALL_DIR}/.venv/bin/python" ]] || return 1
+  [[ -f "${INSTALL_DIR}/updater/agent.py" ]] || return 1
+  [[ -f "${INSTALL_DIR}/config/version.json" ]] || return 1
+  [[ -f "${INSTALL_DIR}/config/manifest.json" ]] || return 1
+
+  for svc in bellforge-backend.service bellforge-client.service bellforge-updater.service; do
+    systemctl cat "${svc}" >/dev/null 2>&1 || return 1
+  done
+  return 0
+}
+
+run_repair() {
+  friendly "Starting BellForge repair"
+  if [[ -f "${INSTALL_DIR}/scripts/repair.sh" ]]; then
+    if [[ -n "${SUDO}" ]]; then
+      ${SUDO} bash "${INSTALL_DIR}/scripts/repair.sh" --yes
+    else
+      bash "${INSTALL_DIR}/scripts/repair.sh" --yes
+    fi
+  else
+    log "repair.sh missing; performing install workflow as recovery"
+    do_install
+  fi
+}
+
+run_uninstall() {
+  local no_reboot="${1:-false}"
+  friendly "Starting BellForge uninstall"
+  if [[ -f "${INSTALL_DIR}/scripts/uninstall.sh" ]]; then
+    if [[ -n "${SUDO}" ]]; then
+      ${SUDO} bash "${INSTALL_DIR}/scripts/uninstall.sh" $( [[ "${PURGE}" == "true" ]] && echo "--purge" ) $( [[ "${no_reboot}" == "true" ]] && echo "--no-reboot" ) --yes
+    else
+      bash "${INSTALL_DIR}/scripts/uninstall.sh" $( [[ "${PURGE}" == "true" ]] && echo "--purge" ) $( [[ "${no_reboot}" == "true" ]] && echo "--no-reboot" ) --yes
+    fi
+  else
+    log "uninstall.sh missing; fallback uninstall"
+    for svc in bellforge-updater.service bellforge-client.service bellforge-backend.service; do
+      run systemctl stop "${svc}" || true
+      run systemctl disable "${svc}" || true
+      run rm -f "/etc/systemd/system/${svc}"
+    done
+    run systemctl daemon-reload
+    run rm -rf "${INSTALL_DIR}"
+    run rm -f /var/log/bellforge-*
+    if [[ "${PURGE}" == "true" ]]; then
+      run rm -rf /var/lib/bellforge /opt/bellforge-data
+    fi
+  fi
+}
+
+do_install() {
+  ensure_packages
+  ensure_user
+  sync_repo
+  setup_python
+  write_local_config
+  install_services
+  NEEDS_REBOOT="true"
+}
+
+do_reinstall() {
+  run_uninstall "true"
+  do_install
+}
+
+choose_action_interactive() {
+  local broken="$1"
+
+  if [[ "${ASSUME_YES}" == "true" ]]; then
+    if [[ "${broken}" == "true" ]]; then
+      ACTION="repair"
+    else
+      ACTION="repair"
+    fi
+    return
+  fi
+
+  if [[ "${broken}" == "true" ]]; then
+    echo
+    echo "BellForge is installed but appears broken or incomplete."
+    echo "1) Repair (recommended)"
+    echo "2) Reinstall"
+    echo "3) Uninstall"
+    echo "4) Cancel"
+  else
+    echo
+    echo "BellForge is already installed and healthy."
+    echo "1) Repair"
+    echo "2) Reinstall"
+    echo "3) Uninstall"
+    echo "4) Cancel"
+  fi
+
+  read -r -p "Choose an option [1-4]: " choice
+  case "${choice}" in
+    1) ACTION="repair" ;;
+    2) ACTION="reinstall" ;;
+    3) ACTION="uninstall" ;;
+    *) ACTION="cancel" ;;
+  esac
+}
+
+main() {
+  parse_args "$@"
+
+  friendly "BellForge setup manager"
+  log "repo=${REPO_URL} branch=${BRANCH} action=${ACTION}"
+
+  if [[ "${ACTION}" == "auto" ]]; then
+    if ! is_installed; then
+      ACTION="install"
+      log "No existing install detected. Running fresh installation."
+    elif is_healthy; then
+      choose_action_interactive "false"
+    else
+      choose_action_interactive "true"
+    fi
+  fi
+
+  case "${ACTION}" in
+    install)
+      do_install
+      ;;
+    repair)
+      run_repair
+      ;;
+    reinstall)
+      do_reinstall
+      ;;
+    uninstall)
+      run_uninstall "true"
+      NEEDS_REBOOT="true"
+      ;;
+    cancel)
+      friendly "No changes were made."
+      exit 0
+      ;;
+    *)
+      echo "Invalid action: ${ACTION}" >&2
+      exit 2
+      ;;
+  esac
+
+  if [[ "${NEEDS_REBOOT}" == "true" && "${NO_REBOOT}" != "true" ]]; then
+    friendly "BellForge action completed. System will reboot in 10 seconds."
+    sleep 10
+    run reboot
+  elif [[ "${NEEDS_REBOOT}" == "true" && "${NO_REBOOT}" == "true" ]]; then
+    friendly "BellForge action completed. Reboot skipped (--no-reboot)."
+  else
+    friendly "BellForge action completed."
+  fi
+}
+
+main "$@"

@@ -1,0 +1,117 @@
+name: Release BellForge
+
+# Triggers on every push to main (including merged PRs).
+# Uses [skip ci] in its own commit message to prevent recursive triggering.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+
+jobs:
+  release:
+    name: Bump version, regenerate manifest, and tag
+    runs-on: ubuntu-latest
+
+    # Don't run on commits made by this workflow itself
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    permissions:
+      contents: write   # needed to push the commit and tag
+      actions: read
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Check out the full history so bump_version.py can read version.json
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # 2. Configure Git identity for the automated commit
+      # -----------------------------------------------------------------------
+      - name: Configure Git
+        run: |
+          git config user.name  "BellForge Release Bot"
+          git config user.email "bellforge-bot@users.noreply.github.com"
+
+      # -----------------------------------------------------------------------
+      # 3. Set up Python
+      # -----------------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # -----------------------------------------------------------------------
+      # 4. Bump patch version and regenerate manifest
+      #    bump_version.py calls generate_manifest.py internally.
+      # -----------------------------------------------------------------------
+      - name: Bump version and generate manifest
+        run: python scripts/bump_version.py patch
+
+      # -----------------------------------------------------------------------
+      # 5. Read the new version for use in the commit message and tag
+      # -----------------------------------------------------------------------
+      - name: Read new version
+        id: version
+        run: |
+          VERSION=$(python -c "import json; print(json.load(open('config/version.json'))['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # 6. Validate the manifest — every referenced file must exist
+      # -----------------------------------------------------------------------
+      - name: Validate manifest integrity
+        run: |
+          python - <<'EOF'
+          import json, sys
+          from pathlib import Path
+
+          manifest = json.loads(Path("config/manifest.json").read_text())
+          missing = [f for f in manifest["files"] if not Path(f).is_file()]
+          if missing:
+              print("ERROR: Files in manifest are missing from the repo:")
+              for m in missing:
+                  print(f"  {m}")
+              sys.exit(1)
+          print(f"Manifest OK — {len(manifest['files'])} file(s) verified.")
+          EOF
+
+      # -----------------------------------------------------------------------
+      # 7. Commit the updated version.json and manifest.json
+      # -----------------------------------------------------------------------
+      - name: Commit release artefacts
+        run: |
+          git add config/version.json config/manifest.json
+          git commit -m "chore: release v${{ steps.version.outputs.version }} [skip ci]"
+
+      # -----------------------------------------------------------------------
+      # 8. Tag the release
+      # -----------------------------------------------------------------------
+      - name: Tag release
+        run: |
+          git tag "v${{ steps.version.outputs.version }}"
+
+      # -----------------------------------------------------------------------
+      # 9. Push commit and tag
+      # -----------------------------------------------------------------------
+      - name: Push changes
+        run: |
+          git push origin main --follow-tags
+
+      # -----------------------------------------------------------------------
+      # 10. Create a GitHub Release (optional but recommended)
+      # -----------------------------------------------------------------------
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "BellForge v${{ steps.version.outputs.version }}" \
+            --notes "Automated release. Pis will auto-update within one poll interval." \
+            --latest

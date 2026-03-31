@@ -1,0 +1,70 @@
+{
+  "version": "0.1.0",
+  "generated_at": "2026-03-31T14:53:36Z",
+  "files": {
+    "backend/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "backend/main.py": {
+      "sha256": "8d67979e5e908dc3a9e5fe8012e237c5b553c783481f74cf88d084aec07b4850",
+      "size": 3760
+    },
+    "backend/requirements.txt": {
+      "sha256": "b9908f7549c66ff5d43a193d0838093d0eb4c611d760ac0ef02ede43d5610888",
+      "size": 85
+    },
+    "backend/routes/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "backend/routes/broadcast.py": {
+      "sha256": "b94de1790fdd045946faaf074d4041ebd4b91e142f24e8ce124dd4f1c6114149",
+      "size": 1615
+    },
+    "backend/routes/schedule.py": {
+      "sha256": "3b02a67e3bee871863c0b7c5ea35a48a0c56f75ae0c04be16782a9a157bd316a",
+      "size": 673
+    },
+    "backend/routes/update.py": {
+      "sha256": "d267cacb06b822d931c6f7014495b71e1b0c11e64a96984a9000d4ff121908a6",
+      "size": 2499
+    },
+    "client/index.html": {
+      "sha256": "5fc0d6687552e2cbf95e31a8ad7e26cd3cb51fc120f04a734616c478e61969ef",
+      "size": 1785
+    },
+    "client/js/main.js": {
+      "sha256": "91ad5d810575ed12b9e4d5d7a50a5afe1dc8a0b5fba1e0885475cd2071cb0424",
+      "size": 9057
+    },
+    "updater/agent.py": {
+      "sha256": "6731c1026be1cd7c6a72ad44a5534cb54181beb19ff2c733a57123e2a78942f9",
+      "size": 13512
+    },
+    "updater/requirements.txt": {
+      "sha256": "cc8487c5be4d4e9c440e2e13212fc5e52baec62d9decaa20a3ed11791d7a4325",
+      "size": 67
+    },
+    "config/payloads/default.html": {
+      "sha256": "d681465d5c39a04f082d2f52f30fae7fbf230457d288efc960add08672f4f782",
+      "size": 357
+    },
+    "config/payloads/main.html": {
+      "sha256": "988e704d61967d40f386b25b553b6d8cb7d66d07ccf92147dffd169e7cdf5b14",
+      "size": 474
+    },
+    "config/schedule.json": {
+      "sha256": "a7c31758ce5c9572fc0278911b080f2159d39f13875891039989a892a9e2efcb",
+      "size": 1450
+    },
+    "config/settings.template.json": {
+      "sha256": "564189f2514f282d5e043b03bd7fc6998a67c5accbfdbb7ac7fd61d2c95193a4",
+      "size": 611
+    },
+    "config/version.json": {
+      "sha256": "287c332cd25bf31912395f1764fdafae45d8d170ef83255235ce676825fc32fa",
+      "size": 171
+    }
+  }
+}

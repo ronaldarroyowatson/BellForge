@@ -1,0 +1,35 @@
+[Unit]
+Description=BellForge Signage Client (Chromium Kiosk)
+Documentation=https://github.com/YOUR_ORG/BellForge
+After=graphical.target bellforge-backend.service
+Wants=bellforge-backend.service
+
+[Service]
+Type=simple
+User=bellforge
+Group=bellforge
+
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/bellforge/.Xauthority
+EnvironmentFile=-/opt/bellforge/config/client.env
+
+# Open the backend-served signage page in full-screen kiosk mode.
+ExecStart=/usr/bin/chromium-browser \
+  --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-restore-session-state \
+  --disable-background-networking \
+  --disable-translate \
+  --app=http://${BELLFORGE_SERVER_IP}:8000/display/${BELLFORGE_DISPLAY_ID}
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bellforge-client
+
+[Install]
+WantedBy=graphical.target

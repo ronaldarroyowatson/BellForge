@@ -1,0 +1,20 @@
+[Unit]
+Description=BellForge Backend (FastAPI + uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bellforge
+Group=bellforge
+WorkingDirectory=/opt/bellforge
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/bellforge/.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bellforge-backend
+
+[Install]
+WantedBy=multi-user.target
