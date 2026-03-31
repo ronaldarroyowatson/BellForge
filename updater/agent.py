@@ -255,11 +255,17 @@ class UpdateAgent:
 
             raise
 
-    def _write_tracking_files(self, remote_version: dict[str, Any], manifest: dict[str, Any]) -> None:
+    def _write_tracking_files(self, manifest: dict[str, Any]) -> None:
+        """Persist the remote manifest so the next cycle can detect drift.
+
+        version.json is intentionally NOT written here — it was already
+        downloaded verbatim and placed by the atomic swap, so re-serialising
+        it with json.dumps would produce byte-for-byte-different content and
+        break SHA-256 verification on the next cycle.
+        """
         config_dir = self.install_dir / "config"
         config_dir.mkdir(parents=True, exist_ok=True)
 
-        (config_dir / "version.json").write_text(json.dumps(remote_version, indent=2), encoding="utf-8")
         (config_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     def _post_update_action(self, remote_version: dict[str, Any]) -> None:
@@ -306,7 +312,7 @@ class UpdateAgent:
             shadow_dir = self._build_shadow_tree(release_dir, files_dir, manifest_files, managed_roots)
 
             self._atomic_swap_roots(shadow_dir, managed_roots)
-            self._write_tracking_files(remote_version, remote_manifest)
+            self._write_tracking_files(remote_manifest)
             self._post_update_action(remote_version)
 
             self.log.info(f"Update applied successfully: {remote_version_text}")

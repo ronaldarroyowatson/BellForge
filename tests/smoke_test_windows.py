@@ -320,6 +320,11 @@ async def test_updater(remote_version: dict, remote_manifest: dict) -> None:
 
         # ---- Phase 4: Uninstall simulation ----
         info("=== Phase 4: Uninstall (cleanup) ===")
+        # Close all logging file handlers so Windows releases the log file
+        # before shutil.rmtree tries to delete it.
+        for handler in list(log.handlers):
+            handler.close()
+            log.removeHandler(handler)
         shutil.rmtree(tmp, ignore_errors=False)
         if not tmp.exists():
             ok(f"Simulated install dir removed cleanly: {tmp}")
