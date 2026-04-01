@@ -1,6 +1,6 @@
 {
-  "version": "0.1.8",
-  "generated_at": "2026-04-01T16:46:45Z",
+  "version": "0.1.9",
+  "generated_at": "2026-04-01T17:54:08Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -43,16 +43,16 @@
       "size": 1898
     },
     "backend/services/device_info.py": {
-      "sha256": "6d3d6420b9d5e852b067669f5719b2ecacb896e30091688b073a3260fa6826b4",
-      "size": 9678
+      "sha256": "4fd5899d2564326bf0df3a0ea18ec2762030e8930ec5fe943576af2713fceef6",
+      "size": 11044
     },
     "backend/services/logs.py": {
       "sha256": "eab916ce2d3e649b3ff94ea216278d81179e61ffef15984ce20927342b919d68",
       "size": 2749
     },
     "backend/services/network.py": {
-      "sha256": "840faedad045b59ba1d7ea69a9a1fa165526cf30315094300646718df92952a6",
-      "size": 4578
+      "sha256": "601570d87811a942390d55bd05e6393a0c93832f1ac6cfa25963a0a0ce574ee5",
+      "size": 5579
     },
     "backend/services/updater_status.py": {
       "sha256": "e7491e96c5a5a6f9bec50a77805da41d608210a2a7eeb1acfa755a5e52b33544",
@@ -95,11 +95,11 @@
       "size": 1428
     },
     "config/settings.template.json": {
-      "sha256": "81c4c569ff85b43e9e67ec5db043ceab33eacf5ccf865f66f7c4a7145a61c865",
-      "size": 604
+      "sha256": "ede159dd7e0a65c6aa0f6208ef1d327716a24d10490c4fba10c9fc9d0092b0ae",
+      "size": 676
     },
     "config/version.json": {
-      "sha256": "1924eedf963def1e8aad6dc541539b9728ba9ec8988bfb7898c46fe0f1a44f39",
+      "sha256": "4a987305c4f00f6c02a1e7cf6938cf166c6cb26dd931305555dbd6043345c59d",
       "size": 163
     }
   }
