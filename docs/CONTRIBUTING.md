@@ -10,7 +10,7 @@ Prerequisites:
 Setup:
 
 ```bash
-git clone https://github.com/<YOUR_ORG_OR_USER>/BellForge.git
+git clone https://github.com/ronaldarroyowatson/BellForge.git
 cd BellForge
 python -m venv .venv
 source .venv/bin/activate

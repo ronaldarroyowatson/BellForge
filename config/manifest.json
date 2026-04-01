@@ -1,106 +1,106 @@
 {
   "version": "0.1.7",
-  "generated_at": "2026-04-01T13:47:54Z",
+  "generated_at": "2026-04-01T16:21:38Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     "backend/main.py": {
-      "sha256": "e8293cb69cd06abbfd23570c3e40ed0b74aba92816714014bd8a2673d1843473",
-      "size": 4604
+      "sha256": "4b3f925ee752790536e963a671d339004f50b18fd5b5be6664d56c824b42d5f1",
+      "size": 4749
     },
     "backend/requirements.txt": {
-      "sha256": "fa72d4a52795775f1fbe3ab6a2390e1b3a2c3a838dbc2129707b2bc683101960",
-      "size": 81
+      "sha256": "b9908f7549c66ff5d43a193d0838093d0eb4c611d760ac0ef02ede43d5610888",
+      "size": 85
     },
     "backend/routes/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     "backend/routes/broadcast.py": {
-      "sha256": "1d7fe495de9e72117ed7beec61ef28ebb13ac576d08da4626db6ff5f104ea24d",
-      "size": 1761
+      "sha256": "747d8340235f22c0bdc6e5dab4fef6674f165279410e2436c565a4e1f9e56ea8",
+      "size": 1819
     },
     "backend/routes/diagnostics.py": {
-      "sha256": "f4dbab196fc3bdb8daea092fd0e4503250e39166712b6cfdb00ab56f6658fae5",
-      "size": 3414
+      "sha256": "3ddf9287c236b32f1311add3ffd8f42cc6efa147df7096d27d7ed06376bcdbe3",
+      "size": 3503
     },
     "backend/routes/schedule.py": {
-      "sha256": "680b0f6e6d2612f578f7d4297881903e9cc36032ee9fa8a2579c0c291bdeaa97",
-      "size": 652
+      "sha256": "3b02a67e3bee871863c0b7c5ea35a48a0c56f75ae0c04be16782a9a157bd316a",
+      "size": 673
     },
     "backend/routes/update.py": {
-      "sha256": "b4561e3f53d1384f3bd1c686d01cbffecc37efa17380484cddb44c8907699964",
-      "size": 2429
+      "sha256": "d267cacb06b822d931c6f7014495b71e1b0c11e64a96984a9000d4ff121908a6",
+      "size": 2499
     },
     "backend/services/__init__.py": {
-      "sha256": "33eb2feb271d67c936bb18b18206f10e3c2f44f0990e9fab3e1980aaac2cd787",
-      "size": 70
+      "sha256": "0aa6daa89fec07d79eeed2d86f1d3c3c66bfe5b14ce5e60dd29226e75eb0d8f6",
+      "size": 71
     },
     "backend/services/auth.py": {
-      "sha256": "6543b1c59b8c5f71b7fc1d1598f8e22b9b307f71653167d9c2e9c3731d9b5dbc",
-      "size": 1898
+      "sha256": "eb15077f46648665f5b689e89470e97e430750b77b7c733870abc50241cd4817",
+      "size": 1958
     },
     "backend/services/device_info.py": {
-      "sha256": "6d3d6420b9d5e852b067669f5719b2ecacb896e30091688b073a3260fa6826b4",
-      "size": 9678
+      "sha256": "9eaf0c08891d6e2457e5afe33406ea76b5faed3cec64dc654f0bf5b427540f2b",
+      "size": 9986
     },
     "backend/services/logs.py": {
-      "sha256": "eab916ce2d3e649b3ff94ea216278d81179e61ffef15984ce20927342b919d68",
-      "size": 2749
+      "sha256": "e6e7129a4100fb1e82aab026f35b57d09c7fceca360c7f78dc808a6ee487c48f",
+      "size": 2841
     },
     "backend/services/network.py": {
-      "sha256": "840faedad045b59ba1d7ea69a9a1fa165526cf30315094300646718df92952a6",
-      "size": 4578
+      "sha256": "16a7a0d96f6a81aca665795eaf41e8507bf885a83d30597deeae3758d532ce5d",
+      "size": 4713
     },
     "backend/services/updater_status.py": {
-      "sha256": "e7491e96c5a5a6f9bec50a77805da41d608210a2a7eeb1acfa755a5e52b33544",
-      "size": 3727
+      "sha256": "cf91d46fb1e3437d2323027c1825af3ce9913c256b572e58f8873f95cf945071",
+      "size": 3831
     },
     "client/index.html": {
-      "sha256": "ab49e011652f4e3dec4f80cad9b1d252c97b7c73df16e564891a37635f7ea52e",
-      "size": 1720
+      "sha256": "5fc0d6687552e2cbf95e31a8ad7e26cd3cb51fc120f04a734616c478e61969ef",
+      "size": 1785
     },
     "client/js/main.js": {
-      "sha256": "ecd13880a5fdc74412186225949bc4131e68e2d8617a206a3d098b903bce8c45",
-      "size": 8804
+      "sha256": "91ad5d810575ed12b9e4d5d7a50a5afe1dc8a0b5fba1e0885475cd2071cb0424",
+      "size": 9057
     },
     "client/settings.html": {
-      "sha256": "03bf4de4472981efc867e2533ce0886d82a7dfc2a759b0a7ae74adb2ed48df46",
-      "size": 13920
+      "sha256": "ac379d023e05775260627f8a5e9a938bdb9a7e1b65d29c1c02a1e041ffda32d8",
+      "size": 14299
     },
     "client/status.html": {
-      "sha256": "68fd4ca0e5e2c971d6fd3477c898730ffc3eaf5951866693da0d73d9dd72671b",
-      "size": 9725
+      "sha256": "0f0681cc92e9e7d48ecc8c6510b09741b8c552062ee5ea7ad961e233bb0f3149",
+      "size": 10007
     },
     "updater/agent.py": {
-      "sha256": "61548179d9d581b86ad93c2f051734ae167987c4382c6b3af91297902ff8c864",
-      "size": 14522
+      "sha256": "343e5d1df12b68d388884cfa6ce3ff5915d3b724e20d108fd10dad60a0aeedf9",
+      "size": 14892
     },
     "updater/requirements.txt": {
-      "sha256": "13c03db805d9f3a3a6db6aa4b8ae9d959bc94fc64322a8f56c136acebf59a901",
-      "size": 65
+      "sha256": "cc8487c5be4d4e9c440e2e13212fc5e52baec62d9decaa20a3ed11791d7a4325",
+      "size": 67
     },
     "config/payloads/default.html": {
-      "sha256": "f915b9b8a371f1bb6206f0f8d81b3827a15409adaa61a04688f2cb6977a45547",
-      "size": 351
+      "sha256": "d681465d5c39a04f082d2f52f30fae7fbf230457d288efc960add08672f4f782",
+      "size": 357
     },
     "config/payloads/main.html": {
-      "sha256": "0f2b2bd7f919cf3cb5d23cc8377da6babab2a6f447d18ff105a85f5518ec5fe1",
-      "size": 468
+      "sha256": "988e704d61967d40f386b25b553b6d8cb7d66d07ccf92147dffd169e7cdf5b14",
+      "size": 474
     },
     "config/schedule.json": {
-      "sha256": "22753fa4ad5aa9bca8f3ada55058831ea66b058e98674642eb8d3fc10db81ada",
-      "size": 1428
+      "sha256": "a7c31758ce5c9572fc0278911b080f2159d39f13875891039989a892a9e2efcb",
+      "size": 1450
     },
     "config/settings.template.json": {
-      "sha256": "1cee321193e9c74f3c7c9f0177e90382d64c5bdf78ca038ce3f1fe2800d01498",
-      "size": 592
+      "sha256": "564189f2514f282d5e043b03bd7fc6998a67c5accbfdbb7ac7fd61d2c95193a4",
+      "size": 611
     },
     "config/version.json": {
-      "sha256": "94237fa793f346f6a3db06d224033ccd8ed806619aa3105f94a50ddfd5e90626",
-      "size": 163
+      "sha256": "7a09cd0d6f13246e7c94ed8306cde7b16fa21324816065f898c1bae5fd3033b2",
+      "size": 169
     }
   }
 }

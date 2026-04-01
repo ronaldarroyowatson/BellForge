@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 # BellForge unified installer and manager.
 # One-line usage:
-#   curl -sSL https://raw.githubusercontent.com/<USER>/BellForge/main/install.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main/install.sh | bash
 #
 # Optional flags:
 #   --install       Force fresh install path
@@ -33,10 +33,10 @@ NO_REBOOT="false"
 
 SUDO=""
 if [[ "${EUID}" -ne 0 ]]; then
-  if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-    SUDO="sudo -n"
+  if command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
   else
-    echo "BellForge installer needs root privileges. Run as root or enable passwordless sudo." >&2
+    echo "BellForge installer needs root privileges. Run as root or install sudo." >&2
     exit 1
   fi
 fi

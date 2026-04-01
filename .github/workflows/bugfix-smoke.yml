@@ -82,3 +82,39 @@ jobs:
         with:
           name: smoke-backend-log
           path: smoke-backend.log
+
+  live-pi-lifecycle:
+    name: Live Pi Lifecycle Smoke Test
+    needs: smoke
+    runs-on: [self-hosted, linux]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.BELLFORGE_PI_SSH_KEY }}" > ~/.ssh/bellforge_pi_key
+          chmod 600 ~/.ssh/bellforge_pi_key
+
+      - name: Run live Pi lifecycle test
+        env:
+          BELLFORGE_PI_HOST: ${{ secrets.BELLFORGE_PI_HOST }}
+          BELLFORGE_PI_USER: ${{ secrets.BELLFORGE_PI_USER }}
+          BELLFORGE_PI_SSH_KEY_PATH: ~/.ssh/bellforge_pi_key
+          BELLFORGE_REPO_OWNER: ronaldarroyowatson
+          BELLFORGE_SERVER_IP: 127.0.0.1
+          BELLFORGE_DISPLAY_ID: CI-LIVE
+        run: |
+          chmod +x tests/live_pi_lifecycle.sh
+          ./tests/live_pi_lifecycle.sh
+
+      - name: Upload live Pi logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-pi-lifecycle-logs
+          path: |
+            tests/logs/live-pi-lifecycle.log
+            tests/logs/live-pi/
