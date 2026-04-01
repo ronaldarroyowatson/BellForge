@@ -50,11 +50,21 @@ scp docs/DISPLAY_DEBUGGING_GUIDE.md "$PI_USER@$PI_IP":/opt/bellforge/docs/ 2>/de
 
 # Make scripts executable
 log "Setting execute permissions..."
-ssh "$PI_USER@$PI_IP" "sudo chmod +x /opt/bellforge/scripts/start_kiosk.sh /opt/bellforge/scripts/gpu_diagnostics.py /opt/bellforge/scripts/post_boot_capture.sh /opt/bellforge/scripts/repair_display.sh /opt/bellforge/tests/test_display_pipeline.sh /opt/bellforge/tests/test_display_stress.sh" 2>/dev/null && log "  ✓ Permissions set" || log "  ✗ Permission setting failed"
+if ssh "$PI_USER@$PI_IP" "sudo chmod +x /opt/bellforge/scripts/start_kiosk.sh /opt/bellforge/scripts/gpu_diagnostics.py /opt/bellforge/scripts/post_boot_capture.sh /opt/bellforge/scripts/repair_display.sh /opt/bellforge/tests/test_display_pipeline.sh /opt/bellforge/tests/test_display_stress.sh"; then
+  log "  ✓ Permissions set"
+else
+  log "  ✗ Permission setting failed"
+  exit 1
+fi
 
 # Restart backend to load new code
 log "Restarting backend service to load new diagnostics code..."
-ssh "$PI_USER@$PI_IP" "sudo systemctl restart bellforge-backend.service" 2>/dev/null && log "  ✓ Backend restarted" || log "  ✗ Backend restart failed"
+if ssh "$PI_USER@$PI_IP" "sudo systemctl restart bellforge-backend.service"; then
+  log "  ✓ Backend restarted"
+else
+  log "  ✗ Backend restart failed"
+  exit 1
+fi
 
 # Verify deployment
 log "Verifying deployment..."

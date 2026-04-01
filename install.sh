@@ -115,6 +115,14 @@ ensure_user() {
   fi
 }
 
+configure_network_permissions() {
+  local sudoers_file="/etc/sudoers.d/bellforge-network"
+  run bash -c "cat > '${sudoers_file}' <<'EOF'
+${SERVICE_USER} ALL=(root) NOPASSWD: /usr/bin/nmcli
+EOF"
+  run chmod 0440 "${sudoers_file}"
+}
+
 ensure_packages() {
   friendly "Installing required system packages"
   local chromium_pkg="chromium-browser"
@@ -157,9 +165,8 @@ xset s noblank
 # Hide the cursor when idle.
 unclutter -idle 5 -root &
 
-# Launch BellForge kiosk
+# Chromium kiosk launch is managed by bellforge-client.service
 [[ -f /opt/bellforge/config/client.env ]] && . /opt/bellforge/config/client.env
-/opt/bellforge/scripts/start_kiosk.sh &
 EOF"
 
   # Write Xorg config pointing kms to card1 (displays on Pi5 are on card1, not card0).
@@ -414,6 +421,7 @@ run_uninstall() {
 do_install() {
   ensure_packages
   ensure_user
+  configure_network_permissions
   sync_repo
   setup_python
   write_local_config

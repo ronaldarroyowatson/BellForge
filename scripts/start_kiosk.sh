@@ -24,6 +24,11 @@ CEC_POWER_ON="${BELLFORGE_CEC_POWER_ON:-1}"
 HDMI_WAIT_SECONDS="${BELLFORGE_HDMI_WAIT_SECONDS:-45}"
 X_WAIT_SECONDS="${BELLFORGE_X_WAIT_SECONDS:-45}"
 GPU_INIT_DELAY="${BELLFORGE_GPU_INIT_DELAY:-8}"
+CHROMIUM_PROFILE_DIR="${BELLFORGE_CHROMIUM_PROFILE_DIR:-${HOME:-/tmp}/.config/chromium-bellforge-kiosk}"
+CLEAR_FRAMEBUFFER_ON_START="${BELLFORGE_CLEAR_FRAMEBUFFER_ON_START:-0}"
+FORCE_MODE_ON_START="${BELLFORGE_FORCE_MODE_ON_START:-0}"
+PREFERRED_MODE="${BELLFORGE_PREFERRED_MODE:-1920x1080}"
+PREFERRED_RATE="${BELLFORGE_PREFERRED_RATE:-60}"
 DISPLAY="${DISPLAY:-:0}"
 export DISPLAY
 
@@ -210,16 +215,17 @@ init_gpu() {
   sleep "$GPU_INIT_DELAY"
   
   # Clear framebuffer to prevent corruption artifacts
-  log "Clearing framebuffer..."
-  if command -v fbset >/dev/null 2>&1; then
-    fbset -c 16 2>/dev/null || true
-  fi
-  if [[ -w /dev/fb0 ]]; then
-    dd if=/dev/zero of=/dev/fb0 bs=1M count=1 2>/dev/null || true
+  if [[ "${CLEAR_FRAMEBUFFER_ON_START}" == "1" ]]; then
+    log "Clearing framebuffer..."
+    if [[ -w /dev/fb0 ]]; then
+      dd if=/dev/zero of=/dev/fb0 bs=1M count=1 2>/dev/null || true
+    fi
+  else
+    log "Skipping framebuffer clear"
   fi
   
   # Set display mode if available
-  if command -v xrandr >/dev/null 2>&1; then
+  if [[ "${FORCE_MODE_ON_START}" == "1" ]] && command -v xrandr >/dev/null 2>&1; then
     log "Detecting display modes..."
     xrandr_output=$(xrandr 2>/dev/null || echo "")
     if echo "$xrandr_output" | grep -q "connected"; then
@@ -229,9 +235,11 @@ init_gpu() {
       connected=$(echo "$xrandr_output" | grep connected | head -1 | awk '{print $1}')
       if [[ -n "$connected" ]]; then
         log "Attempting to set display mode on $connected..."
-        xrandr --output "$connected" --mode 1920x1080 --rate 60 2>/dev/null || true
+        xrandr --output "$connected" --mode "${PREFERRED_MODE}" --rate "${PREFERRED_RATE}" 2>/dev/null || true
       fi
     fi
+  else
+    log "Skipping forced xrandr mode set"
   fi
   
   # Flush GPU caches and sync
@@ -280,6 +288,8 @@ main() {
   
   init_gpu
   validate_network || log_error "Backend unreachable; will retry via client"
+
+  mkdir -p "${CHROMIUM_PROFILE_DIR}" || true
   
   log "Launching Chromium at $KIOSK_URL"
   log "=============== LAUNCHING BROWSER ==============="
@@ -293,10 +303,12 @@ main() {
     --disable-background-networking \
     --disable-translate \
     --disable-sync \
+    --disable-gpu \
+    --disable-gpu-compositing \
     --disable-plugins-power-saver \
     --disable-component-update \
     --no-sandbox \
-    --single-process=false \
+    --user-data-dir="${CHROMIUM_PROFILE_DIR}" \
     --app="${KIOSK_URL}"
 }
 

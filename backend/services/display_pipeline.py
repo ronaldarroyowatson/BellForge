@@ -208,7 +208,20 @@ def _display_mode_info() -> dict[str, Any]:
         "errors": [],
     }
     
-    result["x_display_var"] = Path("/proc/1").read_text(encoding="utf-8", errors="ignore").strip() if Path("/proc/1/environ").exists() else None
+    # Read init environment safely; /proc/1 is a directory and cannot be read directly.
+    environ_path = Path("/proc/1/environ")
+    if environ_path.exists():
+        try:
+            raw = environ_path.read_bytes().replace(b"\x00", b"\n").decode("utf-8", errors="ignore")
+            result["x_display_var"] = next(
+                (line for line in raw.splitlines() if line.startswith("DISPLAY=")),
+                None,
+            )
+        except PermissionError:
+            # Some systems restrict /proc access (e.g. hidepid); not a pipeline failure.
+            result["x_display_var"] = None
+        except Exception as e:
+            result["errors"].append(f"init environ check failed: {e}")
     
     # Try xrandr if X is running
     try:

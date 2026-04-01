@@ -158,6 +158,7 @@ Services restart (or reboot) -> display continues with new version
 - [Architecture](docs/ARCHITECTURE.md)
 - [Coding Conventions](docs/CODING_CONVENTIONS.md)
 - [Contributing Guide](docs/CONTRIBUTING.md)
+- [Bugfix Workflow](docs/BUGFIX_WORKFLOW.md)
 - [Agent Context](docs/CONTEXT.md)
 - [Deployment Guide](docs/deployment.md)
 - [Debugging Guide](docs/debugging.md)

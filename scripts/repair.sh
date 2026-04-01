@@ -56,6 +56,14 @@ validate_structure() {
   run mkdir -p "${INSTALL_DIR}/client"
 }
 
+configure_network_permissions() {
+  local sudoers_file="/etc/sudoers.d/bellforge-network"
+  run bash -c "cat > '${sudoers_file}' <<'EOF'
+${SERVICE_USER} ALL=(root) NOPASSWD: /usr/bin/nmcli
+EOF"
+  run chmod 0440 "${sudoers_file}"
+}
+
 validate_python() {
   if [[ ! -x "${INSTALL_DIR}/.venv/bin/python" ]]; then
     run python3 -m venv "${INSTALL_DIR}/.venv"
@@ -142,9 +150,7 @@ xset s noblank
 # Hide the cursor when idle.
 unclutter -idle 5 -root &
 
-# Launch BellForge kiosk
-[[ -f /opt/bellforge/config/client.env ]] && . /opt/bellforge/config/client.env
-/opt/bellforge/scripts/start_kiosk.sh &
+# Chromium kiosk launch is managed by bellforge-client.service
 EOF"
 
   # Write Xorg config pointing kms to card1 (displays on Pi5 are on card1, not card0).
@@ -309,6 +315,7 @@ main() {
   log "Starting BellForge repair"
 
   validate_structure
+  configure_network_permissions
   validate_chromium
   validate_kiosk_boot
   validate_rpi_firmware
