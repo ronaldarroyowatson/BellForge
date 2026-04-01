@@ -37,9 +37,11 @@ What this does for you automatically:
 For older TVs and slow HDMI handshakes:
 - BellForge now sends HDMI-CEC power-on commands before launching kiosk mode.
 - BellForge waits for HDMI connection before opening Chromium (default: 45 seconds).
+- BellForge waits for X display readiness before launching Chromium (default: 45 seconds).
 - You can tune this in `/opt/bellforge/config/client.env`:
   - `BELLFORGE_CEC_POWER_ON=1`
   - `BELLFORGE_HDMI_WAIT_SECONDS=45`
+  - `BELLFORGE_X_WAIT_SECONDS=45`
 
 What you need to do:
 1. Open Terminal on the Pi.

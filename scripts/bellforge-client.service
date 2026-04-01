@@ -11,7 +11,7 @@ Group=bellforge
 
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/bellforge/.Xauthority
-Environment=BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/status
+Environment=BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/client/index.html
 EnvironmentFile=-/opt/bellforge/config/client.env
 
 # Open the status dashboard in full-screen kiosk mode.

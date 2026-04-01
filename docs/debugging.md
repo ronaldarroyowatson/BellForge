@@ -28,6 +28,40 @@ curl -X POST http://localhost:8765/trigger-update
 curl http://localhost:8765/health
 ```
 
+Trigger listener quick check:
+
+```bash
+curl -X POST http://localhost:8765/trigger-update
+```
+
+---
+
+## Display pipeline diagnostics (GUI + CLI)
+
+GUI:
+- Open `http://PI_IP:8000/settings`
+- Review the **Display Pipeline** card for service state, HDMI state, and issues.
+- Use self-heal buttons (`Enable Client`, `Restart Client`, `Restart LightDM`, `Reboot Pi`) as needed.
+
+API:
+
+```bash
+curl http://localhost:8000/api/display/pipeline | python3 -m json.tool
+```
+
+CLI:
+
+```bash
+# Human-readable summary
+python3 scripts/display_debug.py
+
+# JSON output for automation
+python3 scripts/display_debug.py --json
+
+# Run a self-heal action then re-check
+python3 scripts/display_debug.py --self-heal restart-client
+```
+
 ---
 
 ## Inspecting the local state

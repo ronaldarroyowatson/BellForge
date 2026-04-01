@@ -177,6 +177,17 @@ def test_backend(client: httpx.Client) -> None:
     except Exception as exc:
         fail(f"/api/version — {exc}")
 
+    # /api/display/pipeline
+    try:
+        r = client.get(f"{BACKEND_BASE}/api/display/pipeline")
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        assert data.get("health") in {"ok", "warn", "error"}, f"Unexpected health: {data}"
+        assert isinstance(data.get("issues"), list), f"Expected issues list: {data}"
+        ok("/api/display/pipeline — display diagnostics endpoint works")
+    except Exception as exc:
+        fail(f"/api/display/pipeline — {exc}")
+
 
 # ---------------------------------------------------------------------------
 # Phase 2 — GitHub connectivity

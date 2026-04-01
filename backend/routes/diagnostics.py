@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from backend.services.auth import get_auth_status
 from backend.services.device_info import collect_device_status
+from backend.services.display_pipeline import collect_display_pipeline, run_self_heal
 from backend.services.logs import read_logs
 from backend.services.network import NetworkUpdateRequest, get_network_info, update_network_settings
 from backend.services.updater_status import get_updater_status
@@ -21,6 +22,19 @@ class NetworkUpdatePayload(BaseModel):
     ssid: str | None = Field(default=None, max_length=128)
     password: str | None = Field(default=None, max_length=256)
     use_ethernet: bool = False
+
+
+class DisplaySelfHealPayload(BaseModel):
+    action: Literal[
+        "enable-client",
+        "restart-client",
+        "restart-lightdm",
+        "reboot",
+        "reset-gpu",
+        "clear-framebuffer",
+        "force-hdmi-mode",
+        "cold-reboot",
+    ]
 
 
 def _error_detail(message: str) -> dict[str, str]:
@@ -87,3 +101,19 @@ async def updater_status() -> dict[str, Any]:
         return await get_updater_status(_PROJECT_ROOT)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Updater status failed: {exc}")) from exc
+
+
+@router.get("/display/pipeline", summary="Get end-to-end display pipeline diagnostics")
+async def display_pipeline() -> dict[str, Any]:
+    try:
+        return await collect_display_pipeline(_PROJECT_ROOT)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Display pipeline failed: {exc}")) from exc
+
+
+@router.post("/display/self-heal", summary="Run a display self-heal action")
+async def display_self_heal(payload: DisplaySelfHealPayload) -> dict[str, Any]:
+    try:
+        return run_self_heal(payload.action)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Display self-heal failed: {exc}")) from exc

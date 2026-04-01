@@ -261,11 +261,13 @@ write_local_config() {
 {
   "update_base_url": "${UPDATE_BASE_URL}",
   "poll_interval_seconds": 300,
+  "trigger_port": 8765,
   "install_dir": "${INSTALL_DIR}",
   "staging_dir": "${INSTALL_DIR}/.staging",
   "log_file": "/var/log/bellforge-updater.log",
   "max_retries": 3,
   "retry_delay_seconds": 20,
+  "auto_reboot_after_update": true,
   "device_id": "${DISPLAY_ID}",
   "services_to_restart": [
     "bellforge-backend.service",
@@ -283,9 +285,10 @@ JSON
 
   if [[ ! -f "${client_env_path}" ]]; then
     run bash -c "cat > '${client_env_path}' <<EOF
-BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/status
+BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/client/index.html
 BELLFORGE_CEC_POWER_ON=1
 BELLFORGE_HDMI_WAIT_SECONDS=45
+BELLFORGE_X_WAIT_SECONDS=45
 EOF"
   fi
 

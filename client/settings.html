@@ -209,6 +209,23 @@
         <div class="row"><span>Last Update Result</span><strong id="lastUpdateResult">-</strong></div>
       </article>
 
+      <article class="card">
+        <h2>Display Pipeline</h2>
+        <div class="row"><span>Overall Health</span><span id="displayHealth" class="status warn">Unknown</span></div>
+        <div class="row"><span>Kiosk URL</span><strong id="displayKioskUrl" class="mono">-</strong></div>
+        <div class="row"><span>Client Service (Active / Enabled)</span><strong id="displayClientSvc">-</strong></div>
+        <div class="row"><span>LightDM (Active / Enabled)</span><strong id="displayLightdmSvc">-</strong></div>
+        <div class="row"><span>HDMI Outputs</span><strong id="displayHdmi" class="mono">-</strong></div>
+        <div class="row"><span>Current Issues</span><strong id="displayIssues" class="mono">-</strong></div>
+        <div class="controls">
+          <button id="healEnableClient" class="secondary" type="button">Enable Client</button>
+          <button id="healRestartClient" class="secondary" type="button">Restart Client</button>
+          <button id="healRestartLightdm" class="secondary" type="button">Restart LightDM</button>
+          <button id="healReboot" type="button">Reboot Pi</button>
+        </div>
+        <p id="displayHealResult" class="mono"></p>
+      </article>
+
       <article class="card logs">
         <h2>Debug Service & Logger</h2>
         <div class="controls">
@@ -251,6 +268,17 @@
       downloadProgress: document.getElementById("downloadProgress"),
       lastUpdateAttempt: document.getElementById("lastUpdateAttempt"),
       lastUpdateResult: document.getElementById("lastUpdateResult"),
+      displayHealth: document.getElementById("displayHealth"),
+      displayKioskUrl: document.getElementById("displayKioskUrl"),
+      displayClientSvc: document.getElementById("displayClientSvc"),
+      displayLightdmSvc: document.getElementById("displayLightdmSvc"),
+      displayHdmi: document.getElementById("displayHdmi"),
+      displayIssues: document.getElementById("displayIssues"),
+      displayHealResult: document.getElementById("displayHealResult"),
+      healEnableClient: document.getElementById("healEnableClient"),
+      healRestartClient: document.getElementById("healRestartClient"),
+      healRestartLightdm: document.getElementById("healRestartLightdm"),
+      healReboot: document.getElementById("healReboot"),
       logMeta: document.getElementById("logMeta"),
       logOutput: document.getElementById("logOutput"),
       serviceSelect: document.getElementById("serviceSelect"),
@@ -268,6 +296,21 @@
     function setStatus(el, ok) {
       el.className = "status " + (ok === true ? "good" : ok === false ? "bad" : "warn");
       el.textContent = ok === true ? "Healthy" : ok === false ? "Not Healthy" : "Unknown";
+    }
+
+    function setLevelStatus(el, level) {
+      if (level === "ok") {
+        el.className = "status good";
+        el.textContent = "Healthy";
+        return;
+      }
+      if (level === "error") {
+        el.className = "status bad";
+        el.textContent = "Critical";
+        return;
+      }
+      el.className = "status warn";
+      el.textContent = "Warning";
     }
 
     async function fetchJson(url, options) {
@@ -306,6 +349,43 @@
       elements.lastUpdateResult.textContent = data.last_update_result || "unknown";
     }
 
+    async function refreshDisplayPipeline() {
+      const data = await fetchJson("/api/display/pipeline");
+      setLevelStatus(elements.displayHealth, data.health);
+      elements.displayKioskUrl.textContent = data.kiosk_url || "Unavailable";
+
+      const clientSvc = data.services?.client || {};
+      elements.displayClientSvc.textContent = `${clientSvc.active || "unknown"} / ${clientSvc.enabled || "unknown"}`;
+
+      const lightdmSvc = data.services?.display_manager || {};
+      elements.displayLightdmSvc.textContent = `${lightdmSvc.active || "unknown"} / ${lightdmSvc.enabled || "unknown"}`;
+
+      const hdmi = Array.isArray(data.hdmi_outputs) ? data.hdmi_outputs : [];
+      elements.displayHdmi.textContent = hdmi.length
+        ? hdmi.map((x) => `${x.name}:${x.status}`).join(", ")
+        : "No HDMI outputs found";
+
+      const issues = Array.isArray(data.issues) ? data.issues : [];
+      elements.displayIssues.textContent = issues.length
+        ? issues.map((x) => `[${x.level}] ${x.code}`).join(" | ")
+        : "None";
+    }
+
+    async function runDisplaySelfHeal(action) {
+      elements.displayHealResult.textContent = `Running self-heal: ${action}...`;
+      try {
+        const result = await fetchJson("/api/display/self-heal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        });
+        elements.displayHealResult.textContent = `${result.ok ? "Success" : "Failed"} (${action}) rc=${result.returncode}`;
+        await refreshDisplayPipeline();
+      } catch (error) {
+        elements.displayHealResult.textContent = `Self-heal failed: ${action}`;
+      }
+    }
+
     async function refreshLogs() {
       const service = elements.serviceSelect.value;
       const contains = elements.logFilter.value.trim();
@@ -320,7 +400,7 @@
 
     async function refreshAll() {
       try {
-        await Promise.all([refreshNetwork(), refreshAuth(), refreshUpdater(), refreshLogs()]);
+        await Promise.all([refreshNetwork(), refreshAuth(), refreshUpdater(), refreshDisplayPipeline(), refreshLogs()]);
         lastRefreshed.textContent = `Last refresh: ${new Date().toLocaleTimeString()} (auto every 5s)`;
       } catch (error) {
         lastRefreshed.textContent = `Refresh failed at ${new Date().toLocaleTimeString()}`;
@@ -369,6 +449,11 @@
       a.remove();
       URL.revokeObjectURL(url);
     });
+
+    elements.healEnableClient.addEventListener("click", () => runDisplaySelfHeal("enable-client"));
+    elements.healRestartClient.addEventListener("click", () => runDisplaySelfHeal("restart-client"));
+    elements.healRestartLightdm.addEventListener("click", () => runDisplaySelfHeal("restart-lightdm"));
+    elements.healReboot.addEventListener("click", () => runDisplaySelfHeal("reboot"));
 
     elements.manualRefresh.addEventListener("click", refreshAll);
 

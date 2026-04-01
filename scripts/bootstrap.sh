@@ -30,9 +30,10 @@ SERVER_URL="${BELLFORGE_SERVER_URL:-http://bellforge-server.local:8000}"
 DEVICE_ID="${BELLFORGE_DEVICE_ID:-pi-$(hostname)}"
 BRANCH="${BELLFORGE_BRANCH:-main}"
 REPO_URL="${BELLFORGE_REPO_URL:-https://github.com/YOUR_ORG/BellForge.git}"
+UPDATE_BASE_URL="${BELLFORGE_UPDATE_BASE_URL:-https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/${BRANCH}}"
 INSTALL_DIR="/opt/bellforge"
-STAGING_DIR="/opt/bellforge-staging"
-LOG_DIR="/var/log/bellforge"
+STAGING_DIR="/opt/bellforge/.staging"
+LOG_FILE="/var/log/bellforge-updater.log"
 VENV_DIR="${INSTALL_DIR}/.venv"
 SERVICE_USER="bellforge"
 
@@ -127,18 +128,17 @@ write_settings() {
 
   cat > "$settings_path" <<EOF
 {
-  "server_url": "${SERVER_URL}",
+  "update_base_url": "${UPDATE_BASE_URL}",
   "poll_interval_seconds": 300,
+  "trigger_port": 8765,
   "install_dir": "${INSTALL_DIR}",
   "staging_dir": "${STAGING_DIR}",
-  "log_dir": "${LOG_DIR}",
-  "log_max_bytes": 5242880,
-  "log_backup_count": 5,
-  "trigger_port": 8765,
+  "log_file": "${LOG_FILE}",
   "max_retries": 3,
-  "retry_delay_seconds": 30,
-  "reboot_command": "/sbin/reboot",
-  "services_to_restart": ["bellforge-client.service"],
+  "retry_delay_seconds": 20,
+  "auto_reboot_after_update": true,
+  "services_to_restart": ["bellforge-backend.service", "bellforge-client.service"],
+  "preserve_local_paths": ["config/settings.json", "config/client.env"],
   "device_id": "${DEVICE_ID}"
 }
 EOF
@@ -146,7 +146,8 @@ EOF
   chown "${SERVICE_USER}:${SERVICE_USER}" "$settings_path"
 
   cat > "$client_env_path" <<EOF
-BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/status
+BELLFORGE_KIOSK_URL=http://127.0.0.1:8000/client/index.html
+BELLFORGE_X_WAIT_SECONDS=45
 EOF
 
   chown "${SERVICE_USER}:${SERVICE_USER}" "$client_env_path"

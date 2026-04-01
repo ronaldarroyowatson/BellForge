@@ -97,7 +97,7 @@ The script will install everything and reboot the Pi.
 |---------|---------|
 | `bellforge-backend` | Serves API, status page, and settings page on port `8000` |
 | `bellforge-updater` | Polls backend for updates; self-healing |
-| `bellforge-client` | Chromium kiosk pointing at `http://127.0.0.1:8000/status` |
+| `bellforge-client` | Chromium kiosk pointing at `http://127.0.0.1:8000/client/index.html` |
 
 On the kiosk dashboard, the Pi now displays a typed URL for Settings.
 Users on the same network can open that URL (for example, `http://192.168.1.42:8000/settings`) to reach the settings page.

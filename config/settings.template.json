@@ -2,6 +2,7 @@
   "_comment": "Copy this file to settings.json on each Pi. Do not commit settings.json to git.",
   "update_base_url": "https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main",
   "poll_interval_seconds": 300,
+  "trigger_port": 8765,
   "install_dir": "/opt/bellforge",
   "staging_dir": "/opt/bellforge/.staging",
   "log_file": "/var/log/bellforge-updater.log",
@@ -11,6 +12,7 @@
   },
   "max_retries": 3,
   "retry_delay_seconds": 20,
+  "auto_reboot_after_update": true,
   "services_to_restart": [
     "bellforge-backend.service",
     "bellforge-client.service"
