@@ -9,10 +9,10 @@ NO_REBOOT="false"
 
 SUDO=""
 if [[ "${EUID}" -ne 0 ]]; then
-  if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-    SUDO="sudo -n"
+  if command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
   else
-    echo "BellForge uninstall needs root privileges." >&2
+    echo "BellForge uninstall needs root privileges (or sudo installed)." >&2
     exit 1
   fi
 fi

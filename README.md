@@ -19,38 +19,39 @@ BellForge is designed for real school operations:
 - Unified install, repair, and uninstall workflows.
 - Release readiness checks and operational test suite.
 
-## One-Line Installer
+## Teacher Quick Start (One Command)
+
+If you are a teacher and not technical, this is the command to copy and paste on a Raspberry Pi terminal.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main/install.sh | sudo env BELLFORGE_REPO_OWNER=ronaldarroyowatson BELLFORGE_SERVER_IP=127.0.0.1 BELLFORGE_DISPLAY_ID=Classroom-Display bash -s -- --install --yes
 ```
 
-## Fresh Raspberry Pi Quick Start
+What this does for you automatically:
+- installs everything BellForge needs (including git and Python tools),
+- sets up startup services,
+- reboots the Pi,
+- opens BellForge in kiosk mode,
+- shows the status page and settings URL.
 
-Use this single command on a brand-new Raspberry Pi OS install to install BellForge and start everything automatically:
+What you need to do:
+1. Open Terminal on the Pi.
+2. Paste the command above.
+3. Press Enter and wait for it to finish.
+
+Optional: If this Pi should use a central BellForge server instead of itself, replace `BELLFORGE_SERVER_IP=127.0.0.1` with your server IP.
+
+## One-Line Commands (Install/Repair/Uninstall)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main/install.sh | sudo env BELLFORGE_REPO_OWNER=ronaldarroyowatson BELLFORGE_SERVER_IP=<YOUR_SERVER_IP> BELLFORGE_DISPLAY_ID=<PI_NAME_OR_ROOM> bash -s -- --install --yes
-```
+# Install
+curl -fsSL https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main/install.sh | sudo env BELLFORGE_REPO_OWNER=ronaldarroyowatson BELLFORGE_SERVER_IP=127.0.0.1 BELLFORGE_DISPLAY_ID=Classroom-Display bash -s -- --install --yes
 
-After install, BellForge will:
-- reboot the Pi,
-- auto-login,
-- launch Chromium in kiosk mode,
-- open the device status dashboard,
-- show the URL for the settings page so users can connect from another device.
-
-Common actions:
-
-```bash
-# Fresh install
-curl -sSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/install.sh | bash -s -- --install
-
-# Repair existing install
-curl -sSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/install.sh | bash -s -- --repair
+# Repair
+curl -fsSL https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main/install.sh | sudo env BELLFORGE_REPO_OWNER=ronaldarroyowatson BELLFORGE_SERVER_IP=127.0.0.1 BELLFORGE_DISPLAY_ID=Classroom-Display bash -s -- --repair --yes
 
 # Uninstall
-curl -sSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main/install.sh | sudo env BELLFORGE_REPO_OWNER=ronaldarroyowatson BELLFORGE_SERVER_IP=127.0.0.1 BELLFORGE_DISPLAY_ID=Classroom-Display bash -s -- --uninstall --yes
 ```
 
 ## Bugfix Workflow
@@ -84,6 +85,17 @@ CI bugfix smoke test:
 - Runs automatically for pull requests to `main`.
 - Runs on pushes to `bugfix/**` and `hotfix/**` branches.
 - Workflow file: `.github/workflows/bugfix-smoke.yml`
+
+Live Pi lifecycle smoke test (same workflow):
+- Runs after backend smoke on every bugfix/hotfix cycle.
+- Executes a real lifecycle on a Raspberry Pi: uninstall -> install -> repair (with injected damage) -> uninstall.
+- Uses one-line installer commands from GitHub raw content.
+- Uploads local and remote lifecycle logs as CI artifacts.
+- Requires repository secrets for Pi access:
+  - `BELLFORGE_PI_HOST`
+  - `BELLFORGE_PI_USER`
+  - `BELLFORGE_PI_SSH_KEY`
+- Requires a Linux self-hosted runner with SSH access to the Pi.
 
 ## Screenshots
 
