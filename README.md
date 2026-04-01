@@ -34,6 +34,13 @@ What this does for you automatically:
 - opens BellForge in kiosk mode,
 - shows the status page and settings URL.
 
+For older TVs and slow HDMI handshakes:
+- BellForge now sends HDMI-CEC power-on commands before launching kiosk mode.
+- BellForge waits for HDMI connection before opening Chromium (default: 45 seconds).
+- You can tune this in `/opt/bellforge/config/client.env`:
+  - `BELLFORGE_CEC_POWER_ON=1`
+  - `BELLFORGE_HDMI_WAIT_SECONDS=45`
+
 What you need to do:
 1. Open Terminal on the Pi.
 2. Paste the command above.
@@ -91,11 +98,11 @@ Live Pi lifecycle smoke test (same workflow):
 - Executes a real lifecycle on a Raspberry Pi: uninstall -> install -> repair (with injected damage) -> uninstall.
 - Uses one-line installer commands from GitHub raw content.
 - Uploads local and remote lifecycle logs as CI artifacts.
-- Requires repository secrets for Pi access:
-  - `BELLFORGE_PI_HOST`
-  - `BELLFORGE_PI_USER`
-  - `BELLFORGE_PI_SSH_KEY`
 - Requires a Linux self-hosted runner with SSH access to the Pi.
+- Requires these runner environment variables:
+  - `BELLFORGE_PI_HOST` (required)
+  - `BELLFORGE_PI_USER` (optional, defaults to `pi`)
+  - `BELLFORGE_PI_SSH_KEY` (required, private key content)
 
 ## Screenshots
 

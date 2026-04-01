@@ -5,6 +5,10 @@
   "install_dir": "/opt/bellforge",
   "staging_dir": "/opt/bellforge/.staging",
   "log_file": "/var/log/bellforge-updater.log",
+  "kiosk": {
+    "cec_power_on": true,
+    "hdmi_wait_seconds": 45
+  },
   "max_retries": 3,
   "retry_delay_seconds": 20,
   "services_to_restart": [

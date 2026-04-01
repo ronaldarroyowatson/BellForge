@@ -94,19 +94,19 @@ jobs:
 
       - name: Prepare SSH key
         run: |
+          : "${BELLFORGE_PI_SSH_KEY:?BELLFORGE_PI_SSH_KEY is not set on the runner environment}"
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.BELLFORGE_PI_SSH_KEY }}" > ~/.ssh/bellforge_pi_key
+          printf '%s\n' "${BELLFORGE_PI_SSH_KEY}" > ~/.ssh/bellforge_pi_key
           chmod 600 ~/.ssh/bellforge_pi_key
 
       - name: Run live Pi lifecycle test
         env:
-          BELLFORGE_PI_HOST: ${{ secrets.BELLFORGE_PI_HOST }}
-          BELLFORGE_PI_USER: ${{ secrets.BELLFORGE_PI_USER }}
           BELLFORGE_PI_SSH_KEY_PATH: ~/.ssh/bellforge_pi_key
           BELLFORGE_REPO_OWNER: ronaldarroyowatson
           BELLFORGE_SERVER_IP: 127.0.0.1
           BELLFORGE_DISPLAY_ID: CI-LIVE
         run: |
+          : "${BELLFORGE_PI_HOST:?BELLFORGE_PI_HOST is not set on the runner environment}"
           chmod +x tests/live_pi_lifecycle.sh
           ./tests/live_pi_lifecycle.sh
 

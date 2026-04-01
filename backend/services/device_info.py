@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import ipaddress
 import json
 import os
 import shutil
@@ -33,13 +34,57 @@ def _hostname() -> str:
     return socket.gethostname()
 
 
-def _local_ip() -> str | None:
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.connect(("8.8.8.8", 80))
-            return sock.getsockname()[0]
-    except OSError:
+def _usable_ipv4(value: str | None) -> str | None:
+    if not value:
         return None
+    try:
+        addr = ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    if addr.version != 4 or addr.is_loopback:
+        return None
+    return value
+
+
+def _local_ip() -> str | None:
+    # First preference: socket routing decision (works when default route exists).
+    for endpoint in (("8.8.8.8", 80), ("1.1.1.1", 53)):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.connect(endpoint)
+                ip = _usable_ipv4(sock.getsockname()[0])
+                if ip:
+                    return ip
+        except OSError:
+            pass
+
+    # Fallback: hostname resolution can still provide LAN IP when offline.
+    try:
+        for item in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = _usable_ipv4(item[4][0])
+            if ip:
+                return ip
+    except OSError:
+        pass
+
+    # Linux fallback: parse `hostname -I` (space-separated local addresses).
+    if sys.platform.startswith("linux"):
+        try:
+            result = subprocess.run(
+                ["hostname", "-I"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                for token in result.stdout.split():
+                    ip = _usable_ipv4(token.strip())
+                    if ip:
+                        return ip
+        except Exception:
+            pass
+
+    return None
 
 
 async def _external_ip() -> str | None:

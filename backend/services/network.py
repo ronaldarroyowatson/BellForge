@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import socket
 import subprocess
@@ -26,13 +27,49 @@ def _run_cmd(command: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, capture_output=True, text=True, check=False)
 
 
-def _local_ip() -> str | None:
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.connect(("8.8.8.8", 80))
-            return sock.getsockname()[0]
-    except OSError:
+def _usable_ipv4(value: str | None) -> str | None:
+    if not value:
         return None
+    try:
+        addr = ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    if addr.version != 4 or addr.is_loopback:
+        return None
+    return value
+
+
+def _local_ip() -> str | None:
+    for endpoint in (("8.8.8.8", 80), ("1.1.1.1", 53)):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.connect(endpoint)
+                ip = _usable_ipv4(sock.getsockname()[0])
+                if ip:
+                    return ip
+        except OSError:
+            pass
+
+    try:
+        for item in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = _usable_ipv4(item[4][0])
+            if ip:
+                return ip
+    except OSError:
+        pass
+
+    if sys.platform.startswith("linux"):
+        try:
+            result = _run_cmd(["hostname", "-I"])
+            if result.returncode == 0:
+                for token in result.stdout.split():
+                    ip = _usable_ipv4(token.strip())
+                    if ip:
+                        return ip
+        except Exception:
+            pass
+
+    return None
 
 
 def _nmcli_value(field: str) -> str | None:
