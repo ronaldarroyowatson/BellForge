@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 # BellForge unified installer and manager.
 # One-line usage:
-#   curl -sSL https://raw.githubusercontent.com/<USER>/BellForge/main/install.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main/install.sh | bash
 #
 # Optional flags:
 #   --install       Force fresh install path
