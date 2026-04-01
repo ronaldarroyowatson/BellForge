@@ -30,7 +30,7 @@ curl -sSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/in
 Use this single command on a brand-new Raspberry Pi OS install to install BellForge and start everything automatically:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<YOUR_ORG_OR_USER>/BellForge/main/install.sh | sudo env BELLFORGE_REPO_OWNER=<YOUR_ORG_OR_USER> BELLFORGE_SERVER_IP=<YOUR_SERVER_IP> BELLFORGE_DISPLAY_ID=<PI_NAME_OR_ROOM> bash -s -- --install --yes
+curl -fsSL https://raw.githubusercontent.com/ronaldarroyowatson/BellForge/main/install.sh | sudo env BELLFORGE_REPO_OWNER=ronaldarroyowatson BELLFORGE_SERVER_IP=<YOUR_SERVER_IP> BELLFORGE_DISPLAY_ID=<PI_NAME_OR_ROOM> bash -s -- --install --yes
 ```
 
 After install, BellForge will:
