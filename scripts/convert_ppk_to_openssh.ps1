@@ -9,10 +9,6 @@ param(
   [System.Security.SecureString]$Passphrase,
 
   [Parameter(Mandatory = $false)]
-  [Alias("PassphrasePlain")]
-  [string]$SecretText,
-
-  [Parameter(Mandatory = $false)]
   [string]$ToolsDir = "$PSScriptRoot\..\tools",
 
   [Parameter(Mandatory = $false)]
@@ -62,15 +58,12 @@ if (-not $OutputPrivate) {
   $OutputPrivate = Join-Path $sourceItem.DirectoryName ($sourceItem.BaseName + "_openssh")
 }
 
-if (-not $Passphrase -and [string]::IsNullOrWhiteSpace($SecretText)) {
+if (-not $Passphrase) {
   $Passphrase = Read-Host "Enter PPK passphrase" -AsSecureString
 }
 
 $plainPassphrase = ""
-if (-not [string]::IsNullOrWhiteSpace($SecretText)) {
-  $plainPassphrase = $SecretText
-}
-elseif ($Passphrase) {
+if ($Passphrase) {
   $plainPassphrase = Get-PlainPassphrase -SecurePass $Passphrase
 }
 $passFile = Join-Path $env:TEMP ("ppk_pass_" + [guid]::NewGuid().ToString("N") + ".txt")
