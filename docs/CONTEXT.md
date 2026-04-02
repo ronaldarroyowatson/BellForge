@@ -114,6 +114,10 @@ docs/      -> project documentation and process references
 - `scripts/generate_manifest.py`: build deployable file hash map.
 - `scripts/bump_version.py`: semver increment + manifest regeneration.
 - `scripts/prepare_release.sh`: release gatekeeper workflow.
+- `scripts/bellforge_cli.py`: unified Pi-side diagnostics and operations CLI.
+- `scripts/pi_remote_triage.ps1`: Windows PowerShell wrapper for remote CLI ops over SSH.
+
+For the full list of CLI commands see `docs/CLI_REFERENCE.md`.
 
 ## 9. Safe Modification Guidelines
 

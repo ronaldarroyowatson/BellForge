@@ -78,6 +78,38 @@ Do not cross-contaminate responsibilities across these roots.
 
 - Fail fast on unrecoverable preconditions.
 - Retry transient network operations with bounded attempts.
+
+## 8. CLI Conventions
+
+All CLI logic lives in `scripts/bellforge_cli.py` as a single unified tool.
+
+**Command naming:**
+- Use `noun-verb` kebab-case: `updater-status`, `updater-check-now`, `display-heal`, `display-status`.
+- Group by noun first (`updater-*`, `display-*`) so commands sort logically.
+- Avoid abbreviations — prefer `updater-check-now` over `upd-chk`.
+
+**Arguments:**
+- Positional arguments for mandatory discriminators (e.g., service name, heal action).
+- `--base-url` on every API-backed command; default `http://127.0.0.1:8000`.
+- Boolean flags use `--flag` / no `--no-flag` pattern (argparse `store_true`).
+- All output to stdout as JSON via `print_json()`; errors to stderr.
+
+**Exit codes:**
+- `0` = success or healthy state.
+- `1` = unhealthy or operation failed (expected/handled).
+- `2` = network or API call failure.
+- `3` = unexpected/unhandled exception.
+
+**Function structure:**
+- One `cmd_<noun>_<verb>(args)` function per subcommand.
+- Register in `build_parser()` immediately after the function.
+- Each `cmd_*` function must return an `int` exit code.
+
+**Remote wrapper:**
+- `scripts/pi_remote_triage.ps1` is the Windows-side remote runner.
+- Every new CLI command should have a corresponding `-Switch` on that script if it is commonly run remotely.
+
+See `docs/CLI_REFERENCE.md` for the full command reference.
 - On update failures, preserve current running state whenever possible.
 - Emit actionable failures (what failed, where, and likely next step).
 

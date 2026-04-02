@@ -14,6 +14,11 @@ param(
   [Parameter(Mandatory = $false)]
   [switch]$RunTriage,
 
+  # Trigger an immediate autoupdate check on the Pi.
+  # Equivalent to: bellforge_cli.py updater-check-now
+  [Parameter(Mandatory = $false)]
+  [switch]$CheckNow,
+
   [Parameter(Mandatory = $false)]
   [string]$RemoteCommand
 )
@@ -54,13 +59,25 @@ if ($RunTriage) {
   Write-Host "Saved triage report to $localOut" -ForegroundColor Green
 }
 
+if ($CheckNow) {
+  Write-Host "Triggering updater check-now on Pi..." -ForegroundColor Yellow
+  $result = ssh @sshArgs $remoteHost "python3 /opt/bellforge/scripts/bellforge_cli.py updater-check-now"
+  Write-Host $result
+  Write-Host "Waiting 5 s for updater to process..." -ForegroundColor Gray
+  Start-Sleep -Seconds 5
+  Write-Host "Updater status after check:" -ForegroundColor Yellow
+  ssh @sshArgs $remoteHost "python3 /opt/bellforge/scripts/bellforge_cli.py updater-status"
+}
+
 if ($RemoteCommand) {
   Write-Host "Running remote command: $RemoteCommand" -ForegroundColor Yellow
   ssh @sshArgs $remoteHost $RemoteCommand
 }
 
-if (-not $InstallCli -and -not $RunTriage -and -not $RemoteCommand) {
+if (-not $InstallCli -and -not $RunTriage -and -not $CheckNow -and -not $RemoteCommand) {
   Write-Host "No action selected. Examples:" -ForegroundColor Cyan
-  Write-Host "  .\\scripts\\pi_remote_triage.ps1 -PiHost 192.168.2.180 -InstallCli -RunTriage"
-  Write-Host "  .\\scripts\\pi_remote_triage.ps1 -PiHost 192.168.2.180 -RemoteCommand \"python3 /opt/bellforge/scripts/bellforge_cli.py display-status\""
+  Write-Host "  .\scripts\pi_remote_triage.ps1 -PiHost 192.168.2.180 -InstallCli -RunTriage"
+  Write-Host "  .\scripts\pi_remote_triage.ps1 -PiHost 192.168.2.180 -CheckNow"
+  Write-Host "  .\scripts\pi_remote_triage.ps1 -PiHost 192.168.2.180 -CheckNow -RunTriage"
+  Write-Host "  .\scripts\pi_remote_triage.ps1 -PiHost 192.168.2.180 -RemoteCommand `"python3 /opt/bellforge/scripts/bellforge_cli.py display-status`""
 }
