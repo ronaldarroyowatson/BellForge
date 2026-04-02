@@ -137,13 +137,19 @@ def _staging_state(project_root: Path) -> dict[str, Any]:
     state = _read_json(staging_dir / "state.json")
     progress = _read_json(staging_dir / "download_progress.json")
     last_result = _read_json(staging_dir / "last_update_result.json")
+    pending_update = _read_json(staging_dir / "pending_update.json")
+    pending_release_version = pending_update.get("release_version") if isinstance(pending_update, dict) else None
 
     if not state:
         state = {
-            "state": "idle",
-            "message": "Updater state has not been recorded yet.",
+            "state": "staged" if pending_release_version else "idle",
+            "message": (
+                f"BellForge {pending_release_version} is staged for next startup."
+                if pending_release_version
+                else "Updater state has not been recorded yet."
+            ),
             "staging_in_progress": staging_dir.exists() and any(staging_dir.iterdir()),
-            "reboot_pending": bool(last_result.get("reboot_pending", False)),
+            "reboot_pending": bool(pending_release_version) or bool(last_result.get("reboot_pending", False)),
         }
 
     return {
@@ -157,6 +163,8 @@ def _staging_state(project_root: Path) -> dict[str, Any]:
         "update_available": state.get("update_available"),
         "timestamp": state.get("timestamp"),
         "boot_behavior": state.get("boot_behavior"),
+        "staged_update_pending": bool(pending_release_version),
+        "staged_release_version": pending_release_version,
         "download_progress": {
             "bytes_downloaded": int(progress.get("bytes_downloaded", 0)),
             "bytes_total": int(progress.get("bytes_total", 0)),
@@ -225,6 +233,8 @@ async def get_updater_status(project_root: Path) -> dict[str, Any]:
         "state_message": state.get("message") or last_result_obj.get("message") or "",
         "staging_in_progress": bool(state.get("staging_in_progress", False)),
         "reboot_pending": bool(state.get("reboot_pending", False)),
+        "staged_update_pending": bool(state.get("staged_update_pending", False)),
+        "staged_release_version": state.get("staged_release_version"),
         "auto_updates_enabled": service.get("enabled") == "enabled",
         "checks_on_boot": service.get("enabled") == "enabled",
         "poll_interval_seconds": int(settings.get("poll_interval_seconds", 300)),
@@ -280,6 +290,17 @@ async def trigger_update_check_now(project_root: Path) -> dict[str, Any]:
     if updater_state in ACTIVE_STATES:
         result["message"] = f"Updater is already active ({updater_state})."
         result["stage_reason"] = "updater-active"
+        result["stage_message"] = result["message"]
+        return result
+
+    if bool(state.get("staged_update_pending", False)):
+        staged_version = state.get("staged_release_version")
+        result["message"] = (
+            f"Update already staged for next startup ({staged_version})."
+            if staged_version
+            else "Update already staged for next startup."
+        )
+        result["stage_reason"] = "already-staged"
         result["stage_message"] = result["message"]
         return result
 

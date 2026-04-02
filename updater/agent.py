@@ -179,6 +179,9 @@ class UpdateAgent:
             },
         )
 
+    def _pending_update_path(self) -> Path:
+        return self._staging_file("pending_update.json")
+
     def _write_last_result(
         self,
         result: str,
@@ -374,6 +377,112 @@ class UpdateAgent:
         tmp_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         tmp_path.replace(manifest_path)
 
+    def _write_pending_update(
+        self,
+        *,
+        release_version: str,
+        release_dir: Path,
+        managed_roots: list[str],
+        trigger_source: str,
+    ) -> None:
+        self._write_json_atomic(
+            self._pending_update_path(),
+            {
+                "timestamp": utc_now(),
+                "release_version": release_version,
+                "release_dir": str(release_dir),
+                "managed_roots": managed_roots,
+                "trigger_source": trigger_source,
+            },
+        )
+
+    def _read_pending_update(self) -> dict[str, Any]:
+        path = self._pending_update_path()
+        if not path.is_file():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else {}
+        except Exception:
+            return {}
+
+    def _clear_pending_update(self) -> None:
+        path = self._pending_update_path()
+        if path.is_file():
+            path.unlink()
+
+    def _apply_pending_release_if_present(self) -> None:
+        pending = self._read_pending_update()
+        if not pending:
+            return
+
+        release_version = str(pending.get("release_version") or "unknown")
+        release_dir_value = pending.get("release_dir")
+        managed_roots_value = pending.get("managed_roots")
+
+        if not isinstance(release_dir_value, str):
+            self.log.warning("pending_update.json missing release_dir; clearing pending update marker")
+            self._clear_pending_update()
+            return
+
+        release_dir = Path(release_dir_value)
+        shadow_dir = release_dir / "shadow"
+        manifest_path = release_dir / "manifest.json"
+
+        if not shadow_dir.is_dir() or not manifest_path.is_file():
+            self.log.warning("Pending release is missing staged files; clearing pending marker")
+            self._clear_pending_update()
+            return
+
+        if not isinstance(managed_roots_value, list) or not all(isinstance(item, str) for item in managed_roots_value):
+            self.log.warning("pending_update.json has invalid managed_roots; clearing pending update marker")
+            self._clear_pending_update()
+            return
+
+        managed_roots = [item for item in managed_roots_value if item]
+        if not managed_roots:
+            self.log.warning("pending_update.json has no managed roots; clearing pending update marker")
+            self._clear_pending_update()
+            return
+
+        self.log.info(f"Applying pending staged release {release_version}")
+        self._write_state(
+            "applying",
+            f"Applying staged BellForge {release_version} release.",
+            staging_in_progress=True,
+            reboot_pending=False,
+            latest_version=release_version,
+            trigger_source="boot",
+            update_available=False,
+        )
+
+        self._atomic_swap_roots(shadow_dir, managed_roots)
+        manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self._write_tracking_files(manifest_payload)
+        self._clear_pending_update()
+
+        self._write_state(
+            "idle",
+            f"Applied staged BellForge {release_version} release.",
+            staging_in_progress=False,
+            reboot_pending=False,
+            current_version=release_version,
+            latest_version=release_version,
+            trigger_source="boot",
+            update_available=False,
+        )
+        self._write_last_result(
+            "success",
+            f"Applied staged release: {release_version}",
+            current_version=release_version,
+            latest_version=release_version,
+            trigger_source="boot",
+        )
+
+        for service_name in self.settings.services_to_restart:
+            self.log.info(f"Restarting service after staged apply: {service_name}")
+            subprocess.run(["systemctl", "restart", service_name], capture_output=True, text=True, check=False)
+
     def _post_update_action(self, remote_version: dict[str, Any]) -> bool:
         should_reboot = bool(remote_version.get("reboot_required", False)) or self.settings.auto_reboot_after_update
         if should_reboot:
@@ -568,47 +677,41 @@ class UpdateAgent:
                 update_available=True,
             )
             shadow_dir = self._build_shadow_tree(release_dir, files_dir, manifest_files, managed_roots)
-
+            release_manifest_path = release_dir / "manifest.json"
+            release_manifest_path.write_text(json.dumps(remote_manifest, indent=2), encoding="utf-8")
+            self._write_pending_update(
+                release_version=remote_version_text,
+                release_dir=release_dir,
+                managed_roots=managed_roots,
+                trigger_source=trigger_source,
+            )
             self._write_state(
-                "applying",
-                f"Applying BellForge {remote_version_text}.",
-                staging_in_progress=True,
-                reboot_pending=False,
+                "staged",
+                f"BellForge {remote_version_text} staged. It will be applied on next startup.",
+                staging_in_progress=False,
+                reboot_pending=True,
                 current_version=local_version,
                 latest_version=remote_version_text,
                 trigger_source=trigger_source,
                 update_available=True,
             )
-            self._atomic_swap_roots(shadow_dir, managed_roots)
-            self._write_tracking_files(remote_manifest)
-            reboot_pending = self._post_update_action(remote_version)
-            self._write_state(
-                "reboot-pending" if reboot_pending else "idle",
-                (
-                    f"BellForge {remote_version_text} is staged and waiting to reboot."
-                    if reboot_pending
-                    else f"BellForge {remote_version_text} applied successfully."
-                ),
-                staging_in_progress=False,
-                reboot_pending=reboot_pending,
-                current_version=remote_version_text,
-                latest_version=remote_version_text,
-                trigger_source=trigger_source,
-                update_available=False,
-            )
             self._write_last_result(
-                "success",
-                f"Update applied successfully: {remote_version_text}",
-                reboot_pending=reboot_pending,
-                current_version=remote_version_text,
+                "staged",
+                f"Update staged successfully: {remote_version_text}",
+                reboot_pending=True,
+                current_version=local_version,
                 latest_version=remote_version_text,
                 trigger_source=trigger_source,
             )
 
-            self.log.info(f"Update applied successfully: {remote_version_text}")
+            self.log.info(f"Update staged successfully: {remote_version_text}")
 
     async def run_forever(self) -> None:
         await self._ensure_trigger_listener()
+        try:
+            self._apply_pending_release_if_present()
+        except Exception as exc:
+            self.log.error(f"Failed to apply pending staged release: {exc}")
         while True:
             success = False
             for attempt in range(1, self.settings.max_retries + 1):

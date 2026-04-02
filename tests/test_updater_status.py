@@ -164,6 +164,70 @@ class UpdaterStatusTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(payload["stage_accepted"])
         self.assertEqual(payload["stage_reason"], "started")
 
+    async def test_status_reports_staged_pending_release(self) -> None:
+        (self.project_root / ".staging" / "pending_update.json").write_text(
+            json.dumps(
+                {
+                    "release_version": "1.0.3",
+                    "release_dir": str(self.project_root / ".staging" / "releases" / "1.0.3"),
+                    "managed_roots": ["backend", "client"],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with (
+            patch.object(updater_status, "_service_status", return_value={"unit": updater_status.UPDATER_SERVICE, "active": "active", "enabled": "enabled", "healthy": True}),
+            patch.object(updater_status, "_trigger_listener_status", return_value={"port": 8765, "reachable": True, "healthy": True, "last_error": None}),
+            patch.object(
+                updater_status,
+                "_remote_source_status",
+                return_value={
+                    "update_base_url": "https://example.invalid/bellforge",
+                    "version_healthy": True,
+                    "manifest_healthy": True,
+                    "healthy": True,
+                    "latest_version": "1.0.3",
+                    "manifest_version": "1.0.3",
+                    "last_error": None,
+                },
+            ),
+        ):
+            payload = await updater_status.get_updater_status(self.project_root)
+
+        self.assertTrue(payload["staged_update_pending"])
+        self.assertEqual(payload["staged_release_version"], "1.0.3")
+
+    async def test_manual_check_rejects_when_update_already_staged(self) -> None:
+        (self.project_root / ".staging" / "pending_update.json").write_text(
+            json.dumps(
+                {
+                    "release_version": "1.0.3",
+                    "release_dir": str(self.project_root / ".staging" / "releases" / "1.0.3"),
+                    "managed_roots": ["backend", "client"],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with patch.object(
+            updater_status,
+            "_remote_source_status",
+            return_value={
+                "update_base_url": "https://example.invalid/bellforge",
+                "version_healthy": True,
+                "manifest_healthy": True,
+                "healthy": True,
+                "latest_version": "1.0.3",
+                "manifest_version": "1.0.3",
+                "last_error": None,
+            },
+        ):
+            payload = await updater_status.trigger_update_check_now(self.project_root)
+
+        self.assertFalse(payload["check_accepted"])
+        self.assertEqual(payload["stage_reason"], "already-staged")
+
 
 if __name__ == "__main__":
     unittest.main()
