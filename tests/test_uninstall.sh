@@ -29,9 +29,9 @@ else
   print_ok "BellForge logs removed"
 fi
 
-if pgrep -f "bellforge|updater/agent.py|backend.main:app" >/dev/null 2>&1; then
+if pgrep -f "(python3.*updater/agent|python3.*backend.main|bellforge-backend|bellforge-client|bellforge-updater)" >/dev/null 2>&1; then
   print_fail "BellForge processes still running"
-  pgrep -fa "bellforge|updater/agent.py|backend.main:app" || true
+  pgrep -fa "(python3.*updater/agent|python3.*backend.main|bellforge-backend|bellforge-client|bellforge-updater)" || true
   exit 1
 else
   print_ok "No BellForge processes running"

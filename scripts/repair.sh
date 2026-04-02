@@ -278,8 +278,12 @@ install_dir = Path('/opt/bellforge')
 settings = json.loads((install_dir / 'config' / 'settings.json').read_text())
 base_url = settings['update_base_url'].rstrip('/')
 
-version = json.loads(urlopen(f"{base_url}/config/version.json", timeout=30).read().decode('utf-8'))
-manifest = json.loads(urlopen(f"{base_url}/config/manifest.json", timeout=30).read().decode('utf-8'))
+try:
+    version = json.loads(urlopen(f"{base_url}/config/version.json", timeout=30).read().decode('utf-8'))
+    manifest = json.loads(urlopen(f"{base_url}/config/manifest.json", timeout=30).read().decode('utf-8'))
+except json.JSONDecodeError as e:
+    print(f'ERROR: Failed to parse remote manifest: {e}', file=sys.stderr)
+    sys.exit(1)
 
 for rel_path, meta in manifest.get('files', {}).items():
     target = install_dir / rel_path
@@ -299,7 +303,11 @@ for rel_path, meta in manifest.get('files', {}).items():
             raise RuntimeError(f"Hash mismatch while repairing {rel_path}")
 
 (install_dir / 'config' / 'version.json').write_text(json.dumps(version, indent=2), encoding='utf-8')
-(install_dir / 'config' / 'manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+try:
+    (install_dir / 'config' / 'manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+except Exception as e:
+    print(f'WARNING: Could not update manifest.json: {e}', file=sys.stderr)
+
 print('Manifest integrity repair complete')
 PY
 }
