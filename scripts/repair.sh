@@ -352,12 +352,13 @@ main() {
   configure_network_permissions
   validate_chromium
   validate_kiosk_boot
-  validate_script_runtime
   validate_rpi_firmware
   validate_python
   validate_config_files
   validate_log_targets
   repair_from_manifest
+  # Restore file permissions after repairing files from manifest
+  validate_script_runtime
   validate_services
 
   run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
