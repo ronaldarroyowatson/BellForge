@@ -12,7 +12,7 @@ from backend.services.device_info import collect_device_status
 from backend.services.display_pipeline import collect_display_pipeline, run_self_heal
 from backend.services.logs import read_logs
 from backend.services.network import NetworkUpdateRequest, get_network_info, update_network_settings
-from backend.services.updater_status import get_updater_status
+from backend.services.updater_status import get_updater_status, trigger_update_check_now
 
 router = APIRouter()
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -101,6 +101,14 @@ async def updater_status() -> dict[str, Any]:
         return await get_updater_status(_PROJECT_ROOT)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Updater status failed: {exc}")) from exc
+
+
+@router.post("/updater/check-now", summary="Trigger updater manual check now")
+async def updater_check_now() -> dict[str, Any]:
+    try:
+        return await trigger_update_check_now(_PROJECT_ROOT)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Updater trigger failed: {exc}")) from exc
 
 
 @router.get("/display/pipeline", summary="Get end-to-end display pipeline diagnostics")

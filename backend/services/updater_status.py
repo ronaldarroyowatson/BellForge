@@ -8,6 +8,16 @@ from typing import Any
 import httpx
 
 
+def _parse_semver(value: str | None) -> tuple[int, int, int]:
+    if not value:
+        return (0, 0, 0)
+    try:
+        a, b, c = value.split(".")
+        return (int(a), int(b), int(c))
+    except Exception:
+        return (0, 0, 0)
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -102,3 +112,45 @@ async def get_updater_status(project_root: Path) -> dict[str, Any]:
         "last_update_attempt": _last_update_attempt(project_root),
         "last_update_result": last_result_obj.get("result", "unknown"),
     }
+
+
+async def trigger_update_check_now(project_root: Path) -> dict[str, Any]:
+    settings = _read_settings(project_root)
+    trigger_port = int(settings.get("trigger_port", 8765))
+    trigger_url = f"http://127.0.0.1:{trigger_port}/trigger-update"
+
+    current_version = _local_version(project_root)
+    latest_version = await _remote_version(settings.get("update_base_url"))
+
+    result: dict[str, Any] = {
+        "timestamp": _utc_now(),
+        "ok": False,
+        "accepted": False,
+        "trigger_url": trigger_url,
+        "trigger_port": trigger_port,
+        "status_code": None,
+        "message": "",
+        "current_version": current_version,
+        "latest_version": latest_version,
+        "update_available": _parse_semver(latest_version) > _parse_semver(current_version),
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            response = await client.post(trigger_url)
+            result["status_code"] = response.status_code
+
+            if response.status_code == 200:
+                result["ok"] = True
+                result["accepted"] = True
+                result["message"] = "Manual updater check accepted."
+            else:
+                result["message"] = f"Updater trigger returned HTTP {response.status_code}."
+    except httpx.ConnectError:
+        result["message"] = "Updater trigger listener unreachable on localhost."
+    except httpx.TimeoutException:
+        result["message"] = "Updater trigger listener timed out."
+    except Exception as exc:
+        result["message"] = f"Updater trigger failed: {exc}"
+
+    return result

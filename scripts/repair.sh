@@ -214,6 +214,36 @@ EOF"
   run chown -R "${kiosk_user}:${SERVICE_GROUP}" "/home/${kiosk_user}/.config"
 }
 
+validate_script_runtime() {
+  # Ensure scripts copied from mixed environments (e.g. Windows SCP) keep LF line endings and execute bits.
+  local normalize_targets=(
+    "${INSTALL_DIR}/scripts/start_kiosk.sh"
+    "${INSTALL_DIR}/scripts/repair.sh"
+    "${INSTALL_DIR}/scripts/repair_display.sh"
+    "${INSTALL_DIR}/scripts/deploy_display_fixes.sh"
+    "${INSTALL_DIR}/scripts/post_boot_capture.sh"
+    "${INSTALL_DIR}/tests/test_display_pipeline.sh"
+    "${INSTALL_DIR}/tests/test_display_stress.sh"
+  )
+
+  for path in "${normalize_targets[@]}"; do
+    [[ -f "${path}" ]] || continue
+
+    # Remove CRLF line endings when present to avoid shebang parse failures (bash\r).
+    run sed -i 's/\r$//' "${path}"
+
+    if [[ -x "${path}" ]]; then
+      continue
+    fi
+    run chmod +x "${path}"
+  done
+
+  local service_unit="${INSTALL_DIR}/scripts/bellforge-client.service"
+  if [[ -f "${service_unit}" ]] && ! grep -q "start_kiosk.sh" "${service_unit}"; then
+    log "WARNING: bellforge-client.service does not reference start_kiosk.sh"
+  fi
+}
+
 validate_rpi_firmware() {
   # Only apply on Raspberry Pi hardware.
   local model_file="/proc/device-tree/model"
@@ -306,6 +336,8 @@ PY
 
 restart_services() {
   run systemctl restart bellforge-backend.service
+  # Recycle the desktop session first so /home/bellforge/.Xauthority and DISPLAY :0 are fresh.
+  run systemctl restart lightdm.service || true
   run systemctl restart bellforge-client.service
   run systemctl restart bellforge-updater.service
 }
@@ -318,6 +350,7 @@ main() {
   configure_network_permissions
   validate_chromium
   validate_kiosk_boot
+  validate_script_runtime
   validate_rpi_firmware
   validate_python
   validate_config_files

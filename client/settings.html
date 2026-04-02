@@ -207,6 +207,10 @@
         <div class="row"><span>Download Progress</span><strong id="downloadProgress" class="mono">-</strong></div>
         <div class="row"><span>Last Update Attempt</span><strong id="lastUpdateAttempt" class="mono">-</strong></div>
         <div class="row"><span>Last Update Result</span><strong id="lastUpdateResult">-</strong></div>
+        <div class="controls">
+          <button id="checkUpdaterNow" class="secondary" type="button">Check for Repair Update Now</button>
+        </div>
+        <p id="updaterCheckResult" class="mono"></p>
       </article>
 
       <article class="card">
@@ -268,6 +272,8 @@
       downloadProgress: document.getElementById("downloadProgress"),
       lastUpdateAttempt: document.getElementById("lastUpdateAttempt"),
       lastUpdateResult: document.getElementById("lastUpdateResult"),
+      checkUpdaterNow: document.getElementById("checkUpdaterNow"),
+      updaterCheckResult: document.getElementById("updaterCheckResult"),
       displayHealth: document.getElementById("displayHealth"),
       displayKioskUrl: document.getElementById("displayKioskUrl"),
       displayClientSvc: document.getElementById("displayClientSvc"),
@@ -347,6 +353,32 @@
       elements.downloadProgress.textContent = `${progress.bytes_downloaded || 0} / ${progress.bytes_total || 0} bytes (${(progress.percent || 0).toFixed(2)}%)`;
       elements.lastUpdateAttempt.textContent = data.last_update_attempt || "Unavailable";
       elements.lastUpdateResult.textContent = data.last_update_result || "unknown";
+    }
+
+    async function checkUpdaterNow() {
+      elements.updaterCheckResult.textContent = "Sending manual updater check request...";
+      elements.checkUpdaterNow.disabled = true;
+      try {
+        const result = await fetchJson("/api/updater/check-now", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (result.ok) {
+          const versionHint = result.latest_version
+            ? ` latest=${result.latest_version}`
+            : "";
+          elements.updaterCheckResult.textContent = `Manual check accepted.${versionHint}`;
+        } else {
+          elements.updaterCheckResult.textContent = `Manual check failed: ${result.message || "unknown error"}`;
+        }
+
+        await refreshUpdater();
+      } catch (error) {
+        elements.updaterCheckResult.textContent = "Manual updater check failed.";
+      } finally {
+        elements.checkUpdaterNow.disabled = false;
+      }
     }
 
     async function refreshDisplayPipeline() {
@@ -454,6 +486,7 @@
     elements.healRestartClient.addEventListener("click", () => runDisplaySelfHeal("restart-client"));
     elements.healRestartLightdm.addEventListener("click", () => runDisplaySelfHeal("restart-lightdm"));
     elements.healReboot.addEventListener("click", () => runDisplaySelfHeal("reboot"));
+    elements.checkUpdaterNow.addEventListener("click", checkUpdaterNow);
 
     elements.manualRefresh.addEventListener("click", refreshAll);
 
