@@ -17,6 +17,13 @@
       height: 100%;
       overflow: hidden;
     }
+    .status-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #f3efe7;
+    }
     #status {
       position: fixed;
       bottom: 10px;
@@ -37,8 +44,59 @@
     const params = new URLSearchParams(window.location.search);
     const displayId = params.get("id") || "main";
     const serverUrl = window.BELLFORGE_SERVER_URL || window.location.origin;
+    const EMPTY_STATE_DELAY_MS = 7000;
     const statusEl = document.getElementById("status");
     const screenEl = document.getElementById("screen");
+    let activeMode = null;
+    let emptyStateTimer = null;
+    let emptyStateReady = false;
+
+    function clearEmptyStateTimer() {
+      if (emptyStateTimer) {
+        clearTimeout(emptyStateTimer);
+        emptyStateTimer = null;
+      }
+    }
+
+    function renderStatusFrame() {
+      const statusUrl = `${serverUrl}/status?view=display&id=${encodeURIComponent(displayId)}`;
+      screenEl.innerHTML = `<iframe class="status-frame" title="BellForge device status" src="${statusUrl}"></iframe>`;
+      activeMode = "empty-state-status";
+      statusEl.textContent = `Display ${displayId} | Ready to connect`;
+    }
+
+    async function checkEmptyStateReady() {
+      try {
+        const res = await fetch(`${serverUrl}/api/device/status`, { cache: "no-store" });
+        if (!res.ok) return false;
+        const data = await res.json();
+        return data.repair_service_running !== true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function renderEmptyState(payloadHtml) {
+      if (activeMode === "empty-state-status") {
+        statusEl.textContent = `Display ${displayId} | Ready to connect`;
+        return;
+      }
+
+      if (activeMode !== "empty-state-splash") {
+        screenEl.innerHTML = payloadHtml || "<h1>BellForge</h1>";
+        activeMode = "empty-state-splash";
+      }
+
+      statusEl.textContent = `Display ${displayId} | Showing setup details soon`;
+      if (!emptyStateTimer) {
+        emptyStateTimer = setTimeout(() => {
+          emptyStateTimer = null;
+          if (emptyStateReady) {
+            renderStatusFrame();
+          }
+        }, EMPTY_STATE_DELAY_MS);
+      }
+    }
 
     async function refreshPayload() {
       try {
@@ -51,9 +109,28 @@
         }
 
         const payload = await res.json();
+        if (payload.mode === "empty-state") {
+          emptyStateReady = await checkEmptyStateReady();
+          if (activeMode === "empty-state-status") {
+            statusEl.textContent = `Display ${displayId} | Ready to connect`;
+            return;
+          }
+
+          if (emptyStateReady && !emptyStateTimer) {
+            renderStatusFrame();
+            return;
+          }
+
+          renderEmptyState(payload.html);
+          return;
+        }
+
+        clearEmptyStateTimer();
         screenEl.innerHTML = payload.html || "<h1>BellForge</h1>";
+        activeMode = "content";
         statusEl.textContent = `Display ${displayId} | Updated ${new Date().toLocaleTimeString()}`;
       } catch (error) {
+        clearEmptyStateTimer();
         statusEl.textContent = `Display ${displayId} | Offline`;
       }
     }

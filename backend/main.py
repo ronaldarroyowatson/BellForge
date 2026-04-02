@@ -126,7 +126,13 @@ async def display_payload(display_id: str) -> JSONResponse:
         payload_file = PAYLOAD_DIR / "default.html"
 
     html = payload_file.read_text(encoding="utf-8") if payload_file.is_file() else "<h1>BellForge</h1>"
-    return JSONResponse({"display_id": display_id, "html": html})
+    mode = "empty-state" if "bellforge-empty-state" in html else "content"
+    return JSONResponse({
+        "display_id": display_id,
+        "html": html,
+        "mode": mode,
+        "source": payload_file.name if payload_file.is_file() else None,
+    })
 
 
 @app.get("/status", response_class=FileResponse)

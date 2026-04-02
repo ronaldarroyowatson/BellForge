@@ -102,7 +102,19 @@ def _hdmi_outputs() -> list[dict[str, str]]:
     outputs: list[dict[str, str]] = []
     for path in sorted(Path("/sys/class/drm").glob("card*-HDMI-A-*/status")):
         try:
-            status = path.read_text(encoding="utf-8").strip()
+            # Use timeout to prevent blocking on sysfs reads (some drivers block indefinitely)
+            result = subprocess.run(
+                ["timeout", "1", "cat", str(path)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                status = result.stdout.strip()
+            elif result.returncode == 124:  # timeout exit code
+                status = "timeout"
+            else:
+                status = "unknown"
         except Exception:
             status = "unknown"
         outputs.append({
@@ -210,14 +222,14 @@ def _display_mode_info() -> dict[str, Any]:
     
     # Read init environment safely; /proc/1 is a directory and cannot be read directly.
     environ_path = Path("/proc/1/environ")
-    if environ_path.exists():
+    if environ_path.exists() and environ_path.is_file():
         try:
             raw = environ_path.read_bytes().replace(b"\x00", b"\n").decode("utf-8", errors="ignore")
             result["x_display_var"] = next(
                 (line for line in raw.splitlines() if line.startswith("DISPLAY=")),
                 None,
             )
-        except PermissionError:
+        except (PermissionError, IsADirectoryError):
             # Some systems restrict /proc access (e.g. hidepid); not a pipeline failure.
             result["x_display_var"] = None
         except Exception as e:

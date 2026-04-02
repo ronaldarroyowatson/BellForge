@@ -1,14 +1,14 @@
 {
-  "version": "0.1.14",
-  "generated_at": "2026-04-02T12:38:55Z",
+  "version": "0.1.15",
+  "generated_at": "2026-04-02T15:28:11Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     "backend/main.py": {
-      "sha256": "4b3f925ee752790536e963a671d339004f50b18fd5b5be6664d56c824b42d5f1",
-      "size": 4749
+      "sha256": "a8c18402e1de72a9b9e06f814965e416c38990b24ac2d32fea1f66d82acb540f",
+      "size": 4948
     },
     "backend/requirements.txt": {
       "sha256": "b9908f7549c66ff5d43a193d0838093d0eb4c611d760ac0ef02ede43d5610888",
@@ -47,8 +47,8 @@
       "size": 11397
     },
     "backend/services/display_pipeline.py": {
-      "sha256": "ec2cb860f2dc28e9d14352a9f5de48da855aeb1c8c43745235f51e7e6d638a72",
-      "size": 15583
+      "sha256": "e993d97109a1369e0e48b2d16af125996e59cd6eabe8d245ddb205b86fb8a87e",
+      "size": 16110
     },
     "backend/services/logs.py": {
       "sha256": "e6e7129a4100fb1e82aab026f35b57d09c7fceca360c7f78dc808a6ee487c48f",
@@ -63,8 +63,8 @@
       "size": 5726
     },
     "client/index.html": {
-      "sha256": "5fc0d6687552e2cbf95e31a8ad7e26cd3cb51fc120f04a734616c478e61969ef",
-      "size": 1785
+      "sha256": "11f89ecd447cc5c83b44ea64c1ada7e217e84aa6181c6087a03dd28a71638e0e",
+      "size": 4214
     },
     "client/js/main.js": {
       "sha256": "91ad5d810575ed12b9e4d5d7a50a5afe1dc8a0b5fba1e0885475cd2071cb0424",
@@ -75,8 +75,8 @@
       "size": 20202
     },
     "client/status.html": {
-      "sha256": "0f0681cc92e9e7d48ecc8c6510b09741b8c552062ee5ea7ad961e233bb0f3149",
-      "size": 10007
+      "sha256": "17161b6f5db3b76f9a21acd292ec02e3d4518eba2ef538907f50ddd85234a66c",
+      "size": 18267
     },
     "updater/agent.py": {
       "sha256": "c945f6d4f9f9ee428e68a3a0b2a0ece456223a77ead2e5879ae64bef62062d3c",
@@ -87,12 +87,12 @@
       "size": 67
     },
     "config/payloads/default.html": {
-      "sha256": "d681465d5c39a04f082d2f52f30fae7fbf230457d288efc960add08672f4f782",
-      "size": 357
+      "sha256": "daf150ddb03498621764185ae50f489797366cadf4edf05e7e2337b478157ceb",
+      "size": 401
     },
     "config/payloads/main.html": {
-      "sha256": "988e704d61967d40f386b25b553b6d8cb7d66d07ccf92147dffd169e7cdf5b14",
-      "size": 474
+      "sha256": "c7095848bd236f70931e23ad458ad977bc7adcb5f3c9ef00b0e822a8855413db",
+      "size": 513
     },
     "config/schedule.json": {
       "sha256": "a7c31758ce5c9572fc0278911b080f2159d39f13875891039989a892a9e2efcb",
@@ -103,7 +103,7 @@
       "size": 761
     },
     "config/version.json": {
-      "sha256": "ac32bf7afab1bbf5a28a91e74469f92887c3dda294480fe0e1d7b6711fc1feb3",
+      "sha256": "5e7435cafdd02a3be5ea8b011b1d575ef4e2fae0703202be63ea2090b9eb37f3",
       "size": 170
     }
   }

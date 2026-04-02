@@ -334,6 +334,9 @@ sync_repo() {
   fi
 
   run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}"
+  
+  # Ensure all shell scripts are executable.
+  run find "${INSTALL_DIR}/scripts" -type f -name "*.sh" -exec chmod 0755 {} \;
 }
 
 setup_python() {

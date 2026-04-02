@@ -1,5 +1,49 @@
 # Debugging Guide
 
+## Unified Troubleshooting CLI (Recommended)
+
+Use this single command surface for quick triage and recovery on the Pi:
+
+```bash
+python3 /opt/bellforge/scripts/bellforge_cli.py triage
+```
+
+Useful commands:
+
+```bash
+# Full snapshot (services + API payloads + journal tails)
+python3 /opt/bellforge/scripts/bellforge_cli.py triage --save /tmp/bellforge-triage.json
+
+# Display pipeline and self-heal
+python3 /opt/bellforge/scripts/bellforge_cli.py display-status
+python3 /opt/bellforge/scripts/bellforge_cli.py display-heal restart-lightdm
+python3 /opt/bellforge/scripts/bellforge_cli.py display-heal restart-client
+
+# Updater status + manual check-now trigger
+python3 /opt/bellforge/scripts/bellforge_cli.py updater-status
+python3 /opt/bellforge/scripts/bellforge_cli.py updater-check-now
+
+# Service control
+python3 /opt/bellforge/scripts/bellforge_cli.py service backend status
+python3 /opt/bellforge/scripts/bellforge_cli.py service client restart
+python3 /opt/bellforge/scripts/bellforge_cli.py service lightdm restart
+
+# Log retrieval through backend diagnostics API
+python3 /opt/bellforge/scripts/bellforge_cli.py logs backend --lines 300 --contains error
+```
+
+Tip: after fresh install/reimage, run `triage` first before manual restarts so you keep a baseline snapshot.
+
+Windows remote helper (from repo root):
+
+```powershell
+# Copy latest CLI to Pi and collect a triage JSON locally
+.\scripts\pi_remote_triage.ps1 -Host 192.168.2.180 -InstallCli -RunTriage
+
+# Run any CLI command remotely
+.\scripts\pi_remote_triage.ps1 -Host 192.168.2.180 -RemoteCommand "python3 /opt/bellforge/scripts/bellforge_cli.py display-status"
+```
+
 ## Checking service status on a Pi
 
 ```bash
