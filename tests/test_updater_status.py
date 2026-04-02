@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
 from backend.services import updater_status
@@ -227,6 +228,50 @@ class UpdaterStatusTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(payload["check_accepted"])
         self.assertEqual(payload["stage_reason"], "already-staged")
+
+    async def test_remote_source_status_busts_cache_for_metadata(self) -> None:
+        requested_urls: list[str] = []
+        requested_headers: list[dict[str, str] | None] = []
+
+        class FakeResponse:
+            def __init__(self, payload: dict[str, object]) -> None:
+                self._payload = payload
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict[str, object]:
+                return self._payload
+
+        class FakeClient:
+            def __init__(self, *_args: object, **_kwargs: object) -> None:
+                pass
+
+            async def __aenter__(self) -> "FakeClient":
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+            async def get(self, url: str, headers: dict[str, str] | None = None):
+                requested_urls.append(url)
+                requested_headers.append(headers)
+                if url.endswith("version.json") or "version.json?" in url:
+                    return FakeResponse({"version": "1.0.1"})
+                return FakeResponse({"version": "1.0.1", "files": {"backend/main.py": {}}})
+
+        with patch.object(updater_status.httpx, "AsyncClient", FakeClient):
+            payload = await updater_status._remote_source_status("https://example.invalid/bellforge")
+
+        self.assertTrue(payload["healthy"])
+        self.assertEqual(len(requested_urls), 2)
+        for url in requested_urls:
+            parsed = urlparse(url)
+            self.assertIn("_bellforge_release", parse_qs(parsed.query))
+        for headers in requested_headers:
+            self.assertIsNotNone(headers)
+            assert headers is not None
+            self.assertEqual(headers.get("Cache-Control"), "no-cache, no-store, max-age=0")
 
 
 if __name__ == "__main__":

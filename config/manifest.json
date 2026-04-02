@@ -1,6 +1,6 @@
 {
-  "version": "0.1.24",
-  "generated_at": "2026-04-02T20:22:59Z",
+  "version": "0.1.25",
+  "generated_at": "2026-04-02T20:30:06Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -75,8 +75,8 @@
       "size": 53978
     },
     "backend/services/updater_status.py": {
-      "sha256": "4410a6d9a8d3a6ead6a9b14540b9b472bb030ecb104d6fb31f4a83ca185d0806",
-      "size": 13724
+      "sha256": "2bfcd7cb3f046517fc064e360cff4b3703fdedecc452f5b9c6f58f58e1577258",
+      "size": 14428
     },
     "client/automode.html": {
       "sha256": "83a356d80ed7512b263acfd0833436650028f600aa40df0347c646ca2d2416cf",
@@ -107,8 +107,8 @@
       "size": 21390
     },
     "updater/agent.py": {
-      "sha256": "91d53c2172e3a63f81226223c15c7ec1ffaa52b16066216ffad0fc471ad6111b",
-      "size": 30074
+      "sha256": "41416e0ab9898a1089f085d46883a64e16de84656b46da5e8cb0f3302d7a0292",
+      "size": 31305
     },
     "updater/requirements.txt": {
       "sha256": "13c03db805d9f3a3a6db6aa4b8ae9d959bc94fc64322a8f56c136acebf59a901",
@@ -131,7 +131,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "f5c329f17e585299ce741c87271aab0e3d7bd053ca9b8f831203d0c90268fcc9",
+      "sha256": "be689d293f545211fa368faefb1cff8adebe7e5651fb197d4125405aae4485e2",
       "size": 164
     }
   }

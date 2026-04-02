@@ -20,10 +20,12 @@ import os
 import shutil
 import subprocess
 import sys
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 
@@ -215,17 +217,41 @@ class UpdateAgent:
         except json.JSONDecodeError:
             return "0.0.0"
 
-    async def _fetch_json(self, client: httpx.AsyncClient, relative_path: str) -> dict[str, Any]:
-        url = f"{self.settings.update_base_url}/{relative_path.lstrip('/')}"
-        response = await client.get(url, timeout=45.0)
+    def _remote_url(self, relative_path: str, cache_token: str | None = None) -> str:
+        base = self.settings.update_base_url.rstrip("/")
+        relative = relative_path.lstrip("/")
+        parsed = urlsplit(f"{base}/{relative}")
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        if cache_token:
+            query["_bellforge_release"] = cache_token
+        return urlunsplit(parsed._replace(query=urlencode(query)))
+
+    async def _fetch_json(self, client: httpx.AsyncClient, relative_path: str, *, cache_token: str | None = None) -> dict[str, Any]:
+        url = self._remote_url(relative_path, cache_token)
+        response = await client.get(
+            url,
+            timeout=45.0,
+            headers={
+                "Cache-Control": "no-cache, no-store, max-age=0",
+                "Pragma": "no-cache",
+            },
+        )
         response.raise_for_status()
         return response.json()
 
-    async def _download_file(self, client: httpx.AsyncClient, relative_path: str, destination: Path) -> None:
-        url = f"{self.settings.update_base_url}/{relative_path}"
+    async def _download_file(self, client: httpx.AsyncClient, relative_path: str, destination: Path, *, cache_token: str | None = None) -> None:
+        url = self._remote_url(relative_path, cache_token)
         destination.parent.mkdir(parents=True, exist_ok=True)
 
-        async with client.stream("GET", url, timeout=120.0) as response:
+        async with client.stream(
+            "GET",
+            url,
+            timeout=120.0,
+            headers={
+                "Cache-Control": "no-cache, no-store, max-age=0",
+                "Pragma": "no-cache",
+            },
+        ) as response:
             response.raise_for_status()
             with open(destination, "wb") as handle:
                 async for chunk in response.aiter_bytes(65536):
@@ -253,6 +279,8 @@ class UpdateAgent:
         release_dir: Path,
         changed_files: list[str],
         manifest_files: dict[str, Any],
+        *,
+        cache_token: str | None = None,
     ) -> Path:
         files_dir = release_dir / "files"
         files_dir.mkdir(parents=True, exist_ok=True)
@@ -264,7 +292,7 @@ class UpdateAgent:
         for rel_path in changed_files:
             destination = files_dir / rel_path
             self.log.info(f"Downloading {rel_path}")
-            await self._download_file(client, rel_path, destination)
+            await self._download_file(client, rel_path, destination, cache_token=cache_token)
 
             expected_hash = str(manifest_files[rel_path].get("sha256", ""))
             actual_hash = sha256_file(destination)
@@ -587,8 +615,9 @@ class UpdateAgent:
             trigger_source=trigger_source,
         )
         async with httpx.AsyncClient() as client:
-            remote_version = await self._fetch_json(client, "config/version.json")
-            remote_manifest = await self._fetch_json(client, "config/manifest.json")
+            cache_token = uuid.uuid4().hex
+            remote_version = await self._fetch_json(client, "config/version.json", cache_token=cache_token)
+            remote_manifest = await self._fetch_json(client, "config/manifest.json", cache_token=cache_token)
 
             remote_version_text = str(remote_version.get("version", "0.0.0"))
             self.log.info(f"Version check local={local_version} remote={remote_version_text}")
@@ -665,7 +694,13 @@ class UpdateAgent:
                 trigger_source=trigger_source,
                 update_available=True,
             )
-            files_dir = await self._stage_downloads(client, release_dir, changed_files, manifest_files)
+            files_dir = await self._stage_downloads(
+                client,
+                release_dir,
+                changed_files,
+                manifest_files,
+                cache_token=cache_token,
+            )
             self._write_state(
                 "staging",
                 f"Building staged BellForge {remote_version_text} release tree.",

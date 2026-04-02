@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 
@@ -60,10 +62,21 @@ async def _remote_source_status(update_base_url: str | None) -> dict[str, Any]:
         status["last_error"] = "update_base_url is not configured."
         return status
 
+    def build_remote_url(relative_path: str, cache_token: str) -> str:
+        parsed = urlsplit(f"{update_base_url.rstrip('/')}/{relative_path.lstrip('/')}")
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query["_bellforge_release"] = cache_token
+        return urlunsplit(parsed._replace(query=urlencode(query)))
+
     base_url = update_base_url.rstrip("/")
     try:
+        cache_token = uuid.uuid4().hex
         async with httpx.AsyncClient(timeout=3.0) as client:
-            version_response = await client.get(f"{base_url}/config/version.json")
+            request_headers = {
+                "Cache-Control": "no-cache, no-store, max-age=0",
+                "Pragma": "no-cache",
+            }
+            version_response = await client.get(build_remote_url("config/version.json", cache_token), headers=request_headers)
             version_response.raise_for_status()
             version_payload = version_response.json()
             version_value = version_payload.get("version")
@@ -71,7 +84,7 @@ async def _remote_source_status(update_base_url: str | None) -> dict[str, Any]:
                 status["latest_version"] = version_value
                 status["version_healthy"] = True
 
-            manifest_response = await client.get(f"{base_url}/config/manifest.json")
+            manifest_response = await client.get(build_remote_url("config/manifest.json", cache_token), headers=request_headers)
             manifest_response.raise_for_status()
             manifest_payload = manifest_response.json()
             manifest_version = manifest_payload.get("version")
