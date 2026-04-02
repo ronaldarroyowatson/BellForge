@@ -128,19 +128,40 @@ class UpdateAgent:
     def _staging_file(self, name: str) -> Path:
         return self.staging_dir / name
 
+    def _current_boot_behavior(self) -> str:
+        return "startup-check-then-poll"
+
     def _write_json_atomic(self, path: Path, payload: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         tmp.replace(path)
 
-    def _write_state(self, staging_in_progress: bool, reboot_pending: bool = False) -> None:
+    def _write_state(
+        self,
+        state: str,
+        message: str,
+        *,
+        staging_in_progress: bool,
+        reboot_pending: bool = False,
+        current_version: str | None = None,
+        latest_version: str | None = None,
+        trigger_source: str | None = None,
+        update_available: bool | None = None,
+    ) -> None:
         self._write_json_atomic(
             self._staging_file("state.json"),
             {
                 "timestamp": utc_now(),
+                "state": state,
+                "message": message,
                 "staging_in_progress": staging_in_progress,
                 "reboot_pending": reboot_pending,
+                "current_version": current_version,
+                "latest_version": latest_version,
+                "trigger_source": trigger_source,
+                "update_available": update_available,
+                "boot_behavior": self._current_boot_behavior(),
             },
         )
 
@@ -158,7 +179,16 @@ class UpdateAgent:
             },
         )
 
-    def _write_last_result(self, result: str, message: str, reboot_pending: bool = False) -> None:
+    def _write_last_result(
+        self,
+        result: str,
+        message: str,
+        reboot_pending: bool = False,
+        *,
+        current_version: str | None = None,
+        latest_version: str | None = None,
+        trigger_source: str | None = None,
+    ) -> None:
         self._write_json_atomic(
             self._staging_file("last_update_result.json"),
             {
@@ -167,6 +197,9 @@ class UpdateAgent:
                 "result": result,
                 "message": message,
                 "reboot_pending": reboot_pending,
+                "current_version": current_version,
+                "latest_version": latest_version,
+                "trigger_source": trigger_source,
             },
         )
 
@@ -355,6 +388,27 @@ class UpdateAgent:
                 self.log.warning(f"Failed to restart {service_name}: {result.stderr.strip()}")
         return False
 
+    async def _run_update_cycle_background(self, trigger_source: str) -> None:
+        try:
+            await self.run_update_cycle(trigger_source=trigger_source)
+        except Exception as exc:
+            current_version = self._local_version()
+            self.log.error(f"Background update cycle failed ({trigger_source}): {exc}")
+            self._write_state(
+                "failed",
+                f"Update cycle failed: {exc}",
+                staging_in_progress=False,
+                reboot_pending=False,
+                current_version=current_version,
+                trigger_source=trigger_source,
+            )
+            self._write_last_result(
+                "failed",
+                f"Background update cycle failed: {exc}",
+                current_version=current_version,
+                trigger_source=trigger_source,
+            )
+
     async def _handle_trigger_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
             first_line = await asyncio.wait_for(reader.readline(), timeout=2.0)
@@ -366,7 +420,7 @@ class UpdateAgent:
                     break
 
             if request_line.startswith("POST /trigger-update"):
-                asyncio.create_task(self.run_update_cycle())
+                asyncio.create_task(self._run_update_cycle_background("manual"))
                 body = b'{"status":"accepted"}\n'
                 writer.write(
                     b"HTTP/1.1 200 OK\r\n"
@@ -403,7 +457,7 @@ class UpdateAgent:
         self.log.info(f"Trigger listener started on 0.0.0.0:{self.settings.trigger_port}")
         self._trigger_task = asyncio.create_task(self._trigger_server.serve_forever())
 
-    async def run_update_cycle(self) -> None:
+    async def run_update_cycle(self, trigger_source: str = "scheduled") -> None:
         # Fast, non-blocking guard: if a cycle is already in flight (e.g. a
         # broadcast trigger arrived while the scheduler was mid-swap) skip
         # rather than queue up a second concurrent run.
@@ -411,21 +465,44 @@ class UpdateAgent:
             self.log.info("Update cycle already in progress; skipping concurrent trigger.")
             return
         async with self._cycle_lock:
-            await self._run_update_cycle_locked()
+            await self._run_update_cycle_locked(trigger_source)
 
-    async def _run_update_cycle_locked(self) -> None:
-        self._write_state(staging_in_progress=True, reboot_pending=False)
+    async def _run_update_cycle_locked(self, trigger_source: str) -> None:
+        local_version = self._local_version()
+        self._write_state(
+            "checking",
+            "Checking for a newer BellForge release.",
+            staging_in_progress=True,
+            reboot_pending=False,
+            current_version=local_version,
+            trigger_source=trigger_source,
+        )
         async with httpx.AsyncClient() as client:
             remote_version = await self._fetch_json(client, "config/version.json")
             remote_manifest = await self._fetch_json(client, "config/manifest.json")
 
-            local_version = self._local_version()
             remote_version_text = str(remote_version.get("version", "0.0.0"))
             self.log.info(f"Version check local={local_version} remote={remote_version_text}")
 
             manifest_files = dict(remote_manifest.get("files", {}))
             if not manifest_files:
                 self.log.warning("Remote manifest has no files. Skipping cycle.")
+                self._write_state(
+                    "failed",
+                    "Remote manifest did not include any files.",
+                    staging_in_progress=False,
+                    reboot_pending=False,
+                    current_version=local_version,
+                    latest_version=remote_version_text,
+                    trigger_source=trigger_source,
+                )
+                self._write_last_result(
+                    "failed",
+                    "Remote manifest did not include any files.",
+                    current_version=local_version,
+                    latest_version=remote_version_text,
+                    trigger_source=trigger_source,
+                )
                 return
 
             changed_files = self._changed_files(manifest_files)
@@ -433,8 +510,23 @@ class UpdateAgent:
 
             if not changed_files and not has_newer_version:
                 self.log.info("No changes detected.")
-                self._write_state(staging_in_progress=False, reboot_pending=False)
-                self._write_last_result("no-change", "No file or version changes detected.")
+                self._write_state(
+                    "idle",
+                    "No update is available right now.",
+                    staging_in_progress=False,
+                    reboot_pending=False,
+                    current_version=local_version,
+                    latest_version=remote_version_text,
+                    trigger_source=trigger_source,
+                    update_available=False,
+                )
+                self._write_last_result(
+                    "no-change",
+                    "No file or version changes detected.",
+                    current_version=local_version,
+                    latest_version=remote_version_text,
+                    trigger_source=trigger_source,
+                )
                 return
 
             managed_roots = self._managed_roots(manifest_files)
@@ -444,14 +536,74 @@ class UpdateAgent:
             release_dir.mkdir(parents=True, exist_ok=True)
 
             self.log.info(f"Preparing release {remote_version_text} with {len(changed_files)} changed file(s).")
+            self._write_state(
+                "update-available",
+                f"Update available. Preparing BellForge {remote_version_text}.",
+                staging_in_progress=True,
+                reboot_pending=False,
+                current_version=local_version,
+                latest_version=remote_version_text,
+                trigger_source=trigger_source,
+                update_available=True,
+            )
+            self._write_state(
+                "downloading",
+                f"Downloading {len(changed_files)} changed file(s).",
+                staging_in_progress=True,
+                reboot_pending=False,
+                current_version=local_version,
+                latest_version=remote_version_text,
+                trigger_source=trigger_source,
+                update_available=True,
+            )
             files_dir = await self._stage_downloads(client, release_dir, changed_files, manifest_files)
+            self._write_state(
+                "staging",
+                f"Building staged BellForge {remote_version_text} release tree.",
+                staging_in_progress=True,
+                reboot_pending=False,
+                current_version=local_version,
+                latest_version=remote_version_text,
+                trigger_source=trigger_source,
+                update_available=True,
+            )
             shadow_dir = self._build_shadow_tree(release_dir, files_dir, manifest_files, managed_roots)
 
+            self._write_state(
+                "applying",
+                f"Applying BellForge {remote_version_text}.",
+                staging_in_progress=True,
+                reboot_pending=False,
+                current_version=local_version,
+                latest_version=remote_version_text,
+                trigger_source=trigger_source,
+                update_available=True,
+            )
             self._atomic_swap_roots(shadow_dir, managed_roots)
             self._write_tracking_files(remote_manifest)
             reboot_pending = self._post_update_action(remote_version)
-            self._write_state(staging_in_progress=False, reboot_pending=reboot_pending)
-            self._write_last_result("success", f"Update applied successfully: {remote_version_text}", reboot_pending=reboot_pending)
+            self._write_state(
+                "reboot-pending" if reboot_pending else "idle",
+                (
+                    f"BellForge {remote_version_text} is staged and waiting to reboot."
+                    if reboot_pending
+                    else f"BellForge {remote_version_text} applied successfully."
+                ),
+                staging_in_progress=False,
+                reboot_pending=reboot_pending,
+                current_version=remote_version_text,
+                latest_version=remote_version_text,
+                trigger_source=trigger_source,
+                update_available=False,
+            )
+            self._write_last_result(
+                "success",
+                f"Update applied successfully: {remote_version_text}",
+                reboot_pending=reboot_pending,
+                current_version=remote_version_text,
+                latest_version=remote_version_text,
+                trigger_source=trigger_source,
+            )
 
             self.log.info(f"Update applied successfully: {remote_version_text}")
 
@@ -466,8 +618,21 @@ class UpdateAgent:
                     break
                 except Exception as exc:
                     self.log.error(f"Attempt {attempt}/{self.settings.max_retries} failed: {exc}")
-                    self._write_state(staging_in_progress=False, reboot_pending=False)
-                    self._write_last_result("failed", f"Attempt {attempt} failed: {exc}")
+                    current_version = self._local_version()
+                    self._write_state(
+                        "failed",
+                        f"Attempt {attempt} failed: {exc}",
+                        staging_in_progress=False,
+                        reboot_pending=False,
+                        current_version=current_version,
+                        trigger_source="scheduled",
+                    )
+                    self._write_last_result(
+                        "failed",
+                        f"Attempt {attempt} failed: {exc}",
+                        current_version=current_version,
+                        trigger_source="scheduled",
+                    )
                     if attempt < self.settings.max_retries:
                         await asyncio.sleep(self.settings.retry_delay_seconds)
 

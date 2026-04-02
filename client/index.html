@@ -5,12 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>BellForge Display</title>
   <style>
+    :root {
+      --display-scale: 1;
+    }
     html, body {
       margin: 0;
       height: 100%;
+      overflow: hidden;
       background: #0d1117;
       color: #f0f6fc;
       font-family: "Segoe UI", sans-serif;
+    }
+    #viewport {
+      position: fixed;
+      inset: 0;
+      transform: scale(var(--display-scale));
+      transform-origin: center center;
+      overflow: hidden;
     }
     #screen {
       width: 100%;
@@ -37,8 +48,10 @@
   </style>
 </head>
 <body>
-  <div id="screen"></div>
-  <div id="status">Connecting...</div>
+  <div id="viewport">
+    <div id="screen"></div>
+    <div id="status">Connecting...</div>
+  </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -47,9 +60,22 @@
     const EMPTY_STATE_DELAY_MS = 7000;
     const statusEl = document.getElementById("status");
     const screenEl = document.getElementById("screen");
+    const rootEl = document.documentElement;
     let activeMode = null;
     let emptyStateTimer = null;
     let emptyStateReady = false;
+
+    async function refreshDisplayPreferences() {
+      try {
+        const res = await fetch(`${serverUrl}/api/display/preferences`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const scale = Number(data.display_scale || 1);
+        rootEl.style.setProperty("--display-scale", String(scale));
+      } catch (error) {
+        rootEl.style.setProperty("--display-scale", "1");
+      }
+    }
 
     function clearEmptyStateTimer() {
       if (emptyStateTimer) {
@@ -135,7 +161,9 @@
       }
     }
 
+    refreshDisplayPreferences();
     refreshPayload();
+    setInterval(refreshDisplayPreferences, 10000);
     setInterval(refreshPayload, 15000);
   </script>
 </body>

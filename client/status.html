@@ -292,6 +292,69 @@
       color: rgba(245, 251, 255, 0.76);
       font-size: 0.9rem;
     }
+    .advanced-pager {
+      display: none;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-align: right;
+    }
+    body.display-view .wrap {
+      max-width: 1280px;
+      padding: 14px 18px;
+    }
+    body.display-view .hero,
+    body.display-view .url-panel,
+    body.display-view .stats {
+      margin-bottom: 12px;
+    }
+    body.display-view .hero-main,
+    body.display-view .hero-side,
+    body.display-view .url-panel,
+    body.display-view .stat-card,
+    body.display-view .advanced {
+      padding: 16px 18px;
+    }
+    body.display-view h1 {
+      font-size: clamp(1.8rem, 3vw, 3rem);
+    }
+    body.display-view .lede {
+      margin-bottom: 16px;
+      font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+    }
+    body.display-view .steps {
+      gap: 10px;
+    }
+    body.display-view .step {
+      padding: 12px;
+    }
+    body.display-view .url-card a {
+      font-size: clamp(1rem, 1.2vw, 1.3rem);
+      padding: 12px 14px;
+    }
+    body.display-view .stat-card p {
+      font-size: 1.15rem;
+    }
+    body.display-view .advanced {
+      padding-bottom: 14px;
+    }
+    body.display-view .advanced[open] summary .pill {
+      display: none;
+    }
+    body.display-view .advanced-grid {
+      margin-top: 14px;
+      min-height: 132px;
+    }
+    body.display-view .advanced-item {
+      display: none;
+      padding-top: 10px;
+    }
+    body.display-view .advanced-item.active {
+      display: block;
+    }
+    body.display-view .advanced-pager {
+      display: block;
+    }
     @media (max-width: 980px) {
       .hero,
       .url-grid,
@@ -424,11 +487,21 @@
         <div class="advanced-item"><strong>Disk Usage</strong><span id="diskUsage">-</span></div>
         <div class="advanced-item"><strong>Memory Usage</strong><span id="memoryUsage">-</span></div>
       </div>
+      <div id="advancedPager" class="advanced-pager"></div>
     </details>
   </main>
 
   <script>
     const REFRESH_MS = 10000;
+    const params = new URLSearchParams(window.location.search);
+    const isDisplayView = params.get("view") === "display";
+    const advancedDetails = document.querySelector(".advanced");
+    const advancedItems = Array.from(document.querySelectorAll(".advanced-item"));
+    const advancedPager = document.getElementById("advancedPager");
+    const CAROUSEL_PAGE_SIZE = 4;
+    let diagnosticsRotationMs = 8000;
+    let carouselIndex = 0;
+    let carouselTimer = null;
 
     const els = {
       hostname: document.getElementById("hostname"),
@@ -452,6 +525,11 @@
       memoryUsage: document.getElementById("memoryUsage"),
       refreshLabel: document.getElementById("refreshLabel"),
     };
+
+    if (isDisplayView) {
+      document.body.classList.add("display-view");
+      advancedDetails.open = true;
+    }
 
     function pill(text, level) {
       return `<span class="pill ${level}">${text}</span>`;
@@ -500,6 +578,41 @@
     function setUrl(el, value) {
       el.textContent = value;
       el.href = value === "Unavailable" ? "#" : value;
+    }
+
+    function renderDiagnosticsCarousel() {
+      if (!isDisplayView) return;
+      const totalPages = Math.max(1, Math.ceil(advancedItems.length / CAROUSEL_PAGE_SIZE));
+      advancedItems.forEach((item, index) => {
+        const pageIndex = Math.floor(index / CAROUSEL_PAGE_SIZE);
+        item.classList.toggle("active", pageIndex === carouselIndex);
+      });
+      advancedPager.textContent = `Technical details page ${carouselIndex + 1} of ${totalPages}`;
+    }
+
+    function scheduleDiagnosticsCarousel() {
+      if (!isDisplayView) return;
+      if (carouselTimer) {
+        clearInterval(carouselTimer);
+      }
+      renderDiagnosticsCarousel();
+      const totalPages = Math.max(1, Math.ceil(advancedItems.length / CAROUSEL_PAGE_SIZE));
+      carouselTimer = setInterval(() => {
+        carouselIndex = (carouselIndex + 1) % totalPages;
+        renderDiagnosticsCarousel();
+      }, diagnosticsRotationMs);
+    }
+
+    async function refreshDisplayPreferences() {
+      try {
+        const response = await fetch("/api/display/preferences", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        diagnosticsRotationMs = Math.max(4000, Number(data.diagnostics_rotation_seconds || 8) * 1000);
+        scheduleDiagnosticsCarousel();
+      } catch (error) {
+        // Leave the current carousel timing in place.
+      }
     }
 
     async function refresh() {
@@ -551,7 +664,10 @@
       }
     }
 
+    scheduleDiagnosticsCarousel();
+    refreshDisplayPreferences();
     refresh();
+    setInterval(refreshDisplayPreferences, REFRESH_MS);
     setInterval(refresh, REFRESH_MS);
   </script>
 </body>

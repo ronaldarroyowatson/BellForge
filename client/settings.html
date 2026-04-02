@@ -49,6 +49,26 @@
       color: var(--muted);
       font-size: 0.9rem;
     }
+    .stack-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0 12px;
+    }
+    .helper {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+    .range-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .range-wrap input[type="range"] {
+      flex: 1;
+    }
     button, select, input {
       border: 1px solid #aabac8;
       border-radius: 8px;
@@ -200,33 +220,58 @@
 
       <article class="card">
         <h2>Autoupdater Status</h2>
+        <p class="helper">The updater checks at boot, keeps polling in the background, and this button forces an immediate check when you need it.</p>
+        <div class="stack-controls">
+          <button id="checkUpdaterNow" class="secondary" type="button">Check for Updates Now</button>
+        </div>
+        <div class="row"><span>Pipeline Health</span><span id="updaterHealth" class="status warn">Unknown</span></div>
+        <div class="row"><span>Cycle State</span><strong id="updaterState">-</strong></div>
+        <div class="row"><span>State Message</span><strong id="updaterMessage" class="mono">-</strong></div>
+        <div class="row"><span>Updater Service</span><strong id="updaterServiceState">-</strong></div>
+        <div class="row"><span>Trigger Listener</span><span id="updaterTriggerStatus" class="status warn">Unknown</span></div>
+        <div class="row"><span>Remote Source</span><span id="updaterRemoteStatus" class="status warn">Unknown</span></div>
         <div class="row"><span>Current Version</span><strong id="currentVersion" class="mono">-</strong></div>
         <div class="row"><span>Latest Detected</span><strong id="latestVersion" class="mono">-</strong></div>
         <div class="row"><span>Staging In Progress</span><span id="stagingStatus" class="status warn">Unknown</span></div>
         <div class="row"><span>Reboot Pending</span><span id="rebootStatus" class="status warn">Unknown</span></div>
+        <div class="row"><span>Checks On Boot</span><span id="updaterBootChecks" class="status warn">Unknown</span></div>
         <div class="row"><span>Download Progress</span><strong id="downloadProgress" class="mono">-</strong></div>
         <div class="row"><span>Last Update Attempt</span><strong id="lastUpdateAttempt" class="mono">-</strong></div>
         <div class="row"><span>Last Update Result</span><strong id="lastUpdateResult">-</strong></div>
-        <div class="controls">
-          <button id="checkUpdaterNow" class="secondary" type="button">Check for Repair Update Now</button>
-        </div>
         <p id="updaterCheckResult" class="mono"></p>
       </article>
 
       <article class="card">
         <h2>Display Pipeline</h2>
+        <p class="helper">Use Screen Fit to compensate for TV overscan. Lower values shrink the picture slightly so the top and bottom are not clipped.</p>
         <div class="row"><span>Overall Health</span><span id="displayHealth" class="status warn">Unknown</span></div>
         <div class="row"><span>Kiosk URL</span><strong id="displayKioskUrl" class="mono">-</strong></div>
         <div class="row"><span>Client Service (Active / Enabled)</span><strong id="displayClientSvc">-</strong></div>
         <div class="row"><span>LightDM (Active / Enabled)</span><strong id="displayLightdmSvc">-</strong></div>
         <div class="row"><span>HDMI Outputs</span><strong id="displayHdmi" class="mono">-</strong></div>
         <div class="row"><span>Current Issues</span><strong id="displayIssues" class="mono">-</strong></div>
+        <form id="displayPrefsForm" class="form-grid">
+          <label class="full">Screen Fit / Overscan Compensation
+            <div class="range-wrap">
+              <input id="displayScale" type="range" min="85" max="100" step="1" value="96" />
+              <strong id="displayScaleValue" class="mono">96%</strong>
+            </div>
+          </label>
+          <label class="full">Diagnostics Rotation Seconds
+            <div class="range-wrap">
+              <input id="displayRotation" type="range" min="4" max="30" step="1" value="8" />
+              <strong id="displayRotationValue" class="mono">8s</strong>
+            </div>
+          </label>
+          <button class="full" type="submit">Save Display Preferences</button>
+        </form>
         <div class="controls">
           <button id="healEnableClient" class="secondary" type="button">Enable Client</button>
           <button id="healRestartClient" class="secondary" type="button">Restart Client</button>
           <button id="healRestartLightdm" class="secondary" type="button">Restart LightDM</button>
           <button id="healReboot" type="button">Reboot Pi</button>
         </div>
+        <p id="displayPrefsResult" class="mono"></p>
         <p id="displayHealResult" class="mono"></p>
       </article>
 
@@ -265,10 +310,17 @@
       credentials: document.getElementById("credentials"),
       authStatus: document.getElementById("authStatus"),
       lastAuth: document.getElementById("lastAuth"),
+      updaterHealth: document.getElementById("updaterHealth"),
+      updaterState: document.getElementById("updaterState"),
+      updaterMessage: document.getElementById("updaterMessage"),
+      updaterServiceState: document.getElementById("updaterServiceState"),
+      updaterTriggerStatus: document.getElementById("updaterTriggerStatus"),
+      updaterRemoteStatus: document.getElementById("updaterRemoteStatus"),
       currentVersion: document.getElementById("currentVersion"),
       latestVersion: document.getElementById("latestVersion"),
       stagingStatus: document.getElementById("stagingStatus"),
       rebootStatus: document.getElementById("rebootStatus"),
+      updaterBootChecks: document.getElementById("updaterBootChecks"),
       downloadProgress: document.getElementById("downloadProgress"),
       lastUpdateAttempt: document.getElementById("lastUpdateAttempt"),
       lastUpdateResult: document.getElementById("lastUpdateResult"),
@@ -280,6 +332,12 @@
       displayLightdmSvc: document.getElementById("displayLightdmSvc"),
       displayHdmi: document.getElementById("displayHdmi"),
       displayIssues: document.getElementById("displayIssues"),
+      displayPrefsForm: document.getElementById("displayPrefsForm"),
+      displayScale: document.getElementById("displayScale"),
+      displayScaleValue: document.getElementById("displayScaleValue"),
+      displayRotation: document.getElementById("displayRotation"),
+      displayRotationValue: document.getElementById("displayRotationValue"),
+      displayPrefsResult: document.getElementById("displayPrefsResult"),
       displayHealResult: document.getElementById("displayHealResult"),
       healEnableClient: document.getElementById("healEnableClient"),
       healRestartClient: document.getElementById("healRestartClient"),
@@ -319,6 +377,16 @@
       el.textContent = "Warning";
     }
 
+    function setBoolStatusText(el, value, labels = { true: "Healthy", false: "Not Healthy", unknown: "Unknown" }) {
+      el.className = "status " + (value === true ? "good" : value === false ? "bad" : "warn");
+      el.textContent = value === true ? labels.true : value === false ? labels.false : labels.unknown;
+    }
+
+    function syncDisplayPreferenceLabels() {
+      elements.displayScaleValue.textContent = `${elements.displayScale.value}%`;
+      elements.displayRotationValue.textContent = `${elements.displayRotation.value}s`;
+    }
+
     async function fetchJson(url, options) {
       const response = await fetch(url, { cache: "no-store", ...(options || {}) });
       if (!response.ok) {
@@ -345,10 +413,26 @@
 
     async function refreshUpdater() {
       const data = await fetchJson("/api/updater/status");
+      setLevelStatus(elements.updaterHealth, data.health);
+      elements.updaterState.textContent = data.state || "unknown";
+      elements.updaterMessage.textContent = data.state_message || data.last_update_message || "Unavailable";
+      const service = data.service || {};
+      elements.updaterServiceState.textContent = `${service.active || "unknown"} / ${service.enabled || "unknown"}`;
+      setBoolStatusText(elements.updaterTriggerStatus, data.trigger_listener?.healthy, {
+        true: "Listening",
+        false: "Offline",
+        unknown: "Unknown",
+      });
+      setBoolStatusText(elements.updaterRemoteStatus, data.remote_source?.healthy, {
+        true: "Reachable",
+        false: "Unreachable",
+        unknown: "Unknown",
+      });
       elements.currentVersion.textContent = data.current_device_version || "Unavailable";
       elements.latestVersion.textContent = data.latest_detected_version || "Unavailable";
       setStatus(elements.stagingStatus, data.staging_in_progress);
       setStatus(elements.rebootStatus, data.reboot_pending);
+      setBoolStatusText(elements.updaterBootChecks, data.checks_on_boot);
       const progress = data.download_progress || {};
       elements.downloadProgress.textContent = `${progress.bytes_downloaded || 0} / ${progress.bytes_total || 0} bytes (${(progress.percent || 0).toFixed(2)}%)`;
       elements.lastUpdateAttempt.textContent = data.last_update_attempt || "Unavailable";
@@ -364,13 +448,14 @@
           headers: { "Content-Type": "application/json" },
         });
 
-        if (result.ok) {
-          const versionHint = result.latest_version
-            ? ` latest=${result.latest_version}`
-            : "";
-          elements.updaterCheckResult.textContent = `Manual check accepted.${versionHint}`;
+        if (result.check_accepted) {
+          if (result.stage_requested && result.stage_accepted) {
+            elements.updaterCheckResult.textContent = result.stage_message || "Manual check accepted and background staging started.";
+          } else {
+            elements.updaterCheckResult.textContent = result.stage_message || result.message || "Manual check accepted.";
+          }
         } else {
-          elements.updaterCheckResult.textContent = `Manual check failed: ${result.message || "unknown error"}`;
+          elements.updaterCheckResult.textContent = `Manual check failed: ${result.stage_message || result.message || "unknown error"}`;
         }
 
         await refreshUpdater();
@@ -403,6 +488,32 @@
         : "None";
     }
 
+    async function refreshDisplayPreferences() {
+      const data = await fetchJson("/api/display/preferences");
+      elements.displayScale.value = String(data.overscan_percent || 96);
+      elements.displayRotation.value = String(data.diagnostics_rotation_seconds || 8);
+      syncDisplayPreferenceLabels();
+    }
+
+    async function saveDisplayPreferences(event) {
+      event.preventDefault();
+      elements.displayPrefsResult.textContent = "Saving display preferences...";
+      try {
+        const result = await fetchJson("/api/display/preferences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            overscan_percent: Number(elements.displayScale.value),
+            diagnostics_rotation_seconds: Number(elements.displayRotation.value),
+          }),
+        });
+        elements.displayPrefsResult.textContent = result.message || "Display preferences saved.";
+        await refreshDisplayPreferences();
+      } catch (error) {
+        elements.displayPrefsResult.textContent = "Display preference update failed.";
+      }
+    }
+
     async function runDisplaySelfHeal(action) {
       elements.displayHealResult.textContent = `Running self-heal: ${action}...`;
       try {
@@ -432,7 +543,7 @@
 
     async function refreshAll() {
       try {
-        await Promise.all([refreshNetwork(), refreshAuth(), refreshUpdater(), refreshDisplayPipeline(), refreshLogs()]);
+        await Promise.all([refreshNetwork(), refreshAuth(), refreshUpdater(), refreshDisplayPipeline(), refreshDisplayPreferences(), refreshLogs()]);
         lastRefreshed.textContent = `Last refresh: ${new Date().toLocaleTimeString()} (auto every 5s)`;
       } catch (error) {
         lastRefreshed.textContent = `Refresh failed at ${new Date().toLocaleTimeString()}`;
@@ -487,9 +598,13 @@
     elements.healRestartLightdm.addEventListener("click", () => runDisplaySelfHeal("restart-lightdm"));
     elements.healReboot.addEventListener("click", () => runDisplaySelfHeal("reboot"));
     elements.checkUpdaterNow.addEventListener("click", checkUpdaterNow);
+    elements.displayPrefsForm.addEventListener("submit", saveDisplayPreferences);
+    elements.displayScale.addEventListener("input", syncDisplayPreferenceLabels);
+    elements.displayRotation.addEventListener("input", syncDisplayPreferenceLabels);
 
     elements.manualRefresh.addEventListener("click", refreshAll);
 
+    syncDisplayPreferenceLabels();
     refreshAll();
     setInterval(refreshAll, REFRESH_MS);
   </script>

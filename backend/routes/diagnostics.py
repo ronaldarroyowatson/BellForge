@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from backend.services.auth import get_auth_status
+from backend.services.display_preferences import get_display_preferences, update_display_preferences
 from backend.services.device_info import collect_device_status
 from backend.services.display_pipeline import collect_display_pipeline, run_self_heal
 from backend.services.logs import read_logs
@@ -35,6 +36,11 @@ class DisplaySelfHealPayload(BaseModel):
         "force-hdmi-mode",
         "cold-reboot",
     ]
+
+
+class DisplayPreferencesPayload(BaseModel):
+    overscan_percent: int | None = Field(default=None, ge=85, le=100)
+    diagnostics_rotation_seconds: int | None = Field(default=None, ge=4, le=30)
 
 
 def _error_detail(message: str) -> dict[str, str]:
@@ -117,6 +123,26 @@ async def display_pipeline() -> dict[str, Any]:
         return await collect_display_pipeline(_PROJECT_ROOT)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Display pipeline failed: {exc}")) from exc
+
+
+@router.get("/display/preferences", summary="Get current display preferences")
+async def display_preferences() -> dict[str, Any]:
+    try:
+        return get_display_preferences(_PROJECT_ROOT)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Display preferences failed: {exc}")) from exc
+
+
+@router.post("/display/preferences", summary="Update display preferences")
+async def update_display_preferences_route(payload: DisplayPreferencesPayload) -> dict[str, Any]:
+    try:
+        return update_display_preferences(
+            _PROJECT_ROOT,
+            overscan_percent=payload.overscan_percent,
+            diagnostics_rotation_seconds=payload.diagnostics_rotation_seconds,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Display preference update failed: {exc}")) from exc
 
 
 @router.post("/display/self-heal", summary="Run a display self-heal action")
