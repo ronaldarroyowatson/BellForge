@@ -439,6 +439,50 @@ class UpdateAgent:
         if path.is_file():
             path.unlink()
 
+    def _venv_python_for_apply(self) -> Path | None:
+        candidates = [
+            self.install_dir / ".venv" / "bin" / "python",
+            self.install_dir / ".venv" / "Scripts" / "python.exe",
+        ]
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate
+        return None
+
+    def _sync_runtime_dependencies(self, source_root: Path) -> None:
+        python_exe = self._venv_python_for_apply()
+        if python_exe is None:
+            self.log.warning("No managed virtualenv python found; skipping dependency sync during staged apply")
+            return
+
+        requirement_files = [
+            source_root / "backend" / "requirements.txt",
+            source_root / "updater" / "requirements.txt",
+        ]
+
+        for requirement_file in requirement_files:
+            if not requirement_file.is_file():
+                continue
+            self.log.info(f"Syncing dependencies from {requirement_file}")
+            result = subprocess.run(
+                [
+                    str(python_exe),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--disable-pip-version-check",
+                    "-r",
+                    str(requirement_file),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Dependency sync failed for {requirement_file}: {(result.stderr or result.stdout).strip()}"
+                )
+
     def _apply_pending_release_if_present(self) -> None:
         pending = self._read_pending_update()
         if not pending:
@@ -483,6 +527,26 @@ class UpdateAgent:
             trigger_source="boot",
             update_available=False,
         )
+
+        try:
+            self._sync_runtime_dependencies(shadow_dir)
+        except Exception as exc:
+            self._write_state(
+                "failed",
+                f"Failed to sync staged dependencies for BellForge {release_version}: {exc}",
+                staging_in_progress=False,
+                reboot_pending=True,
+                latest_version=release_version,
+                trigger_source="boot",
+                update_available=True,
+            )
+            self._write_last_result(
+                "failed",
+                f"Dependency sync failed for staged release {release_version}: {exc}",
+                latest_version=release_version,
+                trigger_source="boot",
+            )
+            raise
 
         self._atomic_swap_roots(shadow_dir, managed_roots)
         manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
