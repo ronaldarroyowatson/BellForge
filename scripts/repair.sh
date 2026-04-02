@@ -56,10 +56,14 @@ validate_structure() {
   run mkdir -p "${INSTALL_DIR}/client"
 }
 
-configure_network_permissions() {
-  local sudoers_file="/etc/sudoers.d/bellforge-network"
+configure_self_heal_permissions() {
+  local sudoers_file="/etc/sudoers.d/bellforge-self-heal"
   run bash -c "cat > '${sudoers_file}' <<'EOF'
 ${SERVICE_USER} ALL=(root) NOPASSWD: /usr/bin/nmcli
+${SERVICE_USER} ALL=(root) NOPASSWD: /bin/systemctl
+${SERVICE_USER} ALL=(root) NOPASSWD: /usr/bin/systemctl
+${SERVICE_USER} ALL=(root) NOPASSWD: /sbin/reboot
+${SERVICE_USER} ALL=(root) NOPASSWD: /usr/sbin/reboot
 EOF"
   run chmod 0440 "${sudoers_file}"
 }
@@ -357,7 +361,7 @@ main() {
   log "Starting BellForge repair"
 
   validate_structure
-  configure_network_permissions
+  configure_self_heal_permissions
   validate_chromium
   validate_kiosk_boot
   validate_rpi_firmware
