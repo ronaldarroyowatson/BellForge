@@ -1,6 +1,6 @@
 {
-  "version": "0.1.21",
-  "released_at": "2026-04-02T18:10:56Z",
+  "version": "0.1.22",
+  "released_at": "2026-04-02T18:12:11Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
   "notes": "Initial beta baseline"
