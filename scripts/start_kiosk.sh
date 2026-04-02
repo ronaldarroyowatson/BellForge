@@ -6,7 +6,10 @@ log() {
 }
 
 log_debug() {
-  [[ "${DEBUG_KIOSK:-0}" == "1" ]] && log "DEBUG: $*"
+  if [[ "${DEBUG_KIOSK:-0}" == "1" ]]; then
+    log "DEBUG: $*"
+  fi
+  return 0
 }
 
 log_error() {

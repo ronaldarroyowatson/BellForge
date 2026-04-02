@@ -1,0 +1,228 @@
+{
+  "timestamp": "2026-04-02T13:39:54.441432+00:00",
+  "host": "local",
+  "services": {
+    "bellforge-backend.service": {
+      "unit": "bellforge-backend.service",
+      "active": "active",
+      "enabled": "enabled",
+      "active_rc": 0,
+      "enabled_rc": 0,
+      "active_err": "",
+      "enabled_err": ""
+    },
+    "bellforge-client.service": {
+      "unit": "bellforge-client.service",
+      "active": "active",
+      "enabled": "enabled",
+      "active_rc": 0,
+      "enabled_rc": 0,
+      "active_err": "",
+      "enabled_err": ""
+    },
+    "bellforge-updater.service": {
+      "unit": "bellforge-updater.service",
+      "active": "inactive",
+      "enabled": "disabled",
+      "active_rc": 3,
+      "enabled_rc": 1,
+      "active_err": "",
+      "enabled_err": ""
+    },
+    "lightdm.service": {
+      "unit": "lightdm.service",
+      "active": "active",
+      "enabled": "enabled",
+      "active_rc": 0,
+      "enabled_rc": 0,
+      "active_err": "",
+      "enabled_err": ""
+    }
+  },
+  "api": {
+    "health": {
+      "ok": true,
+      "payload": {
+        "status": "ok"
+      }
+    },
+    "network": {
+      "ok": true,
+      "payload": {
+        "timestamp": "2026-04-02T13:39:54.777364+00:00",
+        "ssid": "TAA-Staff",
+        "signal_strength": 73,
+        "ip_address": "192.168.2.180",
+        "ethernet_available": true,
+        "connection_type": "wifi"
+      }
+    },
+    "auth": {
+      "ok": true,
+      "payload": {
+        "timestamp": "2026-04-02T13:39:54.780959+00:00",
+        "credentials": {
+          "username": "",
+          "password": ""
+        },
+        "authentication_succeeded": false,
+        "last_auth_attempt": null
+      }
+    },
+    "updater": {
+      "ok": true,
+      "payload": {
+        "timestamp": "2026-04-02T13:39:54.869040+00:00",
+        "current_device_version": "0.1.14",
+        "latest_detected_version": "0.1.12",
+        "staging_in_progress": false,
+        "reboot_pending": false,
+        "download_progress": {
+          "bytes_downloaded": 26690,
+          "bytes_total": 26690,
+          "percent": 100.0
+        },
+        "last_update_attempt": "2026-04-02T13:08:36Z",
+        "last_update_result": "no-change"
+      }
+    },
+    "display": {
+      "ok": true,
+      "payload": {
+        "timestamp": "2026-04-02T13:39:55.174406+00:00",
+        "health": "error",
+        "version": "0.1.14",
+        "kiosk_url": "http://127.0.0.1:8000/client/index.html",
+        "services": {
+          "backend": {
+            "active": "active",
+            "enabled": "enabled",
+            "service_manager_ok": true,
+            "is_active": true,
+            "is_enabled": true
+          },
+          "client": {
+            "active": "active",
+            "enabled": "enabled",
+            "service_manager_ok": true,
+            "is_active": true,
+            "is_enabled": true
+          },
+          "updater": {
+            "active": "inactive",
+            "enabled": "disabled",
+            "service_manager_ok": true,
+            "is_active": false,
+            "is_enabled": false
+          },
+          "display_manager": {
+            "active": "active",
+            "enabled": "enabled",
+            "service_manager_ok": true,
+            "is_active": true,
+            "is_enabled": true
+          }
+        },
+        "http_probes": {
+          "backend_health": {
+            "url": "http://127.0.0.1:8000/health",
+            "ok": true,
+            "status_code": 200,
+            "error": null
+          },
+          "kiosk_url": {
+            "url": "http://127.0.0.1:8000/client/index.html",
+            "ok": true,
+            "status_code": 200,
+            "error": null
+          },
+          "status_url": {
+            "url": "http://127.0.0.1:8000/status",
+            "ok": true,
+            "status_code": 200,
+            "error": null
+          }
+        },
+        "hdmi_outputs": [],
+        "gpu_diagnostics": {
+          "driver_loaded": false,
+          "gpu_devices": [
+            "gpu"
+          ],
+          "memory_pressure": 8.282705652981337,
+          "gpu_busy": null,
+          "powerman_status": null,
+          "thermal_status": {
+            "temp_celsius": 61.835
+          },
+          "errors": []
+        },
+        "display_mode": {
+          "xrandr_output": null,
+          "drm_modes": [],
+          "x_display_var": null,
+          "x_socket_connected": false,
+          "errors": [
+            "xrandr failed: Can't open display :0\n"
+          ]
+        },
+        "framebuffer": {
+          "fb_device": "present",
+          "fb_size": null,
+          "fb_colormap": null,
+          "errors": []
+        },
+        "issues": [
+          {
+            "level": "error",
+            "code": "x_display_not_ready",
+            "message": "X display socket not found; X server may not be running.",
+            "suggestion": "Restart lightdm service."
+          },
+          {
+            "level": "warn",
+            "code": "display_mode_detection_failed",
+            "message": "Could not detect display mode: xrandr failed: Can't open display :0\n",
+            "suggestion": "Verify DISPLAY variable and X server status."
+          }
+        ],
+        "suggested_actions": [
+          "enable-client",
+          "restart-client",
+          "restart-lightdm",
+          "reboot"
+        ]
+      }
+    }
+  },
+  "journals": {
+    "bellforge-backend.service": {
+      "unit": "bellforge-backend.service",
+      "ok": true,
+      "returncode": 0,
+      "text": "Apr 02 13:33:38 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:55992 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:33:38 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:54436 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:33:38 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:59745 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:33:38 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:56312 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:33:38 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:56316 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:33:38 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:56324 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:33:38 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:57590 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:33:38 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:49302 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:33:43 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:49302 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:33:43 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:57590 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:33:43 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:55992 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:33:43 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:56338 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:33:43 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:56348 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:33:43 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:56354 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:33:43 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:59745 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:33:43 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:54436 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:33:47 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:59745 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:33:47 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:54436 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:33:47 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:49302 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:33:48 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:35468 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:33:48 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:35478 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:33:48 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:35480 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:33:48 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:55992 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:33:48 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:57590 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:33:52 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:57590 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:33:53 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:55992 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:33:53 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:59745 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:33:53 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:35492 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:33:53 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:35502 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:33:53 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:35516 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:33:53 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:49302 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:33:53 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:54436 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:33:58 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:54436 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:33:58 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:49302 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:33:58 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:64499 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:33:58 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40030 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:33:58 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40034 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:33:58 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40044 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:33:58 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:59745 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:33:58 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:54436 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:34:03 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:59745 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:34:03 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:54436 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:34:03 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:51121 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:34:03 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40048 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:34:03 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40060 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:34:03 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40062 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:34:03 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:49302 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:34:03 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:64499 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:34:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:57294 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:34:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:52948 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:34:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:61108 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:34:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40592 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:34:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40596 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:34:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:56128 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:34:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:40598 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:34:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:65487 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:35:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:58993 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:35:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:51917 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:35:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:59139 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:35:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:58904 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:35:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:58912 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:35:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:58918 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:35:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:50358 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:35:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:52187 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:36:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:57057 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:36:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:64563 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK\nApr 02 13:36:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:57071 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:36:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:59248 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:36:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:59252 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:36:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:59260 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:36:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:58956 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:36:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:49872 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:37:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:62455 - \"GET /api/network/info HTTP/1.1\" 200 OK\nApr 02 13:37:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:62455 - \"GET /api/auth/status HTTP/1.1\" 200 OK\nApr 02 13:37:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:62455 - \"GET /api/updater/status HTTP/1.1\" 200 OK\nApr 02 13:37:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:41738 - \"GET /health HTTP/1.1\" 200 OK\nApr 02 13:37:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:41742 - \"GET /client/index.html HTTP/1.1\" 200 OK\nApr 02 13:37:26 RPi5Dev bellforge-backend[1121]: INFO:     127.0.0.1:41748 - \"GET /status HTTP/1.1\" 200 OK\nApr 02 13:37:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:62455 - \"GET /api/display/pipeline HTTP/1.1\" 200 OK\nApr 02 13:37:26 RPi5Dev bellforge-backend[1121]: INFO:     192.168.2.234:62455 - \"GET /api/logs/backend?lines=200 HTTP/1.1\" 200 OK",
+      "stderr": ""
+    },
+    "bellforge-client.service": {
+      "unit": "bellforge-client.service",
+      "ok": true,
+      "returncode": 0,
+      "text": "Apr 02 13:29:06 RPi5Dev bellforge-client[3200]: [2026-04-02T13:29:06Z] CEC commands sent\nApr 02 13:29:06 RPi5Dev bellforge-client[3200]: [2026-04-02T13:29:06Z] Waiting up to 45s for connected HDMI output...\nApr 02 13:29:51 RPi5Dev bellforge-client[3200]: [2026-04-02T13:29:51Z] ERROR: No HDMI connection detected after 45s\nApr 02 13:29:51 RPi5Dev bellforge-client[3200]: [2026-04-02T13:29:51Z] Waiting up to 45s for X display server...\nApr 02 13:30:36 RPi5Dev bellforge-client[3200]: [2026-04-02T13:30:36Z] ERROR: X display not ready after 45s\nApr 02 13:30:36 RPi5Dev bellforge-client[3200]: [2026-04-02T13:30:36Z] ERROR: X server startup failed; exiting for systemd restart\nApr 02 13:30:36 RPi5Dev systemd[1]: bellforge-client.service: Main process exited, code=exited, status=1/FAILURE\nApr 02 13:30:36 RPi5Dev systemd[1]: bellforge-client.service: Failed with result 'exit-code'.\nApr 02 13:30:46 RPi5Dev systemd[1]: bellforge-client.service: Scheduled restart job, restart counter is at 5.\nApr 02 13:30:46 RPi5Dev systemd[1]: Started bellforge-client.service - BellForge Signage Client (Chromium Kiosk).\nApr 02 13:30:46 RPi5Dev bellforge-client[3843]: [2026-04-02T13:30:46Z] =========== BellForge Kiosk Starting ===========\nApr 02 13:30:46 RPi5Dev bellforge-client[3843]: [2026-04-02T13:30:46Z] Using browser: /usr/lib/chromium/chromium\nApr 02 13:30:46 RPi5Dev bellforge-client[3843]: [2026-04-02T13:30:46Z] Sending HDMI-CEC commands...\nApr 02 13:30:47 RPi5Dev bellforge-client[3843]: [2026-04-02T13:30:47Z] CEC commands sent\nApr 02 13:30:47 RPi5Dev bellforge-client[3843]: [2026-04-02T13:30:47Z] Waiting up to 45s for connected HDMI output...\nApr 02 13:31:32 RPi5Dev bellforge-client[3843]: [2026-04-02T13:31:32Z] ERROR: No HDMI connection detected after 45s\nApr 02 13:31:32 RPi5Dev bellforge-client[3843]: [2026-04-02T13:31:32Z] Waiting up to 45s for X display server...\nApr 02 13:32:17 RPi5Dev bellforge-client[3843]: [2026-04-02T13:32:17Z] ERROR: X display not ready after 45s\nApr 02 13:32:17 RPi5Dev bellforge-client[3843]: [2026-04-02T13:32:17Z] ERROR: X server startup failed; exiting for systemd restart\nApr 02 13:32:17 RPi5Dev systemd[1]: bellforge-client.service: Main process exited, code=exited, status=1/FAILURE\nApr 02 13:32:17 RPi5Dev systemd[1]: bellforge-client.service: Failed with result 'exit-code'.\nApr 02 13:32:27 RPi5Dev systemd[1]: bellforge-client.service: Scheduled restart job, restart counter is at 6.\nApr 02 13:32:27 RPi5Dev systemd[1]: Started bellforge-client.service - BellForge Signage Client (Chromium Kiosk).\nApr 02 13:32:28 RPi5Dev bellforge-client[4510]: [2026-04-02T13:32:28Z] =========== BellForge Kiosk Starting ===========\nApr 02 13:32:28 RPi5Dev bellforge-client[4510]: [2026-04-02T13:32:28Z] Using browser: /usr/lib/chromium/chromium\nApr 02 13:32:28 RPi5Dev bellforge-client[4510]: [2026-04-02T13:32:28Z] Sending HDMI-CEC commands...\nApr 02 13:32:28 RPi5Dev bellforge-client[4510]: [2026-04-02T13:32:28Z] CEC commands sent\nApr 02 13:32:28 RPi5Dev bellforge-client[4510]: [2026-04-02T13:32:28Z] Waiting up to 45s for connected HDMI output...\nApr 02 13:33:13 RPi5Dev bellforge-client[4510]: [2026-04-02T13:33:13Z] ERROR: No HDMI connection detected after 45s\nApr 02 13:33:13 RPi5Dev bellforge-client[4510]: [2026-04-02T13:33:13Z] Waiting up to 45s for X display server...\nApr 02 13:33:59 RPi5Dev bellforge-client[4510]: [2026-04-02T13:33:59Z] ERROR: X display not ready after 45s\nApr 02 13:33:59 RPi5Dev bellforge-client[4510]: [2026-04-02T13:33:59Z] ERROR: X server startup failed; exiting for systemd restart\nApr 02 13:33:59 RPi5Dev systemd[1]: bellforge-client.service: Main process exited, code=exited, status=1/FAILURE\nApr 02 13:33:59 RPi5Dev systemd[1]: bellforge-client.service: Failed with result 'exit-code'.\nApr 02 13:34:09 RPi5Dev systemd[1]: bellforge-client.service: Scheduled restart job, restart counter is at 7.\nApr 02 13:34:09 RPi5Dev systemd[1]: Started bellforge-client.service - BellForge Signage Client (Chromium Kiosk).\nApr 02 13:34:09 RPi5Dev bellforge-client[5178]: [2026-04-02T13:34:09Z] =========== BellForge Kiosk Starting ===========\nApr 02 13:34:09 RPi5Dev bellforge-client[5178]: [2026-04-02T13:34:09Z] Using browser: /usr/lib/chromium/chromium\nApr 02 13:34:09 RPi5Dev bellforge-client[5178]: [2026-04-02T13:34:09Z] Sending HDMI-CEC commands...\nApr 02 13:34:09 RPi5Dev bellforge-client[5178]: [2026-04-02T13:34:09Z] CEC commands sent\nApr 02 13:34:09 RPi5Dev bellforge-client[5178]: [2026-04-02T13:34:09Z] Waiting up to 45s for connected HDMI output...\nApr 02 13:34:55 RPi5Dev bellforge-client[5178]: [2026-04-02T13:34:55Z] ERROR: No HDMI connection detected after 45s\nApr 02 13:34:55 RPi5Dev bellforge-client[5178]: [2026-04-02T13:34:55Z] Waiting up to 45s for X display server...\nApr 02 13:35:40 RPi5Dev bellforge-client[5178]: [2026-04-02T13:35:40Z] ERROR: X display not ready after 45s\nApr 02 13:35:40 RPi5Dev bellforge-client[5178]: [2026-04-02T13:35:40Z] ERROR: X server startup failed; exiting for systemd restart\nApr 02 13:35:40 RPi5Dev systemd[1]: bellforge-client.service: Main process exited, code=exited, status=1/FAILURE\nApr 02 13:35:40 RPi5Dev systemd[1]: bellforge-client.service: Failed with result 'exit-code'.\nApr 02 13:35:50 RPi5Dev systemd[1]: bellforge-client.service: Scheduled restart job, restart counter is at 8.\nApr 02 13:35:50 RPi5Dev systemd[1]: Started bellforge-client.service - BellForge Signage Client (Chromium Kiosk).\nApr 02 13:35:50 RPi5Dev bellforge-client[5410]: [2026-04-02T13:35:50Z] =========== BellForge Kiosk Starting ===========\nApr 02 13:35:50 RPi5Dev bellforge-client[5410]: [2026-04-02T13:35:50Z] Using browser: /usr/lib/chromium/chromium\nApr 02 13:35:50 RPi5Dev bellforge-client[5410]: [2026-04-02T13:35:50Z] Sending HDMI-CEC commands...\nApr 02 13:35:51 RPi5Dev bellforge-client[5410]: [2026-04-02T13:35:51Z] CEC commands sent\nApr 02 13:35:51 RPi5Dev bellforge-client[5410]: [2026-04-02T13:35:51Z] Waiting up to 45s for connected HDMI output...\nApr 02 13:36:36 RPi5Dev bellforge-client[5410]: [2026-04-02T13:36:36Z] ERROR: No HDMI connection detected after 45s\nApr 02 13:36:36 RPi5Dev bellforge-client[5410]: [2026-04-02T13:36:36Z] Waiting up to 45s for X display server...\nApr 02 13:37:21 RPi5Dev bellforge-client[5410]: [2026-04-02T13:37:21Z] ERROR: X display not ready after 45s\nApr 02 13:37:21 RPi5Dev bellforge-client[5410]: [2026-04-02T13:37:21Z] ERROR: X server startup failed; exiting for systemd restart\nApr 02 13:37:21 RPi5Dev systemd[1]: bellforge-client.service: Main process exited, code=exited, status=1/FAILURE\nApr 02 13:37:21 RPi5Dev systemd[1]: bellforge-client.service: Failed with result 'exit-code'.\nApr 02 13:37:31 RPi5Dev systemd[1]: bellforge-client.service: Scheduled restart job, restart counter is at 9.\nApr 02 13:37:31 RPi5Dev systemd[1]: Started bellforge-client.service - BellForge Signage Client (Chromium Kiosk).\nApr 02 13:37:32 RPi5Dev bellforge-client[5640]: [2026-04-02T13:37:32Z] =========== BellForge Kiosk Starting ===========\nApr 02 13:37:32 RPi5Dev bellforge-client[5640]: [2026-04-02T13:37:32Z] Using browser: /usr/lib/chromium/chromium\nApr 02 13:37:32 RPi5Dev bellforge-client[5640]: [2026-04-02T13:37:32Z] Sending HDMI-CEC commands...\nApr 02 13:37:32 RPi5Dev bellforge-client[5640]: [2026-04-02T13:37:32Z] CEC commands sent\nApr 02 13:37:32 RPi5Dev bellforge-client[5640]: [2026-04-02T13:37:32Z] Waiting up to 45s for connected HDMI output...\nApr 02 13:38:18 RPi5Dev bellforge-client[5640]: [2026-04-02T13:38:18Z] ERROR: No HDMI connection detected after 45s\nApr 02 13:38:18 RPi5Dev bellforge-client[5640]: [2026-04-02T13:38:18Z] Waiting up to 45s for X display server...\nApr 02 13:39:03 RPi5Dev bellforge-client[5640]: [2026-04-02T13:39:03Z] ERROR: X display not ready after 45s\nApr 02 13:39:03 RPi5Dev bellforge-client[5640]: [2026-04-02T13:39:03Z] ERROR: X server startup failed; exiting for systemd restart\nApr 02 13:39:03 RPi5Dev systemd[1]: bellforge-client.service: Main process exited, code=exited, status=1/FAILURE\nApr 02 13:39:03 RPi5Dev systemd[1]: bellforge-client.service: Failed with result 'exit-code'.\nApr 02 13:39:13 RPi5Dev systemd[1]: bellforge-client.service: Scheduled restart job, restart counter is at 10.\nApr 02 13:39:13 RPi5Dev systemd[1]: Started bellforge-client.service - BellForge Signage Client (Chromium Kiosk).\nApr 02 13:39:13 RPi5Dev bellforge-client[5825]: [2026-04-02T13:39:13Z] =========== BellForge Kiosk Starting ===========\nApr 02 13:39:13 RPi5Dev bellforge-client[5825]: [2026-04-02T13:39:13Z] Using browser: /usr/lib/chromium/chromium\nApr 02 13:39:13 RPi5Dev bellforge-client[5825]: [2026-04-02T13:39:13Z] Sending HDMI-CEC commands...\nApr 02 13:39:14 RPi5Dev bellforge-client[5825]: [2026-04-02T13:39:14Z] CEC commands sent\nApr 02 13:39:14 RPi5Dev bellforge-client[5825]: [2026-04-02T13:39:14Z] Waiting up to 45s for connected HDMI output...",
+      "stderr": ""
+    },
+    "bellforge-updater.service": {
+      "unit": "bellforge-updater.service",
+      "ok": true,
+      "returncode": 0,
+      "text": "-- No entries --",
+      "stderr": ""
+    },
+    "lightdm.service": {
+      "unit": "lightdm.service",
+      "ok": true,
+      "returncode": 0,
+      "text": "Apr 02 13:22:19 RPi5Dev systemd[1]: Starting lightdm.service - Light Display Manager...\nApr 02 13:22:20 RPi5Dev systemd[1]: Started lightdm.service - Light Display Manager.\nApr 02 13:22:20 RPi5Dev lightdm[1169]: Error getting user list from org.freedesktop.Accounts: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.Accounts was not provided by any .service files",
+      "stderr": ""
+    }
+  }
+}

@@ -48,6 +48,15 @@ scp tests/test_display_stress.sh "$PI_USER@$PI_IP":/opt/bellforge/tests/ 2>/dev/
 log "Deploying documentation..."
 scp docs/DISPLAY_DEBUGGING_GUIDE.md "$PI_USER@$PI_IP":/opt/bellforge/docs/ 2>/dev/null && log "  ✓ DISPLAY_DEBUGGING_GUIDE.md" || log "  ✗ DISPLAY_DEBUGGING_GUIDE.md"
 
+# Normalize script line endings after Windows-origin copies.
+log "Normalizing script line endings..."
+if ssh "$PI_USER@$PI_IP" "sudo sed -i 's/\\r$//' /opt/bellforge/scripts/start_kiosk.sh /opt/bellforge/scripts/post_boot_capture.sh /opt/bellforge/scripts/repair_display.sh /opt/bellforge/tests/test_display_pipeline.sh /opt/bellforge/tests/test_display_stress.sh"; then
+  log "  ✓ Line endings normalized"
+else
+  log "  ✗ Line ending normalization failed"
+  exit 1
+fi
+
 # Make scripts executable
 log "Setting execute permissions..."
 if ssh "$PI_USER@$PI_IP" "sudo chmod +x /opt/bellforge/scripts/start_kiosk.sh /opt/bellforge/scripts/gpu_diagnostics.py /opt/bellforge/scripts/post_boot_capture.sh /opt/bellforge/scripts/repair_display.sh /opt/bellforge/tests/test_display_pipeline.sh /opt/bellforge/tests/test_display_stress.sh"; then

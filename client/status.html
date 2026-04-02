@@ -6,164 +6,507 @@
   <title>BellForge Device Status</title>
   <style>
     :root {
-      --bg: #f3efe7;
+      --bg: #f5efe5;
+      --paper: rgba(255, 251, 244, 0.92);
       --panel: #fffdf8;
-      --text: #1f2328;
-      --muted: #59636e;
-      --line: #d7cec0;
-      --good: #267d3f;
-      --warn: #b67a22;
-      --bad: #bf2e2e;
-      --accent: #155b8d;
+      --text: #1d2730;
+      --muted: #5f6a74;
+      --line: #d7c8b5;
+      --good: #1c7c46;
+      --warn: #9c6a16;
+      --bad: #b73830;
+      --accent: #134f78;
+      --accent-soft: #e2eef7;
+      --shadow: 0 18px 36px rgba(27, 39, 49, 0.10);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Segoe UI", "Trebuchet MS", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 12% 16%, #f5e9d2 0%, transparent 42%),
-        radial-gradient(circle at 82% 4%, #dbe8f3 0%, transparent 36%),
-        var(--bg);
       min-height: 100vh;
+      color: var(--text);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 12%, rgba(235, 198, 140, 0.35) 0%, transparent 30%),
+        radial-gradient(circle at 88% 10%, rgba(133, 181, 214, 0.22) 0%, transparent 26%),
+        linear-gradient(180deg, #f8f2e8 0%, #efe5d8 100%);
     }
     .wrap {
-      max-width: 1080px;
+      max-width: 1240px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 24px;
     }
-    .title {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 12px;
-      margin-bottom: 14px;
+    .hero {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+    .card {
+      background: var(--paper);
+      border: 1px solid rgba(215, 200, 181, 0.9);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+    .hero-main {
+      padding: 28px;
+    }
+    .eyebrow {
+      display: inline-block;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: #18394f;
+      color: #f8fbff;
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
     }
     h1 {
-      margin: 0;
-      font-size: 1.6rem;
-      letter-spacing: 0.02em;
-      color: #0f3f60;
+      margin: 0 0 10px;
+      font-size: clamp(2.2rem, 4vw, 4rem);
+      line-height: 0.95;
+      color: #12344c;
     }
-    .sub {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.95rem;
+    .lede {
+      margin: 0 0 22px;
+      color: #31424e;
+      font-size: clamp(1rem, 1.8vw, 1.35rem);
+      max-width: 34rem;
     }
-    .panel {
-      background: var(--panel);
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .step {
+      background: #fffdf8;
       border: 1px solid var(--line);
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 10px 22px rgba(15, 36, 54, 0.08);
+      border-radius: 18px;
+      padding: 16px;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    .step-num {
+      display: inline-flex;
+      width: 30px;
+      height: 30px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      margin-bottom: 10px;
     }
-    th, td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--line);
-      vertical-align: top;
-      font-size: 0.95rem;
+    .step p {
+      margin: 0;
+      color: #364550;
+      font-size: 0.98rem;
+      line-height: 1.4;
     }
-    th {
-      width: 34%;
-      text-align: left;
-      color: #32414d;
-      background: #f9f2e6;
-      font-weight: 600;
+    .hero-side {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+      background: linear-gradient(180deg, rgba(19, 79, 120, 0.94), rgba(12, 54, 83, 0.95));
+      color: #f5fbff;
     }
-    tr:last-child th,
-    tr:last-child td {
-      border-bottom: none;
+    .hero-side h2,
+    .url-panel h2,
+    .stats h2,
+    .advanced h2 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .hero-side p {
+      margin: 0;
+      color: rgba(245, 251, 255, 0.84);
+      line-height: 1.45;
+    }
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .quick-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .quick-card strong,
+    .quick-card span {
+      display: block;
+    }
+    .quick-card strong {
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: rgba(245, 251, 255, 0.72);
+      margin-bottom: 6px;
+    }
+    .quick-card span {
+      font-size: 1.15rem;
+      font-weight: 700;
+      word-break: break-word;
+    }
+    .url-panel {
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+    .url-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .url-card {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      padding: 18px;
+    }
+    .url-card p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+    .url-card a {
+      display: block;
+      color: #0f4467;
+      text-decoration: none;
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      font-size: clamp(1.1rem, 2vw, 1.65rem);
+      line-height: 1.3;
+      word-break: break-word;
+      background: var(--accent-soft);
+      border: 1px solid #b8d0df;
+      border-radius: 16px;
+      padding: 14px 16px;
+    }
+    .browser-note {
+      margin: 14px 0 0;
+      color: #4d5d68;
+      font-size: 0.96rem;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .stat-card {
+      padding: 18px;
+    }
+    .stat-card h3 {
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .stat-card p {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 700;
+      word-break: break-word;
+    }
+    .advanced {
+      padding: 18px 22px 22px;
+    }
+    .advanced summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .advanced summary::-webkit-details-marker {
+      display: none;
+    }
+    .advanced-copy {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .advanced-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 18px;
+      margin-top: 18px;
+    }
+    .advanced-item {
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+    .advanced-item strong {
+      display: block;
+      color: #43535e;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .advanced-item span,
+    .advanced-item div {
+      color: var(--text);
+      font-size: 0.98rem;
+      word-break: break-word;
     }
     .pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-weight: 600;
+      font-weight: 700;
       border-radius: 999px;
-      padding: 3px 10px;
-      font-size: 0.85rem;
+      padding: 5px 11px;
+      font-size: 0.86rem;
       border: 1px solid transparent;
     }
     .ok {
       color: var(--good);
-      border-color: #79c18b;
+      border-color: #7ab88f;
       background: #edf8f0;
     }
     .warn {
       color: var(--warn);
-      border-color: #e5b771;
-      background: #fff6e8;
+      border-color: #dbbd83;
+      background: #fff5e6;
     }
     .bad {
       color: var(--bad);
-      border-color: #e9a2a2;
-      background: #fff0f0;
+      border-color: #e0a3a0;
+      background: #fff0ef;
     }
     .mono {
       font-family: "Consolas", "Cascadia Mono", monospace;
-      font-size: 0.9rem;
-      word-break: break-word;
     }
-    @media (max-width: 760px) {
-      .title {
-        flex-direction: column;
-        align-items: flex-start;
+    .refresh {
+      margin-top: 10px;
+      color: rgba(245, 251, 255, 0.76);
+      font-size: 0.9rem;
+    }
+    .advanced-pager {
+      display: none;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-align: right;
+    }
+    body.display-view .wrap {
+      max-width: 1280px;
+      padding: 14px 18px;
+    }
+    body.display-view .hero,
+    body.display-view .url-panel,
+    body.display-view .stats {
+      margin-bottom: 12px;
+    }
+    body.display-view .hero-main,
+    body.display-view .hero-side,
+    body.display-view .url-panel,
+    body.display-view .stat-card,
+    body.display-view .advanced {
+      padding: 16px 18px;
+    }
+    body.display-view h1 {
+      font-size: clamp(1.8rem, 3vw, 3rem);
+    }
+    body.display-view .lede {
+      margin-bottom: 16px;
+      font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+    }
+    body.display-view .steps {
+      gap: 10px;
+    }
+    body.display-view .step {
+      padding: 12px;
+    }
+    body.display-view .url-card a {
+      font-size: clamp(1rem, 1.2vw, 1.3rem);
+      padding: 12px 14px;
+    }
+    body.display-view .stat-card p {
+      font-size: 1.15rem;
+    }
+    body.display-view .advanced {
+      padding-bottom: 14px;
+    }
+    body.display-view .advanced[open] summary .pill {
+      display: none;
+    }
+    body.display-view .advanced-grid {
+      margin-top: 14px;
+      min-height: 132px;
+    }
+    body.display-view .advanced-item {
+      display: none;
+      padding-top: 10px;
+    }
+    body.display-view .advanced-item.active {
+      display: block;
+    }
+    body.display-view .advanced-pager {
+      display: block;
+    }
+    @media (max-width: 980px) {
+      .hero,
+      .url-grid,
+      .stats,
+      .advanced-grid,
+      .steps {
+        grid-template-columns: 1fr;
       }
-      th, td {
-        display: block;
-        width: 100%;
+      .quick-grid {
+        grid-template-columns: 1fr 1fr;
       }
-      th {
-        border-bottom: none;
-        padding-bottom: 2px;
+    }
+    @media (max-width: 640px) {
+      .wrap {
+        padding: 14px;
       }
-      td {
-        padding-top: 0;
+      .hero-main,
+      .hero-side,
+      .url-panel,
+      .stat-card,
+      .advanced {
+        padding: 16px;
+      }
+      .quick-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
   <main class="wrap">
-    <header class="title">
-      <h1>Device Status Dashboard</h1>
-      <p class="sub" id="refreshLabel">Refreshing every 10 seconds</p>
-    </header>
+    <section class="hero">
+      <article class="card hero-main">
+        <div class="eyebrow">BellForge Setup Screen</div>
+        <h1>Connect to this display from your browser.</h1>
+        <p class="lede">If you are setting this screen up for the first time, use a phone, laptop, or desktop browser and type one of the addresses shown below exactly as written.</p>
+        <ol class="steps">
+          <li class="step">
+            <span class="step-num">1</span>
+            <p>Open a web browser on another device connected to the same network.</p>
+          </li>
+          <li class="step">
+            <span class="step-num">2</span>
+            <p>Type the address shown in the large blue box into the browser address bar.</p>
+          </li>
+          <li class="step">
+            <span class="step-num">3</span>
+            <p>Use the settings page if you need to configure schedules, content, or networking.</p>
+          </li>
+        </ol>
+      </article>
 
-    <section class="panel">
-      <table>
-        <tbody>
-          <tr><th>Device Hostname</th><td id="hostname">-</td></tr>
-          <tr><th>IP Address (Local / External)</th><td id="ipAddress" class="mono">-</td></tr>
-          <tr><th>Device Access URL</th><td id="accessUrl" class="mono">-</td></tr>
-          <tr><th>Settings Page URL</th><td id="settingsUrl" class="mono">-</td></tr>
-          <tr><th>Network Connectivity</th><td id="networkStatus">-</td></tr>
-          <tr><th>Network Speed Test</th><td id="networkSpeed">-</td></tr>
-          <tr><th>Backend Reachable</th><td id="backendReachable">-</td></tr>
-          <tr><th>Autoupdater Running</th><td id="updaterRunning">-</td></tr>
-          <tr><th>Repair Service Running</th><td id="repairRunning">-</td></tr>
-          <tr><th>Other BellForge Devices</th><td id="otherDevices">-</td></tr>
-          <tr><th>Current Version</th><td id="versionValue" class="mono">-</td></tr>
-          <tr><th>Manifest Hash</th><td id="manifestHash" class="mono">-</td></tr>
-          <tr><th>System Uptime</th><td id="uptime">-</td></tr>
-          <tr><th>CPU Temperature</th><td id="cpuTemp">-</td></tr>
-          <tr><th>CPU Load</th><td id="cpuLoad">-</td></tr>
-          <tr><th>Disk Usage</th><td id="diskUsage">-</td></tr>
-          <tr><th>Memory Usage</th><td id="memoryUsage">-</td></tr>
-        </tbody>
-      </table>
+      <aside class="card hero-side">
+        <div>
+          <h2>Quick facts</h2>
+          <p>This display refreshes itself every few seconds. Once content is assigned, this setup screen will disappear automatically.</p>
+        </div>
+        <div class="quick-grid">
+          <div class="quick-card">
+            <strong>Device name</strong>
+            <span id="hostname">-</span>
+          </div>
+          <div class="quick-card">
+            <strong>Local IP</strong>
+            <span id="localIpValue">-</span>
+          </div>
+          <div class="quick-card">
+            <strong>Internet</strong>
+            <span id="networkStatus">-</span>
+          </div>
+          <div class="quick-card">
+            <strong>Version</strong>
+            <span id="versionValue">-</span>
+          </div>
+        </div>
+        <div class="refresh" id="refreshLabel">Refreshing every 10 seconds</div>
+      </aside>
     </section>
+
+    <section class="card url-panel">
+      <h2>Type these into a web browser</h2>
+      <div class="url-grid">
+        <article class="url-card">
+          <p>Open this page to reach the display dashboard.</p>
+          <a id="accessUrl" href="#" target="_blank" rel="noreferrer">Unavailable</a>
+        </article>
+        <article class="url-card">
+          <p>Open this page to change settings and manage the display.</p>
+          <a id="settingsUrl" href="#" target="_blank" rel="noreferrer">Unavailable</a>
+        </article>
+      </div>
+      <p class="browser-note">Use a browser such as Chrome, Edge, Safari, or Firefox. Enter the address in the top address bar, not in a search box.</p>
+    </section>
+
+    <section class="stats">
+      <article class="card stat-card">
+        <h3>IP Address</h3>
+        <p id="ipAddress">-</p>
+      </article>
+      <article class="card stat-card">
+        <h3>Backend</h3>
+        <p id="backendReachable">-</p>
+      </article>
+      <article class="card stat-card">
+        <h3>Updater</h3>
+        <p id="updaterRunning">-</p>
+      </article>
+      <article class="card stat-card">
+        <h3>Uptime</h3>
+        <p id="uptime">-</p>
+      </article>
+    </section>
+
+    <details class="card advanced">
+      <summary>
+        <div>
+          <h2>Advanced Diagnostics</h2>
+          <div class="advanced-copy">Smaller technical details for troubleshooting and IT staff.</div>
+        </div>
+        <span class="pill warn">Expand</span>
+      </summary>
+      <div class="advanced-grid">
+        <div class="advanced-item"><strong>External IP</strong><span id="externalIpValue">-</span></div>
+        <div class="advanced-item"><strong>Network Speed Test</strong><span id="networkSpeed">-</span></div>
+        <div class="advanced-item"><strong>Repair Service</strong><span id="repairRunning">-</span></div>
+        <div class="advanced-item"><strong>Other BellForge Devices</strong><div id="otherDevices">-</div></div>
+        <div class="advanced-item"><strong>Manifest Hash</strong><span id="manifestHash" class="mono">-</span></div>
+        <div class="advanced-item"><strong>CPU Temperature</strong><span id="cpuTemp">-</span></div>
+        <div class="advanced-item"><strong>CPU Load</strong><span id="cpuLoad">-</span></div>
+        <div class="advanced-item"><strong>Disk Usage</strong><span id="diskUsage">-</span></div>
+        <div class="advanced-item"><strong>Memory Usage</strong><span id="memoryUsage">-</span></div>
+      </div>
+      <div id="advancedPager" class="advanced-pager"></div>
+    </details>
   </main>
 
   <script>
     const REFRESH_MS = 10000;
+    const params = new URLSearchParams(window.location.search);
+    const isDisplayView = params.get("view") === "display";
+    const advancedDetails = document.querySelector(".advanced");
+    const advancedItems = Array.from(document.querySelectorAll(".advanced-item"));
+    const advancedPager = document.getElementById("advancedPager");
+    const CAROUSEL_PAGE_SIZE = 4;
+    let diagnosticsRotationMs = 8000;
+    let carouselIndex = 0;
+    let carouselTimer = null;
 
     const els = {
       hostname: document.getElementById("hostname"),
+      localIpValue: document.getElementById("localIpValue"),
+      externalIpValue: document.getElementById("externalIpValue"),
       ipAddress: document.getElementById("ipAddress"),
       accessUrl: document.getElementById("accessUrl"),
       settingsUrl: document.getElementById("settingsUrl"),
@@ -182,6 +525,11 @@
       memoryUsage: document.getElementById("memoryUsage"),
       refreshLabel: document.getElementById("refreshLabel"),
     };
+
+    if (isDisplayView) {
+      document.body.classList.add("display-view");
+      advancedDetails.open = true;
+    }
 
     function pill(text, level) {
       return `<span class="pill ${level}">${text}</span>`;
@@ -227,37 +575,76 @@
       };
     }
 
+    function setUrl(el, value) {
+      el.textContent = value;
+      el.href = value === "Unavailable" ? "#" : value;
+    }
+
+    function renderDiagnosticsCarousel() {
+      if (!isDisplayView) return;
+      const totalPages = Math.max(1, Math.ceil(advancedItems.length / CAROUSEL_PAGE_SIZE));
+      advancedItems.forEach((item, index) => {
+        const pageIndex = Math.floor(index / CAROUSEL_PAGE_SIZE);
+        item.classList.toggle("active", pageIndex === carouselIndex);
+      });
+      advancedPager.textContent = `Technical details page ${carouselIndex + 1} of ${totalPages}`;
+    }
+
+    function scheduleDiagnosticsCarousel() {
+      if (!isDisplayView) return;
+      if (carouselTimer) {
+        clearInterval(carouselTimer);
+      }
+      renderDiagnosticsCarousel();
+      const totalPages = Math.max(1, Math.ceil(advancedItems.length / CAROUSEL_PAGE_SIZE));
+      carouselTimer = setInterval(() => {
+        carouselIndex = (carouselIndex + 1) % totalPages;
+        renderDiagnosticsCarousel();
+      }, diagnosticsRotationMs);
+    }
+
+    async function refreshDisplayPreferences() {
+      try {
+        const response = await fetch("/api/display/preferences", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        diagnosticsRotationMs = Math.max(4000, Number(data.diagnostics_rotation_seconds || 8) * 1000);
+        scheduleDiagnosticsCarousel();
+      } catch (error) {
+        // Leave the current carousel timing in place.
+      }
+    }
+
     async function refresh() {
       try {
         const response = await fetch("/api/device/status", { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
 
-        els.hostname.textContent = data.hostname || "Unknown";
         const localIp = data.ip_address?.local || null;
-        els.ipAddress.textContent = `${localIp || "n/a"} / ${data.ip_address?.external || "n/a"}`;
+        const externalIp = data.ip_address?.external || null;
         const urls = buildUrls(localIp);
-        els.accessUrl.textContent = urls.base;
-        els.settingsUrl.textContent = urls.settings;
-
+        const devices = Array.isArray(data.other_bellforge_devices) ? data.other_bellforge_devices : [];
         const connectivity = data.network_connectivity || {};
         const online = connectivity.online === true;
-        els.networkStatus.innerHTML = online ? pill("Online", "ok") : pill("Offline", "bad");
-
         const ping = connectivity.ping_ms != null ? `${connectivity.ping_ms.toFixed(1)} ms` : "n/a";
         const throughput = connectivity.throughput_mbps != null ? `${connectivity.throughput_mbps.toFixed(2)} Mbps` : "n/a";
-        els.networkSpeed.textContent = `Ping: ${ping} | Throughput: ${throughput}`;
 
+        els.hostname.textContent = data.hostname || "Unknown";
+        els.localIpValue.textContent = localIp || "Unavailable";
+        els.externalIpValue.textContent = externalIp || "Unavailable";
+        els.ipAddress.textContent = localIp || "Unavailable";
+        setUrl(els.accessUrl, urls.base);
+        setUrl(els.settingsUrl, urls.settings);
+
+        els.networkStatus.innerHTML = online ? pill("Online", "ok") : pill("Offline", "bad");
+        els.networkSpeed.textContent = `Ping: ${ping} | Throughput: ${throughput}`;
         els.backendReachable.innerHTML = boolPill(data.backend_reachable);
         els.updaterRunning.innerHTML = boolPill(data.autoupdater_running);
         els.repairRunning.innerHTML = boolPill(data.repair_service_running);
-
-        const devices = Array.isArray(data.other_bellforge_devices) ? data.other_bellforge_devices : [];
-        if (devices.length === 0) {
-          els.otherDevices.innerHTML = pill("None Detected", "warn");
-        } else {
-          els.otherDevices.textContent = devices.map((d) => d.ip).join(", ");
-        }
+        els.otherDevices.innerHTML = devices.length === 0
+          ? pill("None detected", "warn")
+          : devices.map((device) => device.ip).join(", ");
 
         els.versionValue.textContent = data.version || "Unavailable";
         els.manifestHash.textContent = data.manifest_hash || "Unavailable";
@@ -266,16 +653,21 @@
         els.cpuLoad.textContent = data.cpu_load_1m != null ? data.cpu_load_1m.toFixed(2) : "Unavailable";
         els.diskUsage.textContent = percentDisplay(data.disk_usage);
         els.memoryUsage.textContent = percentDisplay(data.memory_usage);
-        els.refreshLabel.textContent = `Last refresh: ${new Date().toLocaleTimeString()} (auto every 10s)`;
+        els.refreshLabel.textContent = `Last refresh: ${new Date().toLocaleTimeString()} | Updates automatically every 10 seconds`;
       } catch (error) {
         els.networkStatus.innerHTML = pill("Fetch Failed", "bad");
-        els.accessUrl.textContent = "Unavailable";
-        els.settingsUrl.textContent = "Unavailable";
+        els.localIpValue.textContent = "Unavailable";
+        els.ipAddress.textContent = "Unavailable";
+        setUrl(els.accessUrl, "Unavailable");
+        setUrl(els.settingsUrl, "Unavailable");
         els.refreshLabel.textContent = `Last refresh failed at ${new Date().toLocaleTimeString()}`;
       }
     }
 
+    scheduleDiagnosticsCarousel();
+    refreshDisplayPreferences();
     refresh();
+    setInterval(refreshDisplayPreferences, REFRESH_MS);
     setInterval(refresh, REFRESH_MS);
   </script>
 </body>
