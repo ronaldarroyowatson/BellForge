@@ -102,6 +102,26 @@
       }
     }
 
+    async function checkContentReady() {
+      const probes = [
+        `${serverUrl}/health`,
+        `${serverUrl}/client/index.html`,
+        `${serverUrl}/client/js/main.js`,
+      ];
+
+      try {
+        const results = await Promise.all(
+          probes.map(async (url) => {
+            const res = await fetch(url, { cache: "no-store" });
+            return res.ok;
+          })
+        );
+        return results.every(Boolean);
+      } catch (error) {
+        return false;
+      }
+    }
+
     function renderEmptyState(payloadHtml) {
       if (activeMode === "empty-state-status") {
         statusEl.textContent = `Display ${displayId} | Ready to connect`;
@@ -152,6 +172,14 @@
           }
 
           renderEmptyState(payload.html);
+          return;
+        }
+
+        const contentReady = await checkContentReady();
+        if (!contentReady) {
+          clearEmptyStateTimer();
+          renderStatusFrame();
+          statusEl.textContent = `Display ${displayId} | Waiting for server and assets`;
           return;
         }
 

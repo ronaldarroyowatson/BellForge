@@ -377,8 +377,9 @@
       el.textContent = "Warning";
     }
 
-    function setBoolStatusText(el, value, labels = { true: "Healthy", false: "Not Healthy", unknown: "Unknown" }) {
-      el.className = "status " + (value === true ? "good" : value === false ? "bad" : "warn");
+    function setBoolStatusText(el, value, labels = { true: "Healthy", false: "Not Healthy", unknown: "Unknown" }, classes = { true: "good", false: "bad", unknown: "warn" }) {
+      const stateClass = value === true ? classes.true : value === false ? classes.false : classes.unknown;
+      el.className = "status " + stateClass;
       el.textContent = value === true ? labels.true : value === false ? labels.false : labels.unknown;
     }
 
@@ -430,7 +431,15 @@
       });
       elements.currentVersion.textContent = data.current_device_version || "Unavailable";
       elements.latestVersion.textContent = data.latest_detected_version || "Unavailable";
-      setStatus(elements.stagingStatus, data.staging_in_progress);
+      setBoolStatusText(elements.stagingStatus, data.staging_in_progress, {
+        true: "In Progress",
+        false: "No Update Pending",
+        unknown: "Unknown",
+      }, {
+        true: "warn",
+        false: "good",
+        unknown: "warn",
+      });
       setStatus(elements.rebootStatus, data.reboot_pending);
       setBoolStatusText(elements.updaterBootChecks, data.checks_on_boot);
       const progress = data.download_progress || {};
