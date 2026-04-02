@@ -1,14 +1,14 @@
 {
-  "version": "0.1.18",
-  "generated_at": "2026-04-02T16:51:43Z",
+  "version": "0.1.14",
+  "generated_at": "2026-04-02T17:05:55Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     "backend/main.py": {
-      "sha256": "6063d6691afaf297359b1d3b8b14e1f1833c6c4d63b3c5ecfac51a935316d487",
-      "size": 4797
+      "sha256": "e8293cb69cd06abbfd23570c3e40ed0b74aba92816714014bd8a2673d1843473",
+      "size": 4604
     },
     "backend/requirements.txt": {
       "sha256": "fa72d4a52795775f1fbe3ab6a2390e1b3a2c3a838dbc2129707b2bc683101960",
@@ -23,8 +23,8 @@
       "size": 1761
     },
     "backend/routes/diagnostics.py": {
-      "sha256": "658261d74982e0dd6e65cabac8029713b2f8cfd9f57b8e989ecf44fc0f9c6c22",
-      "size": 6015
+      "sha256": "ea9e10e69bfc6b6cdb7ed6b830e9d5000733a8a7f0c0a0529702bdb5b76c3e31",
+      "size": 4468
     },
     "backend/routes/schedule.py": {
       "sha256": "680b0f6e6d2612f578f7d4297881903e9cc36032ee9fa8a2579c0c291bdeaa97",
@@ -47,12 +47,8 @@
       "size": 11044
     },
     "backend/services/display_pipeline.py": {
-      "sha256": "2065b42a409540d38d5f4894a28c92189d56cf5264172a527d7fd45a23454a5f",
-      "size": 15630
-    },
-    "backend/services/display_preferences.py": {
-      "sha256": "647046d5831eb36fc7122a672f692e7dcb83ce7577eaaa8ca0db65c96cd7abc9",
-      "size": 4086
+      "sha256": "b62b8c75531fc52a0b18bf2ad5e737a517b624c6a014cdab72b1be799b873b0a",
+      "size": 15115
     },
     "backend/services/logs.py": {
       "sha256": "eab916ce2d3e649b3ff94ea216278d81179e61ffef15984ce20927342b919d68",
@@ -63,40 +59,40 @@
       "size": 11606
     },
     "backend/services/updater_status.py": {
-      "sha256": "4410a6d9a8d3a6ead6a9b14540b9b472bb030ecb104d6fb31f4a83ca185d0806",
-      "size": 13724
+      "sha256": "e7491e96c5a5a6f9bec50a77805da41d608210a2a7eeb1acfa755a5e52b33544",
+      "size": 3727
     },
     "client/index.html": {
-      "sha256": "14023ae86e60e4a274c91dd137afb1368721b98c67bb5191cdb0263293f44fb9",
-      "size": 4950
+      "sha256": "ab49e011652f4e3dec4f80cad9b1d252c97b7c73df16e564891a37635f7ea52e",
+      "size": 1720
     },
     "client/js/main.js": {
       "sha256": "ecd13880a5fdc74412186225949bc4131e68e2d8617a206a3d098b903bce8c45",
       "size": 8804
     },
     "client/settings.html": {
-      "sha256": "331b4cb45928819dbd4f20fecc14d7532acc7f425a6683bd304fdb839dc691fe",
-      "size": 25888
+      "sha256": "de132d90653fc27331c32d4da4e1fefb9c80cd754c5c592e15c367dcc653ad39",
+      "size": 18331
     },
     "client/status.html": {
-      "sha256": "83c1a07eafa63617a4afde24e00fe940188681d7537ed053c02f22796cf8e6ad",
-      "size": 21390
+      "sha256": "68fd4ca0e5e2c971d6fd3477c898730ffc3eaf5951866693da0d73d9dd72671b",
+      "size": 9725
     },
     "updater/agent.py": {
-      "sha256": "666bcbe6fb56a6d597abf5ba7af0ad7a57e5c1983421ae469fb8526d38c5456a",
-      "size": 30066
+      "sha256": "2e735307f9f556b4c6d3788bbd187dfee0dc6ea494b5d4ce565116c4de713953",
+      "size": 19819
     },
     "updater/requirements.txt": {
       "sha256": "13c03db805d9f3a3a6db6aa4b8ae9d959bc94fc64322a8f56c136acebf59a901",
       "size": 65
     },
     "config/payloads/default.html": {
-      "sha256": "f78ca9919adb02aff765ddf4a2a7ea1e156d0168461f8ff1dc709f6fb5c166ff",
-      "size": 394
+      "sha256": "f915b9b8a371f1bb6206f0f8d81b3827a15409adaa61a04688f2cb6977a45547",
+      "size": 351
     },
     "config/payloads/main.html": {
-      "sha256": "d6a90df227ac7e2b8968306801dcc3cc9a3f1d1f4ec762b207c5e180a6230e9e",
-      "size": 506
+      "sha256": "0f2b2bd7f919cf3cb5d23cc8377da6babab2a6f447d18ff105a85f5518ec5fe1",
+      "size": 468
     },
     "config/schedule.json": {
       "sha256": "22753fa4ad5aa9bca8f3ada55058831ea66b058e98674642eb8d3fc10db81ada",
@@ -107,7 +103,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "8a12ee5ef504be55b35a20dc83e6af69f0c72218de5309b71b5f3dbca923e004",
+      "sha256": "c5bb4af26892f7f6f5b1ce151137727e0fb5411d279a600882bd351780be48e4",
       "size": 164
     }
   }
