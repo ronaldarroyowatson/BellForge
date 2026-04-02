@@ -487,7 +487,7 @@ class UpdateAgent:
         should_reboot = bool(remote_version.get("reboot_required", False)) or self.settings.auto_reboot_after_update
         if should_reboot:
             self.log.info("Reboot requested by update policy. Rebooting now.")
-            subprocess.run(["/sbin/reboot"], check=False)
+            subprocess.run(["sudo", "/sbin/reboot"], check=False)
             return True
 
         for service_name in self.settings.services_to_restart:

@@ -119,6 +119,8 @@ configure_network_permissions() {
   local sudoers_file="/etc/sudoers.d/bellforge-network"
   run bash -c "cat > '${sudoers_file}' <<'EOF'
 ${SERVICE_USER} ALL=(root) NOPASSWD: /usr/bin/nmcli
+${SERVICE_USER} ALL=(root) NOPASSWD: /sbin/reboot
+${SERVICE_USER} ALL=(root) NOPASSWD: /usr/sbin/reboot
 EOF"
   run chmod 0440 "${sudoers_file}"
 }
