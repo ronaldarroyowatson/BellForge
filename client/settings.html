@@ -88,6 +88,28 @@
       color: #22313f;
       border-color: #b8c1c9;
     }
+    .refresh-icon-button {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .refresh-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+      display: inline-block;
+      transform-origin: center center;
+    }
+    .refresh-icon-button.is-spinning .refresh-icon {
+      animation: spin-refresh 0.8s linear infinite;
+    }
+    @keyframes spin-refresh {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(300px, 1fr));
@@ -183,7 +205,13 @@
     <section class="head">
       <h1>Settings & Diagnostics</h1>
       <div class="controls">
-        <button id="manualRefresh" class="secondary">Refresh Now</button>
+        <button
+          id="manualRefresh"
+          class="secondary refresh-icon-button"
+          type="button"
+          aria-label="Refresh diagnostics"
+          title="Refresh diagnostics"
+        ><span class="refresh-icon" aria-hidden="true">&#x21bb;</span></button>
         <span id="lastRefreshed">Auto-refresh every 5 seconds</span>
       </div>
     </section>
@@ -356,6 +384,14 @@
     };
 
     let lastLogPayload = null;
+    let refreshPromise = null;
+
+    function setManualRefreshBusy(isBusy, options = {}) {
+      const disableButton = options.disableButton === true;
+      elements.manualRefresh.classList.toggle("is-spinning", isBusy);
+      elements.manualRefresh.disabled = isBusy && disableButton;
+      elements.manualRefresh.setAttribute("aria-busy", isBusy ? "true" : "false");
+    }
 
     function setStatus(el, ok) {
       el.className = "status " + (ok === true ? "good" : ok === false ? "bad" : "warn");
@@ -440,7 +476,15 @@
         false: "good",
         unknown: "warn",
       });
-      setStatus(elements.rebootStatus, data.reboot_pending);
+      setBoolStatusText(elements.rebootStatus, data.reboot_pending, {
+        true: "Pending",
+        false: "No Reboot Needed",
+        unknown: "Unknown",
+      }, {
+        true: "warn",
+        false: "good",
+        unknown: "warn",
+      });
       setBoolStatusText(elements.updaterBootChecks, data.checks_on_boot);
       const progress = data.download_progress || {};
       elements.downloadProgress.textContent = `${progress.bytes_downloaded || 0} / ${progress.bytes_total || 0} bytes (${(progress.percent || 0).toFixed(2)}%)`;
@@ -531,7 +575,12 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action }),
         });
-        elements.displayHealResult.textContent = `${result.ok ? "Success" : "Failed"} (${action}) rc=${result.returncode}`;
+        if (result.ok) {
+          elements.displayHealResult.textContent = `Success (${action}) rc=${result.returncode}`;
+        } else {
+          const detail = result.stderr || result.stdout || "unknown error";
+          elements.displayHealResult.textContent = `Failed (${action}) rc=${result.returncode}: ${detail}`;
+        }
         await refreshDisplayPipeline();
       } catch (error) {
         elements.displayHealResult.textContent = `Self-heal failed: ${action}`;
@@ -550,12 +599,37 @@
       elements.logOutput.scrollTop = elements.logOutput.scrollHeight;
     }
 
-    async function refreshAll() {
+    async function refreshAll(options = {}) {
+      const manual = options.manual === true;
+
+      if (refreshPromise) {
+        if (manual) {
+          setManualRefreshBusy(true, { disableButton: true });
+          try {
+            await refreshPromise;
+          } finally {
+            setManualRefreshBusy(false);
+          }
+        }
+        return refreshPromise;
+      }
+
+      setManualRefreshBusy(true, { disableButton: manual });
+
+      refreshPromise = (async () => {
+        try {
+          await Promise.all([refreshNetwork(), refreshAuth(), refreshUpdater(), refreshDisplayPipeline(), refreshDisplayPreferences(), refreshLogs()]);
+          lastRefreshed.textContent = `Last refresh: ${new Date().toLocaleTimeString()} (auto every 5s)`;
+        } catch (error) {
+          lastRefreshed.textContent = `Refresh failed at ${new Date().toLocaleTimeString()}`;
+        }
+      })();
+
       try {
-        await Promise.all([refreshNetwork(), refreshAuth(), refreshUpdater(), refreshDisplayPipeline(), refreshDisplayPreferences(), refreshLogs()]);
-        lastRefreshed.textContent = `Last refresh: ${new Date().toLocaleTimeString()} (auto every 5s)`;
-      } catch (error) {
-        lastRefreshed.textContent = `Refresh failed at ${new Date().toLocaleTimeString()}`;
+        await refreshPromise;
+      } finally {
+        refreshPromise = null;
+        setManualRefreshBusy(false);
       }
     }
 
@@ -611,7 +685,7 @@
     elements.displayScale.addEventListener("input", syncDisplayPreferenceLabels);
     elements.displayRotation.addEventListener("input", syncDisplayPreferenceLabels);
 
-    elements.manualRefresh.addEventListener("click", refreshAll);
+    elements.manualRefresh.addEventListener("click", () => refreshAll({ manual: true }));
 
     syncDisplayPreferenceLabels();
     refreshAll();

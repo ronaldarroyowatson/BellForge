@@ -11,6 +11,9 @@ Use this workflow for production bugfix cycles and nightly closeout.
 ## 2. Verify the Fix
 
 1. Run targeted tests for changed areas.
+2. Run auth integrity suite (mandatory for any auth/device/account change):
+   - `python tests/run_auth_suite.py --coverage`
+   - `npm run test:auth`
 2. Run smoke tests:
    - `python tests/smoke_test_windows.py` (dev/Windows)
    - `bash tests/smoke_test.sh` (Pi/system install)
@@ -30,6 +33,14 @@ BellForge versioning is `X.Y.Z` (major.feature.bugfix). For bugfixes, increment 
    - `config/manifest.json`
 3. Commit with a bugfix-focused message:
    - `fix(display): stabilize kiosk startup and diagnostics`
+
+Auth gate policy:
+- Do not push bugfix version bumps unless auth suite passes locally.
+- CI also enforces this in `.github/workflows/auth-tests.yml`, `.github/workflows/bugfix-smoke.yml`, and `.github/workflows/release.yml`.
+
+Recommended local hook setup:
+- `git config core.hooksPath .githooks`
+- `chmod +x .githooks/pre-push`
 
 ## 4. Merge and Deploy
 

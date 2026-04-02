@@ -58,12 +58,16 @@
     const displayId = params.get("id") || "main";
     const serverUrl = window.BELLFORGE_SERVER_URL || window.location.origin;
     const EMPTY_STATE_DELAY_MS = 7000;
+    const MIN_STATUS_SCREEN_MS = 3000;
     const statusEl = document.getElementById("status");
     const screenEl = document.getElementById("screen");
     const rootEl = document.documentElement;
     let activeMode = null;
     let emptyStateTimer = null;
     let emptyStateReady = false;
+    let sawEmptyState = false;
+    let statusStageShown = false;
+    let statusShownAt = 0;
 
     async function refreshDisplayPreferences() {
       try {
@@ -86,8 +90,13 @@
 
     function renderStatusFrame() {
       const statusUrl = `${serverUrl}/status?view=display&id=${encodeURIComponent(displayId)}`;
+      const enteringStatus = activeMode !== "empty-state-status";
       screenEl.innerHTML = `<iframe class="status-frame" title="BellForge device status" src="${statusUrl}"></iframe>`;
       activeMode = "empty-state-status";
+      if (enteringStatus) {
+        statusStageShown = true;
+        statusShownAt = Date.now();
+      }
       statusEl.textContent = `Display ${displayId} | Ready to connect`;
     }
 
@@ -160,6 +169,7 @@
           String(payload.html || "").includes("bellforge-empty-state");
 
         if (isEmptyState) {
+          sawEmptyState = true;
           emptyStateReady = await checkEmptyStateReady();
           if (activeMode === "empty-state-status") {
             statusEl.textContent = `Display ${displayId} | Ready to connect`;
@@ -175,6 +185,18 @@
           return;
         }
 
+        if (sawEmptyState && !statusStageShown) {
+          clearEmptyStateTimer();
+          renderStatusFrame();
+          statusEl.textContent = `Display ${displayId} | Waiting for server and assets`;
+          return;
+        }
+
+        if (sawEmptyState && statusStageShown && Date.now() - statusShownAt < MIN_STATUS_SCREEN_MS) {
+          statusEl.textContent = `Display ${displayId} | Waiting for server and assets`;
+          return;
+        }
+
         const contentReady = await checkContentReady();
         if (!contentReady) {
           clearEmptyStateTimer();
@@ -186,6 +208,9 @@
         clearEmptyStateTimer();
         screenEl.innerHTML = payload.html || "<h1>BellForge</h1>";
         activeMode = "content";
+        sawEmptyState = false;
+        statusStageShown = false;
+        statusShownAt = 0;
         statusEl.textContent = `Display ${displayId} | Updated ${new Date().toLocaleTimeString()}`;
       } catch (error) {
         clearEmptyStateTimer();

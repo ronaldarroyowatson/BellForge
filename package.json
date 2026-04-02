@@ -1,0 +1,10 @@
+{
+  "name": "bellforge",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "test": "npm run test:auth",
+    "test:auth": "node tests/run_auth_suite.mjs --coverage",
+    "test:auth:parallel": "node tests/run_auth_suite.mjs --parallel"
+  }
+}

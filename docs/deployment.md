@@ -119,7 +119,7 @@ Edit `config/schedule.json` on the server:
 }
 ```
 
-Then push to `main`; Pis will pick up the new schedule within one poll interval.
+Then push to `main`; Pis will stage the new release within one poll interval and apply it on the next updater startup or reboot.
 
 ---
 
@@ -130,7 +130,7 @@ Then push to `main`; Pis will pick up the new schedule within one poll interval.
 1. Make your changes on a feature branch.
 2. Merge to `main`.
 3. GitHub Actions automatically bumps the patch version, regenerates the manifest, commits, and tags.
-4. Pis auto-update within the next poll interval (default 5 minutes).
+4. Pis detect the new release within the next poll interval (default 5 minutes), stage it under `.staging`, and apply it on the next updater startup or reboot.
 
 ### Manual
 
@@ -147,6 +147,13 @@ git commit -m "chore: release v$(python -c "import json; print(json.load(open('c
 git push origin main
 ```
 
+Release behavior:
+
+- Polling stages changed files into `.staging/releases/<version>`.
+- The updater writes `.staging/pending_update.json` once the staged tree is verified.
+- The staged release is applied on the next updater startup or system reboot.
+- Set `reboot_required` in `config/version.json` when the release must be applied automatically during the rollout window.
+
 ### Force immediate update on all Pis
 
 ```bash
@@ -154,6 +161,8 @@ curl -X POST http://YOUR_SERVER:8000/api/broadcast \
   -H "Content-Type: application/json" \
   -d '{"pi_ips": ["192.168.1.101", "192.168.1.102", "192.168.1.103"]}'
 ```
+
+This trigger starts an immediate check-and-stage cycle. It does not force a live in-place swap; the staged release is still applied on the next updater startup or reboot.
 
 ---
 
@@ -164,3 +173,43 @@ curl -X POST http://YOUR_SERVER:8000/api/broadcast \
 | Pi → Server | HTTP | 8000 | Update polling, schedule fetch |
 | Server → Pi | HTTP | 8765 | Broadcast trigger (optional) |
 | User/IT → Pi | HTTP | 8000 | Status and settings pages |
+
+---
+
+## 6. Unified Auth Deployment
+
+BellForge auth endpoints are hosted by the same backend service under `/api/auth`, `/api/devices`, and `/api/automode`.
+
+### Required environment variables
+
+```bash
+BELLFORGE_JWT_SECRET=<strong-random-secret>
+BELLFORGE_JWT_ISSUER=bellforge-server
+
+BELLFORGE_GOOGLE_CLIENT_ID=<google-client-id>
+BELLFORGE_GOOGLE_JWKS_URL=https://www.googleapis.com/oauth2/v3/certs
+
+BELLFORGE_MICROSOFT_CLIENT_ID=<microsoft-client-id>
+BELLFORGE_MICROSOFT_JWKS_URL=https://login.microsoftonline.com/common/discovery/v2.0/keys
+
+BELLFORGE_APPLE_CLIENT_ID=<apple-service-id>
+BELLFORGE_APPLE_JWKS_URL=https://appleid.apple.com/auth/keys
+```
+
+Optional:
+
+```bash
+BELLFORGE_GITHUB_CLIENT_ID=<github-client-id>
+BELLFORGE_GITHUB_JWKS_URL=<github-jwks-url>
+BELLFORGE_AUTH_STORE_PATH=/opt/bellforge/config/auth_registry.json
+```
+
+### Reverse proxy and TLS
+
+In production, terminate TLS at a reverse proxy and forward traffic to Uvicorn. Never expose the auth API over plain HTTP on untrusted networks.
+
+### Operational references
+
+- Full auth architecture and endpoint details: `docs/AUTH_BACKEND.md`
+- Frontend integration examples: `client/js/auth_integration_examples.js`
+- Headless device bootstrap pairing: `scripts/device_bootstrap_auth.py`

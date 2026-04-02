@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BellForge AutoMode Console</title>
+  <style>
+    :root {
+      --bg: #f8f7f3;
+      --panel: #ffffff;
+      --ink: #1f2728;
+      --muted: #5a6668;
+      --accent: #0b6e4f;
+      --danger: #9f2a2a;
+      --border: #d9dfdf;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 20% 20%, #f2ead8, transparent 30%),
+                  radial-gradient(circle at 80% 10%, #dcefe8, transparent 25%),
+                  var(--bg);
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    h1 { margin: 0 0 1rem; font-size: 1.5rem; letter-spacing: 0.01em; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+    }
+    .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    input, button {
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+    }
+    input { min-width: 140px; }
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+    }
+    button.secondary {
+      background: #2a3d42;
+    }
+    button.danger {
+      background: var(--danger);
+    }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    ul { padding-left: 1.1rem; }
+    .pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 0.2rem 0.55rem;
+      background: #edf6f2;
+      color: #0b6e4f;
+      font-size: 0.8rem;
+      margin-right: 0.45rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>BellForge AutoMode Console</h1>
+  <div class="grid">
+    <section class="card">
+      <h2>AutoMode Status</h2>
+      <p class="muted" id="automode-status">Not activated.</p>
+      <div class="row">
+        <input id="controller-id" placeholder="Controller Device ID" value="controller-main" />
+        <input id="network-id" placeholder="Network ID" value="network-a" />
+        <button id="activate-automode">Activate</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Discovered Devices</h2>
+      <p class="muted">Reported by mDNS, broadcast, heartbeat, or queue mechanisms.</p>
+      <ul id="discovered-list"></ul>
+      <div class="row">
+        <button class="secondary" id="refresh-pending">Refresh Pending</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Pending Approvals</h2>
+      <div id="pending-list"></div>
+    </section>
+
+    <section class="card">
+      <h2>Auto-Linked History</h2>
+      <ul id="history-list"></ul>
+      <div class="row">
+        <button class="secondary" id="refresh-history">Refresh History</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="/client/js/automode.js"></script>
+</body>
+</html>

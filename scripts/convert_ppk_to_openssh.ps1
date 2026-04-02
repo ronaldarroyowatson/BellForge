@@ -28,7 +28,7 @@ function Get-ModernPuttyGen {
   $targetExe = Join-Path $TargetDir "puttygen.exe"
 
   if (-not (Test-Path $targetExe)) {
-    Write-Host "Downloading modern puttygen..." -ForegroundColor Yellow
+    Write-Output "Downloading modern puttygen..."
     Invoke-WebRequest -Uri $DownloadUrl -OutFile $targetExe
   }
 
@@ -93,9 +93,9 @@ try {
   # Restrict private key ACL to current user.
   & icacls $OutputPrivate /inheritance:r /grant:r "$env:USERNAME:(R,W)" /c | Out-Null
 
-  Write-Host "Converted private key: $OutputPrivate" -ForegroundColor Green
-  Write-Host "Derived public key:    $pubOut" -ForegroundColor Green
-  Write-Host "Use with SSH: ssh -i $OutputPrivate pi@192.168.2.180" -ForegroundColor Cyan
+  Write-Output "Converted private key: $OutputPrivate"
+  Write-Output "Derived public key:    $pubOut"
+  Write-Output "Use with SSH: ssh -i $OutputPrivate pi@192.168.2.180"
 }
 finally {
   Remove-Item -ErrorAction SilentlyContinue $passFile

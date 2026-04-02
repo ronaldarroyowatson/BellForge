@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.routes import broadcast, diagnostics, schedule, update
+from backend.routes import auth_api, broadcast, devices, diagnostics, schedule, update
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
@@ -46,6 +46,8 @@ app.include_router(update.router, prefix="/api")
 app.include_router(schedule.router, prefix="/api")
 app.include_router(broadcast.router, prefix="/api")
 app.include_router(diagnostics.router, prefix="/api")
+app.include_router(auth_api.router, prefix="/api")
+app.include_router(devices.router, prefix="/api")
 app.mount("/client", StaticFiles(directory=PROJECT_ROOT / "client"), name="client")
 
 

@@ -228,7 +228,7 @@ curl http://localhost:8080/
 
 ### Service won't start after update
 
-The updater restarts only the services listed in `services_to_restart`. Ensure `bellforge-client.service` and `bellforge-file-server.service` are in that list. For the updater itself to reload new code, a reboot is required (set `"reboot_required": true` in `version.json` or manually `sudo systemctl restart bellforge-updater`).
+The updater restarts only the services listed in `services_to_restart` after a staged release is applied. Ensure `bellforge-client.service` and `bellforge-file-server.service` are in that list. For the updater itself to reload new code, the newly staged release must be applied on the next updater startup or reboot (set `"reboot_required": true` in `version.json` or manually `sudo systemctl restart bellforge-updater`).
 
 ---
 

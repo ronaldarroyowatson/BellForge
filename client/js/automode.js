@@ -1,0 +1,109 @@
+"use strict";
+
+const BASE = window.BELLFORGE_SERVER_URL || "http://127.0.0.1:8000";
+const ACCESS_TOKEN = localStorage.getItem("bellforge.access_token") || "";
+
+const elStatus = document.getElementById("automode-status");
+const elPending = document.getElementById("pending-list");
+const elDiscovered = document.getElementById("discovered-list");
+const elHistory = document.getElementById("history-list");
+
+function authHeaders() {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${ACCESS_TOKEN}`,
+  };
+}
+
+async function activateAutoMode() {
+  const controllerId = document.getElementById("controller-id").value.trim();
+  const networkId = document.getElementById("network-id").value.trim();
+  const response = await fetch(`${BASE}/api/automode/activate`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ controller_device_id: controllerId, network_id: networkId }),
+  });
+  if (!response.ok) {
+    elStatus.textContent = `Activation failed: HTTP ${response.status}`;
+    return;
+  }
+  const payload = await response.json();
+  elStatus.textContent = `AutoMode active on ${payload.controller_device_id}`;
+  await Promise.all([loadPending(), loadHistory()]);
+}
+
+async function loadPending() {
+  const response = await fetch(`${BASE}/api/automode/pending`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    elPending.innerHTML = `<p>Unable to load pending: HTTP ${response.status}</p>`;
+    return;
+  }
+  const payload = await response.json();
+  const pending = payload.pending || [];
+
+  elDiscovered.innerHTML = pending
+    .map(item => `<li>${item.discovered_device_name} <span class="pill">${item.network_id}</span></li>`)
+    .join("") || "<li>No devices discovered.</li>";
+
+  elPending.innerHTML = pending
+    .map(item => `
+      <div style="border:1px solid #d9dfdf;border-radius:10px;padding:0.6rem;margin-bottom:0.55rem;">
+        <div><strong>${item.discovered_device_name}</strong> (${item.discovered_fingerprint})</div>
+        <div style="margin-top:0.4rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
+          <button data-approve="${item.id}">Approve</button>
+          <button class="danger" data-deny="${item.id}">Deny</button>
+        </div>
+      </div>
+    `)
+    .join("") || "<p>No pending approvals.</p>";
+
+  elPending.querySelectorAll("button[data-approve]").forEach(button => {
+    button.addEventListener("click", () => decide(button.getAttribute("data-approve"), true));
+  });
+  elPending.querySelectorAll("button[data-deny]").forEach(button => {
+    button.addEventListener("click", () => decide(button.getAttribute("data-deny"), false));
+  });
+}
+
+async function decide(pendingId, approve) {
+  const response = await fetch(`${BASE}/api/automode/decide`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      pending_id: pendingId,
+      approve,
+      org_id: "default-org",
+      classroom_id: "default-classroom",
+    }),
+  });
+  if (!response.ok) {
+    alert(`Decision failed: HTTP ${response.status}`);
+    return;
+  }
+  await Promise.all([loadPending(), loadHistory()]);
+}
+
+async function loadHistory() {
+  const response = await fetch(`${BASE}/api/automode/history`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    elHistory.innerHTML = `<li>Unable to load history: HTTP ${response.status}</li>`;
+    return;
+  }
+  const payload = await response.json();
+  const history = payload.history || [];
+  elHistory.innerHTML = history
+    .slice(0, 30)
+    .map(item => `<li>${item.discovered_device_name} -> ${item.status} (${item.decided_at || item.created_at})</li>`)
+    .join("") || "<li>No history yet.</li>";
+}
+
+document.getElementById("activate-automode").addEventListener("click", activateAutoMode);
+document.getElementById("refresh-pending").addEventListener("click", loadPending);
+document.getElementById("refresh-history").addEventListener("click", loadHistory);
+
+loadPending();
+loadHistory();

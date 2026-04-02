@@ -1,26 +1,34 @@
 {
-  "version": "0.1.23",
-  "generated_at": "2026-04-02T18:22:40Z",
+  "version": "0.1.24",
+  "generated_at": "2026-04-02T20:22:59Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     "backend/main.py": {
-      "sha256": "6063d6691afaf297359b1d3b8b14e1f1833c6c4d63b3c5ecfac51a935316d487",
-      "size": 4797
+      "sha256": "8f30f2c5856bf6b9be366804ffc442e07c538fb36321d8f4c6ab159ff3c3643a",
+      "size": 4917
     },
     "backend/requirements.txt": {
-      "sha256": "fa72d4a52795775f1fbe3ab6a2390e1b3a2c3a838dbc2129707b2bc683101960",
-      "size": 81
+      "sha256": "4bdc6268e6ab00c1533174dd21c127cf0537b678c77f4577f794bf2dbfa3ad51",
+      "size": 102
     },
     "backend/routes/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
+    "backend/routes/auth_api.py": {
+      "sha256": "789b04e2c527813b6bccd01464b1c6ffaa4e7d1c17ca11eaedc4e3d374cc3c13",
+      "size": 7243
+    },
     "backend/routes/broadcast.py": {
       "sha256": "1d7fe495de9e72117ed7beec61ef28ebb13ac576d08da4626db6ff5f104ea24d",
       "size": 1761
+    },
+    "backend/routes/devices.py": {
+      "sha256": "0ef653a5116115547211c52c277548e14cda476b440ca3de7bd4c00ec42375c8",
+      "size": 8850
     },
     "backend/routes/diagnostics.py": {
       "sha256": "658261d74982e0dd6e65cabac8029713b2f8cfd9f57b8e989ecf44fc0f9c6c22",
@@ -47,8 +55,8 @@
       "size": 11044
     },
     "backend/services/display_pipeline.py": {
-      "sha256": "2065b42a409540d38d5f4894a28c92189d56cf5264172a527d7fd45a23454a5f",
-      "size": 15630
+      "sha256": "ba4943b35d82c5bbb72e70171d2331cac289e890b08dfddff8d1249b2e308d44",
+      "size": 17835
     },
     "backend/services/display_preferences.py": {
       "sha256": "647046d5831eb36fc7122a672f692e7dcb83ce7577eaaa8ca0db65c96cd7abc9",
@@ -62,21 +70,37 @@
       "sha256": "8d78949b57f46a16987dc2601bcffd3beaf5f4b0444055f9f9fcfe02ed354308",
       "size": 11606
     },
+    "backend/services/unified_auth.py": {
+      "sha256": "09c32114bf7ac1408f51d43cb7fb0927850869150dffcf8e0c874ef2fa9921fc",
+      "size": 53978
+    },
     "backend/services/updater_status.py": {
       "sha256": "4410a6d9a8d3a6ead6a9b14540b9b472bb030ecb104d6fb31f4a83ca185d0806",
       "size": 13724
     },
+    "client/automode.html": {
+      "sha256": "83a356d80ed7512b263acfd0833436650028f600aa40df0347c646ca2d2416cf",
+      "size": 3153
+    },
     "client/index.html": {
-      "sha256": "0d5eb4e9c5ce6a3376f6794a44c67875f8b403fda3d5ea60c0cc7f002fc95d6c",
-      "size": 5962
+      "sha256": "ffb2a6be6f25c8237a2bfa93b3cb9ac40d923da1a38f7e7e5380b5dbf20c70c8",
+      "size": 6841
+    },
+    "client/js/auth_integration_examples.js": {
+      "sha256": "1a7907cbff1601e2d2d5ecfc0a9f07b66a129b58c2ea2f21f5e82b2cf4ae9fff",
+      "size": 4518
+    },
+    "client/js/automode.js": {
+      "sha256": "9566f834d24f77c3bd784a57a5d3dba373ae1d18dea4368457678d24db9c4074",
+      "size": 3938
     },
     "client/js/main.js": {
       "sha256": "ecd13880a5fdc74412186225949bc4131e68e2d8617a206a3d098b903bce8c45",
       "size": 8804
     },
     "client/settings.html": {
-      "sha256": "25df9893c1738207585a411efbfee7c2a76d5cc38f00fb1938d055299abce5c5",
-      "size": 26198
+      "sha256": "65ff4c52a86a004fa0433492d63e18d40a0de74ff5b9a175beb257aff21ed866",
+      "size": 28378
     },
     "client/status.html": {
       "sha256": "83c1a07eafa63617a4afde24e00fe940188681d7537ed053c02f22796cf8e6ad",
@@ -107,7 +131,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "429685ee4ae54f2cae579d71699454eb414007c174756b2a230475971b49b4ab",
+      "sha256": "f5c329f17e585299ce741c87271aab0e3d7bd053ca9b8f831203d0c90268fcc9",
       "size": 164
     }
   }

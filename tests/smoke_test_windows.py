@@ -300,28 +300,54 @@ async def test_updater(remote_version: dict, remote_manifest: dict) -> None:
             fail(f"Update cycle raised: {exc}")
             return
 
-        # ---- Verify version was bumped ----
+        pending_update = staging / "pending_update.json"
+        if pending_update.is_file():
+            ok("Update cycle staged a pending release marker")
+        else:
+            fail("Expected pending_update.json after staging, but none was written")
+            return
+
+        staged_local_ver = agent._local_version()
+        if staged_local_ver == "0.0.0":
+            ok("Staging left the live install untouched until apply-on-startup")
+        else:
+            fail(f"Expected staged cycle to keep live version at 0.0.0, got {staged_local_ver}")
+
+        info("Applying staged release the same way the updater does on next startup…")
+        try:
+            agent._apply_pending_release_if_present()
+            ok("Pending staged release applied without exception")
+        except Exception as exc:
+            fail(f"Applying staged release raised: {exc}")
+            return
+
+        if not pending_update.exists():
+            ok("Pending release marker cleared after apply")
+        else:
+            fail("pending_update.json still exists after apply")
+
+        # ---- Verify version was bumped after apply ----
         new_local_ver = agent._local_version()
         expected_ver = remote_version.get("version", "")
         if new_local_ver == expected_ver:
-            ok(f"Version bumped correctly to {new_local_ver}")
+            ok(f"Version updated correctly to {new_local_ver} after staged apply")
         else:
-            fail(f"Version not updated: expected {expected_ver}, got {new_local_ver}")
+            fail(f"Version not updated after staged apply: expected {expected_ver}, got {new_local_ver}")
 
-        # ---- Verify every manifest file exists and has correct hash ----
+        # ---- Verify every manifest file exists and has correct hash after apply ----
         manifest_files: dict = remote_manifest.get("files", {})
         hash_errors = 0
         missing_files = 0
         for rel_path, meta in manifest_files.items():
             installed = tmp / rel_path
             if not installed.is_file():
-                fail(f"Missing after update: {rel_path}")
+                fail(f"Missing after staged apply: {rel_path}")
                 missing_files += 1
                 continue
             actual = sha256_file(installed)
             expected = str(meta.get("sha256", ""))
             if actual != expected:
-                fail(f"Hash mismatch for {rel_path}: expected {expected[:12]}… got {actual[:12]}…")
+                fail(f"Hash mismatch after staged apply for {rel_path}: expected {expected[:12]}… got {actual[:12]}…")
                 hash_errors += 1
 
         if missing_files == 0 and hash_errors == 0:

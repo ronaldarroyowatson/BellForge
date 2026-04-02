@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+set -eu
+
+echo "[bellforge] Running auth suite before push..."
+python tests/run_auth_suite.py --coverage
+
+echo "[bellforge] Auth suite passed. Proceeding with push."

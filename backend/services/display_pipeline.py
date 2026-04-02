@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -468,13 +470,76 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
         "cold-reboot": ["/bin/sh", "-c", "sleep 2 && /sbin/reboot"],
     }
 
+    privileged_actions: set[SelfHealAction] = {
+        "enable-client",
+        "restart-client",
+        "restart-lightdm",
+        "reboot",
+        "reset-gpu",
+        "clear-framebuffer",
+        "force-hdmi-mode",
+        "cold-reboot",
+    }
+
+    def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(cmd, capture_output=True, text=True, check=False)
+
     cmd = command_map[action]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    result = _run(cmd)
+    used_sudo = False
+
+    # Services run as user bellforge, so actions that touch systemd/reboot/GPU
+    # often require sudo privileges.
+    current_euid = os.geteuid() if hasattr(os, "geteuid") else -1
+
+    if (
+        action in privileged_actions
+        and result.returncode != 0
+        and current_euid != 0
+        and shutil.which("sudo")
+    ):
+        sudo_probe = _run(["sudo", "-n", "true"])
+        if sudo_probe.returncode == 0:
+            sudo_result = _run(["sudo", "-n", *cmd])
+            used_sudo = True
+            if sudo_result.returncode == 0:
+                result = sudo_result
+            else:
+                combined_stderr = "\n".join(
+                    part for part in [result.stderr.strip(), sudo_result.stderr.strip()] if part
+                )
+                combined_stdout = "\n".join(
+                    part for part in [result.stdout.strip(), sudo_result.stdout.strip()] if part
+                )
+                result = subprocess.CompletedProcess(
+                    args=["sudo", "-n", *cmd],
+                    returncode=sudo_result.returncode,
+                    stdout=combined_stdout,
+                    stderr=combined_stderr,
+                )
+
+    stderr = result.stderr.strip()
+    permission_denied = (
+        action in privileged_actions
+        and result.returncode != 0
+        and (
+            "permission denied" in stderr.lower()
+            or "interactive authentication required" in stderr.lower()
+            or "a terminal is required to read the password" in stderr.lower()
+            or "sudo:" in stderr.lower()
+        )
+    )
+
+    if permission_denied and not stderr:
+        stderr = "Insufficient privileges for this action. Configure passwordless sudo for bellforge service user."
+
     return {
         "timestamp": _utc_now(),
         "action": action,
         "ok": result.returncode == 0,
         "returncode": result.returncode,
         "stdout": result.stdout.strip(),
-        "stderr": result.stderr.strip(),
+        "stderr": stderr,
+        "used_sudo": used_sudo,
+        "permission_denied": permission_denied,
     }
