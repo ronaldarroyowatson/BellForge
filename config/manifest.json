@@ -1,6 +1,6 @@
 {
-  "version": "0.1.15",
-  "generated_at": "2026-04-02T17:10:21Z",
+  "version": "0.1.16",
+  "generated_at": "2026-04-02T17:16:42Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -103,7 +103,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "d9e65426c7adbcd13b300ea797c5bfaec55297dcd46d707dc044d7efe8d63a8d",
+      "sha256": "a65111e754af3a984f3274b7ae30659b9e8ad61af90fe342e13e798f282aa470",
       "size": 164
     }
   }
