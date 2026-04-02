@@ -42,12 +42,21 @@ SKIP_RELATIVE = {
     "config/client.env",      # Device-local client endpoint override.
 }
 
+TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh"}
+
+
+def canonical_file_bytes(path: Path) -> bytes:
+    data = path.read_bytes()
+    if path.suffix.lower() in TEXT_SUFFIXES or path.name in {"Dockerfile", ".env"}:
+        return data.replace(b"\r\n", b"\n")
+    return data
+
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
+    data = canonical_file_bytes(path)
+    for index in range(0, len(data), 65536):
+        h.update(data[index:index + 65536])
     return h.hexdigest()
 
 
@@ -72,9 +81,10 @@ def collect_files() -> dict[str, dict]:
             rel = path.relative_to(ROOT).as_posix()
             if rel in SKIP_RELATIVE:
                 continue
+            canonical_bytes = canonical_file_bytes(path)
             entries[rel] = {
                 "sha256": sha256_file(path),
-                "size":   path.stat().st_size,
+                "size":   len(canonical_bytes),
             }
             print(f"  {rel}")
 
