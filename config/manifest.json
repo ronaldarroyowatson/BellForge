@@ -1,6 +1,6 @@
 {
-  "version": "0.1.22",
-  "generated_at": "2026-04-02T18:12:11Z",
+  "version": "0.1.23",
+  "generated_at": "2026-04-02T18:22:40Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -67,16 +67,16 @@
       "size": 13724
     },
     "client/index.html": {
-      "sha256": "c8f2cc3102d9efbe88f52ad83da94ef64205270490e0ba12105632a5525fe69f",
-      "size": 5196
+      "sha256": "0d5eb4e9c5ce6a3376f6794a44c67875f8b403fda3d5ea60c0cc7f002fc95d6c",
+      "size": 5962
     },
     "client/js/main.js": {
       "sha256": "ecd13880a5fdc74412186225949bc4131e68e2d8617a206a3d098b903bce8c45",
       "size": 8804
     },
     "client/settings.html": {
-      "sha256": "331b4cb45928819dbd4f20fecc14d7532acc7f425a6683bd304fdb839dc691fe",
-      "size": 25888
+      "sha256": "25df9893c1738207585a411efbfee7c2a76d5cc38f00fb1938d055299abce5c5",
+      "size": 26198
     },
     "client/status.html": {
       "sha256": "83c1a07eafa63617a4afde24e00fe940188681d7537ed053c02f22796cf8e6ad",
@@ -107,7 +107,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "37dac027b2971abb78255275b2a712dd425c5f6cb7249f0bf731234ceef4cb30",
+      "sha256": "429685ee4ae54f2cae579d71699454eb414007c174756b2a230475971b49b4ab",
       "size": 164
     }
   }
