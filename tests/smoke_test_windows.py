@@ -148,6 +148,22 @@ def test_backend(client: httpx.Client) -> None:
     except Exception as exc:
         fail(f"/display/main — {exc}")
 
+    # auth/onboarding surfaces
+    for path in (
+        "/auth",
+        "/onboarding",
+        "/automode",
+        "/client/auth.html",
+        "/client/onboarding.html",
+        "/client/automode.html",
+    ):
+        try:
+            r = client.get(f"{BACKEND_BASE}{path}")
+            assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+            ok(f"{path} — page delivered")
+        except Exception as exc:
+            fail(f"{path} — {exc}")
+
     # File endpoint path-traversal guard
     traversal_paths = [
         "../../../etc/passwd",

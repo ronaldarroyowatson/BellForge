@@ -356,18 +356,78 @@
     body.display-view .wrap {
       max-width: 1280px;
       padding: 14px 18px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
+      gap: 12px;
+      align-items: start;
     }
     body.display-view .hero,
     body.display-view .url-panel,
-    body.display-view .stats {
+    body.display-view .stats,
+    body.display-view .onboarding-qr-panel {
       margin-bottom: 12px;
     }
     body.display-view .hero-main,
     body.display-view .hero-side,
     body.display-view .url-panel,
+    body.display-view .onboarding-qr-panel,
     body.display-view .stat-card,
     body.display-view .advanced {
       padding: 16px 18px;
+    }
+    body.display-view .hero {
+      grid-column: 1 / 2;
+      grid-row: 1;
+      margin-bottom: 0;
+    }
+    body.display-view .onboarding-qr-panel {
+      grid-column: 2 / 3;
+      grid-row: 1;
+      align-self: start;
+      padding: 16px 18px;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    body.display-view .onboarding-qr-shell {
+      max-width: 240px;
+      margin: 0 auto;
+      padding: 10px;
+    }
+    body.display-view .onboarding-qr-shell img {
+      max-width: 200px;
+    }
+    body.display-view .onboarding-qr-meta p {
+      font-size: 0.94rem;
+      margin-bottom: 8px;
+    }
+    body.display-view .onboarding-direct-link {
+      font-size: 0.95rem;
+      padding: 10px 12px;
+    }
+    body.display-view .url-panel {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+    body.display-view .stats {
+      grid-column: 1 / -1;
+      grid-row: 3;
+    }
+    body.display-view .advanced {
+      grid-column: 1 / -1;
+      grid-row: 4;
+    }
+    body.display-view .url-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    body.display-view .url-card {
+      padding: 14px;
+    }
+    body.display-view .url-card:nth-child(n+4) {
+      display: none;
+    }
+    body.display-view .browser-note {
+      margin-top: 10px;
+      font-size: 0.9rem;
     }
     body.display-view h1 {
       font-size: clamp(1.8rem, 3vw, 3rem);
@@ -417,6 +477,20 @@
       .onboarding-qr-panel,
       .steps {
         grid-template-columns: 1fr;
+      }
+      body.display-view .wrap {
+        grid-template-columns: 1fr;
+      }
+      body.display-view .hero,
+      body.display-view .onboarding-qr-panel,
+      body.display-view .url-panel,
+      body.display-view .stats,
+      body.display-view .advanced {
+        grid-column: 1;
+        grid-row: auto;
+      }
+      body.display-view .url-card:nth-child(n+4) {
+        display: block;
       }
       .quick-grid {
         grid-template-columns: 1fr 1fr;
@@ -669,9 +743,9 @@
       return {
         base,
         settings: `${base}/settings`,
-        auth: `${base}/auth`,
-        onboarding: `${base}/onboarding`,
-        automode: `${base}/automode`,
+        auth: `${base}/client/auth.html`,
+        onboarding: `${base}/client/onboarding.html`,
+        automode: `${base}/client/automode.html`,
       };
     }
 

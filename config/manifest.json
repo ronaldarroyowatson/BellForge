@@ -1,6 +1,6 @@
 {
-  "version": "0.1.31",
-  "generated_at": "2026-04-03T17:01:38Z",
+  "version": "0.1.32",
+  "generated_at": "2026-04-03T17:21:13Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -123,8 +123,8 @@
       "size": 28378
     },
     "client/status.html": {
-      "sha256": "a19de74b2355c2d33c70b5e05a79468d933250c663134911cceae51753005983",
-      "size": 28289
+      "sha256": "914d2b105d72542e933538a865821edf905de5b8da34c8a6016975fc07b9ca94",
+      "size": 30234
     },
     "updater/agent.py": {
       "sha256": "e5d39943ffdb740645541d3f091fc90d6ddafb1fd5a19a4c8b894724af5cba62",
@@ -151,7 +151,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "954142d85765da6fa8c84d08d06126533919658a2cdce54b32c0b054b18a9c74",
+      "sha256": "896534ff24eedcc69f136b113464e095cab6efc9448e2200fbc6fada1afc508b",
       "size": 164
     }
   }

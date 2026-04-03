@@ -5,6 +5,8 @@
 #   $env:BELLFORGE_PI_SSH_KEY_PATH = "$env:USERPROFILE\.ssh\id_rsa"
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tests/install_test_live.ps1
 
+#pragma warning disable PSAvoidUsingWriteHost
+
 param(
     [string]$PiHost = $env:BELLFORGE_PI_HOST,
     [string]$PiUser = $env:BELLFORGE_PI_USER,
@@ -38,28 +40,28 @@ if (!(Test-Path $TestLogDir)) {
 function Write-LogInfo {
     param([string]$Message)
     $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [INFO] $Message"
-    Write-Host $line -ForegroundColor Cyan
+    Write-Output $line
     Add-Content -Path $LogFile -Value $line
 }
 
 function Write-LogOk {
     param([string]$Message)
     $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [OK] $Message"
-    Write-Host $line -ForegroundColor Green
+    Write-Output $line
     Add-Content -Path $LogFile -Value $line
 }
 
 function Write-LogWarn {
     param([string]$Message)
     $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [WARN] $Message"
-    Write-Host $line -ForegroundColor Yellow
+    Write-Output $line
     Add-Content -Path $LogFile -Value $line
 }
 
 function Write-LogError {
     param([string]$Message)
     $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [ERROR] $Message"
-    Write-Host $line -ForegroundColor Red
+    Write-Output $line
     Add-Content -Path $LogFile -Value $line
     Add-Content -Path $ErrorLog -Value $line
 }
@@ -190,3 +192,5 @@ catch {
     Write-LogInfo "Error log: $ErrorLog"
     exit 1
 }
+
+#pragma warning restore PSAvoidUsingWriteHost
