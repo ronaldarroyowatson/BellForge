@@ -58,14 +58,19 @@ validate_structure() {
 
 configure_self_heal_permissions() {
   local sudoers_file="/etc/sudoers.d/bellforge-self-heal"
+  local helper_script="${INSTALL_DIR}/scripts/self_heal_root.sh"
   run bash -c "cat > '${sudoers_file}' <<'EOF'
-${SERVICE_USER} ALL=(root) NOPASSWD: /usr/bin/nmcli
+Defaults:${SERVICE_USER} !requiretty
+${SERVICE_USER} ALL=(root) NOPASSWD: ${helper_script} *
 ${SERVICE_USER} ALL=(root) NOPASSWD: /bin/systemctl
 ${SERVICE_USER} ALL=(root) NOPASSWD: /usr/bin/systemctl
 ${SERVICE_USER} ALL=(root) NOPASSWD: /sbin/reboot
 ${SERVICE_USER} ALL=(root) NOPASSWD: /usr/sbin/reboot
 EOF"
   run chmod 0440 "${sudoers_file}"
+  if [[ -f "${helper_script}" ]]; then
+    run chmod +x "${helper_script}"
+  fi
 }
 
 validate_python() {
@@ -223,6 +228,7 @@ EOF"
 validate_script_runtime() {
   # Ensure scripts copied from mixed environments (e.g. Windows SCP) keep LF line endings and execute bits.
   local normalize_targets=(
+    "${INSTALL_DIR}/scripts/self_heal_root.sh"
     "${INSTALL_DIR}/scripts/start_kiosk.sh"
     "${INSTALL_DIR}/scripts/repair.sh"
     "${INSTALL_DIR}/scripts/repair_display.sh"

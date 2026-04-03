@@ -100,10 +100,14 @@ async def _remote_source_status(update_base_url: str | None) -> dict[str, Any]:
 
 
 def _service_status(unit: str) -> dict[str, Any]:
-    active_result = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True, check=False)
-    enabled_result = subprocess.run(["systemctl", "is-enabled", unit], capture_output=True, text=True, check=False)
-    active = active_result.stdout.strip() or "unknown"
-    enabled = enabled_result.stdout.strip() or "unknown"
+    try:
+        active_result = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True, check=False)
+        enabled_result = subprocess.run(["systemctl", "is-enabled", unit], capture_output=True, text=True, check=False)
+        active = active_result.stdout.strip() or "unknown"
+        enabled = enabled_result.stdout.strip() or "unknown"
+    except FileNotFoundError:
+        active = "unknown"
+        enabled = "unknown"
     return {
         "unit": unit,
         "active": active,
@@ -277,6 +281,8 @@ async def trigger_update_check_now(project_root: Path) -> dict[str, Any]:
     update_available = _parse_semver(latest_version) > _parse_semver(current_version)
     state = _staging_state(project_root)
     updater_state = str(state.get("state") or "idle")
+    service = _service_status(UPDATER_SERVICE)
+    trigger_listener = await _trigger_listener_status(trigger_port)
 
     result: dict[str, Any] = {
         "timestamp": _utc_now(),
@@ -300,7 +306,7 @@ async def trigger_update_check_now(project_root: Path) -> dict[str, Any]:
         "remote_source": remote_source,
     }
 
-    if updater_state in ACTIVE_STATES:
+    if updater_state in ACTIVE_STATES and service.get("active") == "active" and trigger_listener.get("healthy"):
         result["message"] = f"Updater is already active ({updater_state})."
         result["stage_reason"] = "updater-active"
         result["stage_message"] = result["message"]

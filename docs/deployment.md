@@ -102,6 +102,16 @@ The script will install everything and reboot the Pi.
 On the kiosk dashboard, the Pi now displays a typed URL for Settings.
 Users on the same network can open that URL (for example, `http://192.168.1.42:8000/settings`) to reach the settings page.
 
+### Self-heal privilege policy (required for reboot/service controls)
+
+For existing installs, run this once on each Pi to enforce the BellForge sudoers policy used by display self-heal actions:
+
+```bash
+sudo bash /opt/bellforge/scripts/repair.sh --yes
+```
+
+This installs `/etc/sudoers.d/bellforge-self-heal` and allows the backend service user to run controlled root actions (reboot, service restart, display recovery) without interactive password prompts.
+
 ---
 
 ## 3. Managing the Schedule

@@ -79,12 +79,30 @@ create_user() {
   else
     log "Creating system user '$SERVICE_USER'…"
     useradd --system --create-home --shell /bin/bash "$SERVICE_USER"
-    # Allow the bellforge user to run reboot/systemctl without a password
-    echo "${SERVICE_USER} ALL=(ALL) NOPASSWD: /sbin/reboot, /bin/systemctl" \
-      >> /etc/sudoers.d/bellforge
-    chmod 440 /etc/sudoers.d/bellforge
     ok "User '$SERVICE_USER' created."
   fi
+}
+
+configure_self_heal_permissions() {
+  local sudoers_file="/etc/sudoers.d/bellforge-self-heal"
+  local helper_script="${INSTALL_DIR}/scripts/self_heal_root.sh"
+
+  log "Configuring self-heal sudoers policy for '${SERVICE_USER}'…"
+  cat > "${sudoers_file}" <<EOF
+Defaults:${SERVICE_USER} !requiretty
+${SERVICE_USER} ALL=(root) NOPASSWD: ${helper_script} *
+${SERVICE_USER} ALL=(root) NOPASSWD: /usr/bin/systemctl
+${SERVICE_USER} ALL=(root) NOPASSWD: /bin/systemctl
+${SERVICE_USER} ALL=(root) NOPASSWD: /sbin/reboot
+${SERVICE_USER} ALL=(root) NOPASSWD: /usr/sbin/reboot
+EOF
+  chmod 440 "${sudoers_file}"
+
+  if [[ -f "${helper_script}" ]]; then
+    chmod +x "${helper_script}"
+    chown "${SERVICE_USER}:${SERVICE_USER}" "${helper_script}"
+  fi
+  ok "Self-heal sudoers policy installed."
 }
 
 # ---------------------------------------------------------------------------
@@ -236,6 +254,7 @@ main() {
   install_packages
   create_user
   clone_or_update
+  configure_self_heal_permissions
   setup_venv
   write_settings
   setup_log_dir

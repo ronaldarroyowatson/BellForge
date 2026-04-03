@@ -459,6 +459,7 @@ async def collect_display_pipeline(project_root: Path) -> dict[str, Any]:
 
 
 def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
+    helper_script = Path("/opt/bellforge/scripts/self_heal_root.sh")
     command_map: dict[SelfHealAction, list[str]] = {
         "enable-client": ["systemctl", "enable", "--now", "bellforge-client.service"],
         "restart-client": ["systemctl", "restart", "bellforge-client.service"],
@@ -485,6 +486,9 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
         return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
     cmd = command_map[action]
+    if action in privileged_actions and helper_script.is_file():
+        cmd = [str(helper_script), action]
+
     result = _run(cmd)
     used_sudo = False
 
@@ -524,7 +528,7 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
     )
 
     if permission_denied and not stderr:
-        stderr = "Insufficient privileges for this action. Configure passwordless sudo for bellforge service user."
+        stderr = "Insufficient privileges for this action. Run repair.sh to enforce bellforge self-heal sudoers policy."
 
     return {
         "timestamp": _utc_now(),

@@ -8,6 +8,26 @@ from backend.services.display_pipeline import run_self_heal
 
 
 class DisplayPipelineSelfHealTests(unittest.TestCase):
+    def test_reboot_uses_root_helper_script_when_present(self) -> None:
+        helper_success = subprocess.CompletedProcess(
+            args=["/opt/bellforge/scripts/self_heal_root.sh", "reboot"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+        with (
+            patch("backend.services.display_pipeline.Path.is_file", return_value=True),
+            patch("backend.services.display_pipeline.subprocess.run", return_value=helper_success) as run_mock,
+        ):
+            result = run_self_heal("reboot")
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["used_sudo"])
+        called = run_mock.call_args.args[0]
+        self.assertEqual(called[1], "reboot")
+        self.assertTrue(str(called[0]).replace("\\", "/").endswith("/opt/bellforge/scripts/self_heal_root.sh"))
+
     def test_command_specific_sudoers_still_allows_reboot(self) -> None:
         direct_failure = subprocess.CompletedProcess(
             args=["/sbin/reboot"],

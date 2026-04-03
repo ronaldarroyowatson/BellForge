@@ -107,18 +107,22 @@ class UpdaterStatusTests(unittest.IsolatedAsyncioTestCase):
             encoding="utf-8",
         )
 
-        with patch.object(
-            updater_status,
-            "_remote_source_status",
-            return_value={
-                "update_base_url": "https://example.invalid/bellforge",
-                "version_healthy": True,
-                "manifest_healthy": True,
-                "healthy": True,
-                "latest_version": "1.0.2",
-                "manifest_version": "1.0.2",
-                "last_error": None,
-            },
+        with (
+            patch.object(
+                updater_status,
+                "_remote_source_status",
+                return_value={
+                    "update_base_url": "https://example.invalid/bellforge",
+                    "version_healthy": True,
+                    "manifest_healthy": True,
+                    "healthy": True,
+                    "latest_version": "1.0.2",
+                    "manifest_version": "1.0.2",
+                    "last_error": None,
+                },
+            ),
+            patch.object(updater_status, "_service_status", return_value={"unit": updater_status.UPDATER_SERVICE, "active": "active", "enabled": "enabled", "healthy": True}),
+            patch.object(updater_status, "_trigger_listener_status", return_value={"port": 8765, "reachable": True, "healthy": True, "last_error": None}),
         ):
             payload = await updater_status.trigger_update_check_now(self.project_root)
 
