@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BellForge Sign-In Console</title>
+  <style>
+    :root {
+      --bg: #eef4f6;
+      --ink: #1b252d;
+      --muted: #586875;
+      --panel: #fcfeff;
+      --line: #ccd8e1;
+      --accent: #0e5b80;
+      --accent-alt: #1c7c5b;
+      --danger: #98363a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 1.25rem;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 12%, rgba(145, 194, 219, 0.34), transparent 24%),
+        radial-gradient(circle at 88% 8%, rgba(167, 215, 189, 0.32), transparent 24%),
+        linear-gradient(180deg, #eef5f7 0%, #e6edf1 100%);
+    }
+    .wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 1rem; }
+    .hero, .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: 0 12px 26px rgba(13, 41, 60, 0.08);
+    }
+    .hero { padding: 1rem 1.2rem; }
+    h1 { margin: 0 0 0.4rem; font-size: clamp(1.35rem, 3vw, 2.2rem); color: #0f3e59; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+    .card { padding: 1rem; }
+    .card h2 { margin: 0 0 0.55rem; font-size: 1.08rem; color: #14435e; }
+    .muted { margin: 0 0 0.65rem; color: var(--muted); font-size: 0.94rem; }
+    label { display: block; margin-bottom: 0.55rem; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.84rem; color: #3f5463; }
+    input, textarea, select, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.6rem 0.66rem;
+      font: inherit;
+      margin-bottom: 0.6rem;
+    }
+    textarea { min-height: 100px; resize: vertical; font-family: "Consolas", "Cascadia Mono", monospace; font-size: 0.84rem; }
+    .row { display: grid; gap: 0.55rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    button { border: none; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
+    button.secondary { background: var(--accent-alt); }
+    button.danger { background: var(--danger); }
+    .result {
+      background: #edf4fb;
+      border: 1px solid #bdd2e4;
+      border-radius: 10px;
+      padding: 0.7rem;
+      min-height: 120px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      font-size: 0.84rem;
+    }
+    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>BellForge Sign-In Services</h1>
+      <p class="muted">Use this console to validate cloud-provider token exchange, local-only auth flows, refresh/logout, and token verification.</p>
+      <p class="muted">Providers supported: Google, Microsoft, Apple, GitHub.</p>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Cloud Provider Login</h2>
+        <label for="provider">Provider</label>
+        <select id="provider">
+          <option value="google">Google</option>
+          <option value="microsoft">Microsoft</option>
+          <option value="apple">Apple</option>
+          <option value="github">GitHub</option>
+        </select>
+        <label for="provider-subject">Subject</label>
+        <input id="provider-subject" value="demo-user" />
+        <label for="provider-email">Email</label>
+        <input id="provider-email" value="demo-user@example.com" />
+        <div class="row">
+          <button id="cloud-login">Login via Provider</button>
+          <button id="verify-token" class="secondary">Verify Access Token</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Local Auth</h2>
+        <label for="local-email">Local Email</label>
+        <input id="local-email" value="local@example.com" />
+        <label for="local-password">Local Password</label>
+        <input id="local-password" value="local-password-123" />
+        <label for="local-name">Display Name</label>
+        <input id="local-name" value="Local User" />
+        <div class="row">
+          <button id="local-register">Register</button>
+          <button id="local-login" class="secondary">Login</button>
+        </div>
+        <div class="row">
+          <button id="local-reset-request">Request Reset</button>
+          <button id="local-reset-confirm" class="secondary">Confirm Reset</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Session Operations</h2>
+        <label for="token-access">Access Token</label>
+        <textarea id="token-access"></textarea>
+        <label for="token-refresh">Refresh Token</label>
+        <textarea id="token-refresh"></textarea>
+        <div class="row">
+          <button id="refresh-session">Refresh Session</button>
+          <button id="logout-session" class="danger">Logout Session</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>API Output</h2>
+        <p class="muted">Latest response payload is shown here.</p>
+        <div id="auth-output" class="result">Ready.</div>
+      </section>
+    </div>
+  </div>
+
+  <script src="/client/js/auth_console.js"></script>
+</body>
+</html>

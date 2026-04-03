@@ -138,6 +138,23 @@ class UnifiedAuthIntegrationTests(unittest.TestCase):
         self.assertEqual(status_response.status_code, 200)
         self.assertTrue(status_response.json()["paired"])
 
+    def test_pairing_qr_svg_endpoint_renders_image(self) -> None:
+        init_response = self.client.post(
+            "/api/devices/pairing/init",
+            json={
+                "device_name": "Pi QR",
+                "device_fingerprint": "FP-QR-101",
+                "network_id": "net-qr",
+            },
+        )
+        self.assertEqual(init_response.status_code, 200)
+        token = init_response.json()["pairing_token"]
+
+        qr = self.client.get("/api/devices/pairing/qr-svg", params={"pairing_token": token})
+        self.assertEqual(qr.status_code, 200)
+        self.assertIn("image/svg+xml", qr.headers.get("content-type", ""))
+        self.assertIn("<svg", qr.text)
+
     def test_automode_discovery_and_approval_endpoints(self) -> None:
         login = self._login("google", "automode-user")
         headers = {"Authorization": f"Bearer {login['access_token']}"}
@@ -172,6 +189,35 @@ class UnifiedAuthIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(approved.status_code, 200)
         self.assertEqual(approved.json()["status"], "approved")
+
+    def test_automode_discovery_skips_already_linked_fingerprint(self) -> None:
+        login = self._login("google", "automode-owner")
+        headers = {"Authorization": f"Bearer {login['access_token']}"}
+
+        registered = self.client.post(
+            "/api/devices/register",
+            headers=headers,
+            json={
+                "device_name": "Pi Existing",
+                "device_fingerprint": "FP-EXISTING-101",
+                "org_id": "org-z",
+                "classroom_id": "existing",
+            },
+        )
+        self.assertEqual(registered.status_code, 200)
+
+        report = self.client.post(
+            "/api/automode/discovery/report",
+            json={
+                "discovered_device_name": "Pi Existing Duplicate",
+                "discovered_fingerprint": "FP-EXISTING-101",
+                "network_id": "net-lab",
+                "already_authenticated": False,
+            },
+        )
+        self.assertEqual(report.status_code, 200)
+        self.assertFalse(report.json()["queued"])
+        self.assertEqual(report.json()["reason"], "already-linked")
 
 
 if __name__ == "__main__":

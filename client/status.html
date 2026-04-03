@@ -161,6 +161,60 @@
       padding: 24px;
       margin-bottom: 18px;
     }
+    .onboarding-qr-panel {
+      padding: 24px;
+      margin-bottom: 18px;
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(220px, 260px) 1fr;
+      align-items: center;
+    }
+    .onboarding-qr-shell {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border: 1px solid #bfd1df;
+      border-radius: 20px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+    .onboarding-qr-shell img {
+      width: 100%;
+      max-width: 220px;
+      height: auto;
+      display: block;
+    }
+    .onboarding-qr-meta h2 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .onboarding-qr-meta p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .onboarding-qr-status {
+      margin: 0 0 12px;
+      color: #114b6f;
+      font-weight: 700;
+    }
+    .onboarding-direct-link {
+      display: block;
+      color: #0f4467;
+      text-decoration: none;
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      font-size: clamp(1rem, 1.8vw, 1.25rem);
+      line-height: 1.35;
+      word-break: break-word;
+      background: var(--accent-soft);
+      border: 1px solid #b8d0df;
+      border-radius: 16px;
+      padding: 12px 14px;
+    }
     .url-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -360,6 +414,7 @@
       .url-grid,
       .stats,
       .advanced-grid,
+      .onboarding-qr-panel,
       .steps {
         grid-template-columns: 1fr;
       }
@@ -445,8 +500,32 @@
           <p>Open this page to change settings and manage the display.</p>
           <a id="settingsUrl" href="#" target="_blank" rel="noreferrer">Unavailable</a>
         </article>
+        <article class="url-card">
+          <p>Open this page for sign-in services (cloud and local auth).</p>
+          <a id="authUrl" href="#" target="_blank" rel="noreferrer">Unavailable</a>
+        </article>
+        <article class="url-card">
+          <p>Open this page for pairing code, QR onboarding, and AutoMode controls.</p>
+          <a id="onboardingUrl" href="#" target="_blank" rel="noreferrer">Unavailable</a>
+        </article>
+        <article class="url-card">
+          <p>Open this page for AutoMode pending approvals and history.</p>
+          <a id="automodeUrl" href="#" target="_blank" rel="noreferrer">Unavailable</a>
+        </article>
       </div>
       <p class="browser-note">Use a browser such as Chrome, Edge, Safari, or Firefox. Enter the address in the top address bar, not in a search box.</p>
+    </section>
+
+    <section class="card onboarding-qr-panel">
+      <div class="onboarding-qr-shell">
+        <img id="onboardingQr" alt="QR code for BellForge first-time auth onboarding" />
+      </div>
+      <div class="onboarding-qr-meta">
+        <h2>First-time sign-in</h2>
+        <p>Scan this code with your phone to open the exact onboarding page for this device. It includes the active pairing session so setup is as short as possible.</p>
+        <p id="onboardingQrStatus" class="onboarding-qr-status">Preparing onboarding QR...</p>
+        <a id="onboardingDirectUrl" class="onboarding-direct-link" href="#" target="_blank" rel="noreferrer">Unavailable</a>
+      </div>
     </section>
 
     <section class="stats">
@@ -502,6 +581,12 @@
     let diagnosticsRotationMs = 8000;
     let carouselIndex = 0;
     let carouselTimer = null;
+    const pairingState = {
+      token: "",
+      code: "",
+      expiresAtMs: 0,
+      fingerprint: "",
+    };
 
     const els = {
       hostname: document.getElementById("hostname"),
@@ -510,6 +595,12 @@
       ipAddress: document.getElementById("ipAddress"),
       accessUrl: document.getElementById("accessUrl"),
       settingsUrl: document.getElementById("settingsUrl"),
+      authUrl: document.getElementById("authUrl"),
+      onboardingUrl: document.getElementById("onboardingUrl"),
+      automodeUrl: document.getElementById("automodeUrl"),
+      onboardingQr: document.getElementById("onboardingQr"),
+      onboardingQrStatus: document.getElementById("onboardingQrStatus"),
+      onboardingDirectUrl: document.getElementById("onboardingDirectUrl"),
       networkStatus: document.getElementById("networkStatus"),
       networkSpeed: document.getElementById("networkSpeed"),
       backendReachable: document.getElementById("backendReachable"),
@@ -566,18 +657,97 @@
       const port = window.location.port || "8000";
       const host = localIp || window.location.hostname;
       if (!host) {
-        return { base: "Unavailable", settings: "Unavailable" };
+        return {
+          base: "Unavailable",
+          settings: "Unavailable",
+          auth: "Unavailable",
+          onboarding: "Unavailable",
+          automode: "Unavailable",
+        };
       }
       const base = `${protocol}//${host}:${port}`;
       return {
         base,
         settings: `${base}/settings`,
+        auth: `${base}/auth`,
+        onboarding: `${base}/onboarding`,
+        automode: `${base}/automode`,
       };
     }
 
     function setUrl(el, value) {
       el.textContent = value;
       el.href = value === "Unavailable" ? "#" : value;
+    }
+
+    function networkIdFromIp(localIp) {
+      if (!localIp || localIp.split(".").length !== 4) {
+        return null;
+      }
+      const parts = localIp.split(".");
+      return `${parts[0]}.${parts[1]}.${parts[2]}.x`;
+    }
+
+    function buildDeviceFingerprint(data, localIp) {
+      const host = String(data.hostname || "unknown-host").toLowerCase();
+      const ip = (localIp || "unknown-ip").replace(/[^0-9.]/g, "");
+      return `bf-${host}-${ip}`;
+    }
+
+    async function ensurePairingSession(deviceName, fingerprint, networkId) {
+      const ttlBufferMs = 30000;
+      if (
+        pairingState.token &&
+        pairingState.fingerprint === fingerprint &&
+        Date.now() < pairingState.expiresAtMs - ttlBufferMs
+      ) {
+        return;
+      }
+
+      const response = await fetch("/api/devices/pairing/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          device_name: deviceName,
+          device_fingerprint: fingerprint,
+          network_id: networkId,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Pairing init failed: HTTP ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const expiresIn = Number(payload.pairing_code_expires_in || 240);
+      pairingState.token = String(payload.pairing_token || "");
+      pairingState.code = String(payload.pairing_code || "");
+      pairingState.fingerprint = fingerprint;
+      pairingState.expiresAtMs = Date.now() + Math.max(30, expiresIn) * 1000;
+    }
+
+    async function refreshOnboardingCard(data, urls, localIp) {
+      if (!urls.onboarding || urls.onboarding === "Unavailable") {
+        els.onboardingQrStatus.textContent = "Onboarding link unavailable until network details load.";
+        setUrl(els.onboardingDirectUrl, "Unavailable");
+        els.onboardingQr.removeAttribute("src");
+        return;
+      }
+
+      try {
+        const deviceName = String(data.hostname || "BellForge Device");
+        const fingerprint = buildDeviceFingerprint(data, localIp);
+        const networkId = networkIdFromIp(localIp);
+        await ensurePairingSession(deviceName, fingerprint, networkId);
+
+        const onboardingLink = `${urls.onboarding}?pairing_token=${encodeURIComponent(pairingState.token)}&pairing_code=${encodeURIComponent(pairingState.code)}`;
+        setUrl(els.onboardingDirectUrl, onboardingLink);
+        els.onboardingQr.src = `/api/qr/svg?text=${encodeURIComponent(onboardingLink)}`;
+        els.onboardingQrStatus.textContent = `Scan to start. Pairing code: ${pairingState.code}`;
+      } catch (error) {
+        setUrl(els.onboardingDirectUrl, urls.onboarding);
+        els.onboardingQr.src = `/api/qr/svg?text=${encodeURIComponent(urls.onboarding)}`;
+        els.onboardingQrStatus.textContent = "Using fallback onboarding link. Open the direct URL below if scan fails.";
+      }
     }
 
     function renderDiagnosticsCarousel() {
@@ -636,6 +806,10 @@
         els.ipAddress.textContent = localIp || "Unavailable";
         setUrl(els.accessUrl, urls.base);
         setUrl(els.settingsUrl, urls.settings);
+        setUrl(els.authUrl, urls.auth);
+        setUrl(els.onboardingUrl, urls.onboarding);
+        setUrl(els.automodeUrl, urls.automode);
+        await refreshOnboardingCard(data, urls, localIp);
 
         els.networkStatus.innerHTML = online ? pill("Online", "ok") : pill("Offline", "bad");
         els.networkSpeed.textContent = `Ping: ${ping} | Throughput: ${throughput}`;
@@ -660,6 +834,12 @@
         els.ipAddress.textContent = "Unavailable";
         setUrl(els.accessUrl, "Unavailable");
         setUrl(els.settingsUrl, "Unavailable");
+        setUrl(els.authUrl, "Unavailable");
+        setUrl(els.onboardingUrl, "Unavailable");
+        setUrl(els.automodeUrl, "Unavailable");
+        setUrl(els.onboardingDirectUrl, "Unavailable");
+        els.onboardingQrStatus.textContent = "Unable to generate onboarding QR right now.";
+        els.onboardingQr.removeAttribute("src");
         els.refreshLabel.textContent = `Last refresh failed at ${new Date().toLocaleTimeString()}`;
       }
     }

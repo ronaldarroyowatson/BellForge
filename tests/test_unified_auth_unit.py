@@ -125,6 +125,30 @@ class UnifiedAuthUnitTests(unittest.TestCase):
         self.assertEqual(decision["status"], "approved")
         self.assertIn("device_token", decision)
 
+    def test_pairing_claim_conflict_rejected_for_existing_fingerprint(self) -> None:
+        service = get_auth_service(force_reload=True)
+        user_tokens = self._login_user(provider="google", subject="user-7", email="u7@example.com")
+        principal = service.verify_bellforge_token(user_tokens["access"])
+
+        service.register_device(
+            principal,
+            device_name="Pi Existing",
+            device_fingerprint="FP-CONFLICT-PAIRING-001",
+            org_id="org-a",
+            classroom_id="room-105",
+            permissions=None,
+        )
+
+        pairing = service.create_pairing_session(
+            device_name="Pi Duplicate",
+            device_fingerprint="FP-CONFLICT-PAIRING-001",
+            network_id="net-campus",
+        )
+
+        with self.assertRaises(AuthError) as conflict:
+            service.claim_pairing_code(principal, pairing["pairing_code"], "org-a", "room-105")
+        self.assertEqual(conflict.exception.code, "device_claim_conflict")
+
     def test_unauthorized_device_heartbeat_is_rejected(self) -> None:
         service = get_auth_service(force_reload=True)
         user_tokens = self._login_user(provider="google", subject="user-6", email="u6@example.com")

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Never
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from backend.routes.auth_api import device_principal_dependency, user_principal_dependency
@@ -158,6 +159,15 @@ async def pairing_claim_qr(payload: PairingClaimQrRequest, principal: TokenPrinc
 async def pairing_status(payload: PairingStatusRequest) -> dict[str, Any]:
     try:
         return get_auth_service().pairing_status(payload.pairing_token, payload.device_fingerprint)
+    except AuthError as exc:
+        _raise(exc)
+
+
+@router.get("/devices/pairing/qr-svg")
+async def pairing_qr_svg(pairing_token: str = Query(min_length=20, max_length=10000)) -> Response:
+    try:
+        svg = get_auth_service().render_pairing_qr_svg(pairing_token)
+        return Response(content=svg, media_type="image/svg+xml")
     except AuthError as exc:
         _raise(exc)
 

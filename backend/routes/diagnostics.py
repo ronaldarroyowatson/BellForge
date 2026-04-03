@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
+import qrcode
+import qrcode.image.svg
 
 from backend.services.auth import get_auth_status
 from backend.services.display_preferences import get_display_preferences, update_display_preferences
@@ -151,3 +154,16 @@ async def display_self_heal(payload: DisplaySelfHealPayload) -> dict[str, Any]:
         return run_self_heal(payload.action)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Display self-heal failed: {exc}")) from exc
+
+
+@router.get("/qr/svg", summary="Render a QR code as SVG")
+async def qr_svg(text: str = Query(min_length=1, max_length=2048)) -> Response:
+    try:
+        qr = qrcode.QRCode(border=2, box_size=7, error_correction=qrcode.constants.ERROR_CORRECT_M)
+        qr.add_data(text)
+        qr.make(fit=True)
+        image = qr.make_image(image_factory=qrcode.image.svg.SvgPathImage)
+        payload = image.to_string().decode("utf-8")
+        return Response(content=payload, media_type="image/svg+xml")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"QR render failed: {exc}")) from exc

@@ -9,6 +9,7 @@ User=bellforge
 Group=bellforge
 WorkingDirectory=/opt/bellforge
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/opt/bellforge/.venv/bin/python -m backend.services.runtime_deps_guard --venv-python /opt/bellforge/.venv/bin/python --requirements /opt/bellforge/backend/requirements.txt --stamp /opt/bellforge/.venv/.bellforge_backend_requirements.sha256
 ExecStart=/opt/bellforge/.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5

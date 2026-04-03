@@ -180,6 +180,16 @@ This trigger starts an immediate check-and-stage cycle. It does not force a live
 
 BellForge auth endpoints are hosted by the same backend service under `/api/auth`, `/api/devices`, and `/api/automode`.
 
+### Built-in workflow consoles
+
+After backend startup, these built-in pages provide end-to-end flow visibility:
+
+- `http://<server>:8000/auth` for cloud/local sign-in services and token lifecycle checks
+- `http://<server>:8000/onboarding` for pairing code + QR onboarding workflows
+- `http://<server>:8000/automode` for AutoMode activation, approvals, and link history
+
+These pages call the production API routes directly and are intended for validation, support, and staging rollouts.
+
 ### Required environment variables
 
 ```bash

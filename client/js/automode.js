@@ -1,7 +1,8 @@
 "use strict";
 
 const BASE = window.BELLFORGE_SERVER_URL || "http://127.0.0.1:8000";
-const ACCESS_TOKEN = localStorage.getItem("bellforge.access_token") || "";
+const ACCESS_KEY = "bellforge.access_token";
+const REFRESH_KEY = "bellforge.refresh_token";
 
 const elStatus = document.getElementById("automode-status");
 const elPending = document.getElementById("pending-list");
@@ -9,18 +10,60 @@ const elDiscovered = document.getElementById("discovered-list");
 const elHistory = document.getElementById("history-list");
 
 function authHeaders() {
+  const access = localStorage.getItem(ACCESS_KEY) || "";
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${ACCESS_TOKEN}`,
+    Authorization: `Bearer ${access}`,
   };
+}
+
+async function refreshSessionToken() {
+  const refreshToken = localStorage.getItem(REFRESH_KEY) || "";
+  if (!refreshToken) {
+    return false;
+  }
+
+  const response = await fetch(`${BASE}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!response.ok) {
+    return false;
+  }
+
+  const payload = await response.json();
+  if (payload.access_token) {
+    localStorage.setItem(ACCESS_KEY, payload.access_token);
+  }
+  if (payload.refresh_token) {
+    localStorage.setItem(REFRESH_KEY, payload.refresh_token);
+  }
+  return true;
+}
+
+async function authFetch(path, options = {}) {
+  const execute = (headers) =>
+    fetch(`${BASE}${path}`, {
+      ...options,
+      headers,
+    });
+
+  let response = await execute(authHeaders());
+  if (response.status === 401) {
+    const refreshed = await refreshSessionToken();
+    if (refreshed) {
+      response = await execute(authHeaders());
+    }
+  }
+  return response;
 }
 
 async function activateAutoMode() {
   const controllerId = document.getElementById("controller-id").value.trim();
   const networkId = document.getElementById("network-id").value.trim();
-  const response = await fetch(`${BASE}/api/automode/activate`, {
+  const response = await authFetch("/api/automode/activate", {
     method: "POST",
-    headers: authHeaders(),
     body: JSON.stringify({ controller_device_id: controllerId, network_id: networkId }),
   });
   if (!response.ok) {
@@ -33,9 +76,7 @@ async function activateAutoMode() {
 }
 
 async function loadPending() {
-  const response = await fetch(`${BASE}/api/automode/pending`, {
-    headers: authHeaders(),
-  });
+  const response = await authFetch("/api/automode/pending");
   if (!response.ok) {
     elPending.innerHTML = `<p>Unable to load pending: HTTP ${response.status}</p>`;
     return;
@@ -68,9 +109,8 @@ async function loadPending() {
 }
 
 async function decide(pendingId, approve) {
-  const response = await fetch(`${BASE}/api/automode/decide`, {
+  const response = await authFetch("/api/automode/decide", {
     method: "POST",
-    headers: authHeaders(),
     body: JSON.stringify({
       pending_id: pendingId,
       approve,
@@ -86,9 +126,7 @@ async function decide(pendingId, approve) {
 }
 
 async function loadHistory() {
-  const response = await fetch(`${BASE}/api/automode/history`, {
-    headers: authHeaders(),
-  });
+  const response = await authFetch("/api/automode/history");
   if (!response.ok) {
     elHistory.innerHTML = `<li>Unable to load history: HTTP ${response.status}</li>`;
     return;

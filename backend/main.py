@@ -66,6 +66,13 @@ def _resolve_safe_path(rel_path: str) -> Path:
     return candidate
 
 
+def _serve_client_page(filename: str) -> FileResponse:
+    page = PROJECT_ROOT / "client" / filename
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail=f"{filename} not found")
+    return FileResponse(page)
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -139,15 +146,24 @@ async def display_payload(display_id: str) -> JSONResponse:
 
 @app.get("/status", response_class=FileResponse)
 async def status_page() -> FileResponse:
-    page = PROJECT_ROOT / "client" / "status.html"
-    if not page.is_file():
-        raise HTTPException(status_code=404, detail="status.html not found")
-    return FileResponse(page)
+    return _serve_client_page("status.html")
 
 
 @app.get("/settings", response_class=FileResponse)
 async def settings_page() -> FileResponse:
-    page = PROJECT_ROOT / "client" / "settings.html"
-    if not page.is_file():
-        raise HTTPException(status_code=404, detail="settings.html not found")
-    return FileResponse(page)
+    return _serve_client_page("settings.html")
+
+
+@app.get("/onboarding", response_class=FileResponse)
+async def onboarding_page() -> FileResponse:
+    return _serve_client_page("onboarding.html")
+
+
+@app.get("/auth", response_class=FileResponse)
+async def auth_page() -> FileResponse:
+    return _serve_client_page("auth.html")
+
+
+@app.get("/automode", response_class=FileResponse)
+async def automode_page() -> FileResponse:
+    return _serve_client_page("automode.html")

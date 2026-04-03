@@ -10,8 +10,12 @@ import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Any
+
+import qrcode
+import qrcode.image.svg
 
 jwt = importlib.import_module("jwt")
 InvalidTokenError = getattr(jwt, "InvalidTokenError")
@@ -990,6 +994,16 @@ class UnifiedAuthService:
         if not isinstance(user, dict):
             raise AuthError(404, "user_not_found", "User not found.")
 
+        session_fingerprint = str(session.get("fingerprint") or "")
+        if session_fingerprint:
+            for existing in data["devices"].values():
+                if not isinstance(existing, dict):
+                    continue
+                if bool(existing.get("revoked", False)):
+                    continue
+                if str(existing.get("fingerprint") or "") == session_fingerprint:
+                    raise AuthError(409, "device_claim_conflict", "A device with this fingerprint is already linked.")
+
         device_id = str(uuid.uuid4())
         permissions = _as_list(user.get("permissions"))
         device = {
@@ -1127,6 +1141,29 @@ class UnifiedAuthService:
             "device_token_expires_in": self._device_ttl_seconds,
         }
 
+    def render_pairing_qr_svg(self, pairing_token: str) -> str:
+        payload = self._decode_token(pairing_token)
+        if payload.get("typ") != "pairing_qr":
+            raise AuthError(401, "invalid_token_type", "Pairing QR token is required.")
+
+        session_id = str(payload.get("sub") or "")
+        nonce = str(payload.get("nonce") or "")
+        data = self._read()
+        self._cleanup(data)
+        session = data["pairing_sessions"].get(session_id)
+        if not isinstance(session, dict):
+            raise AuthError(404, "pairing_not_found", "Pairing session not found.")
+        if session.get("qr_nonce") != nonce:
+            raise AuthError(401, "pairing_invalid", "Pairing token is invalid.")
+
+        qr = qrcode.QRCode(border=2, box_size=7, error_correction=qrcode.constants.ERROR_CORRECT_M)
+        qr.add_data(pairing_token)
+        qr.make(fit=True)
+        image = qr.make_image(image_factory=qrcode.image.svg.SvgPathImage)
+        buffer = BytesIO()
+        image.save(buffer)
+        return buffer.getvalue().decode("utf-8")
+
     def automode_activate(self, principal: TokenPrincipal, controller_device_id: str, network_id: str) -> dict[str, Any]:
         if principal.role != "user" or principal.user_id is None:
             raise AuthError(403, "forbidden", "Only users can activate AutoMode.")
@@ -1158,6 +1195,14 @@ class UnifiedAuthService:
 
         if already_authenticated:
             return {"ok": True, "queued": False, "reason": "already-authenticated"}
+
+        for existing in data["devices"].values():
+            if not isinstance(existing, dict):
+                continue
+            if bool(existing.get("revoked", False)):
+                continue
+            if str(existing.get("fingerprint") or "") == discovered_fingerprint:
+                return {"ok": True, "queued": False, "reason": "already-linked"}
 
         pending_id = str(uuid.uuid4())
         data["automode"]["pending"][pending_id] = {
@@ -1219,6 +1264,16 @@ class UnifiedAuthService:
         user = data["users"].get(principal.user_id)
         if not isinstance(user, dict):
             raise AuthError(404, "user_not_found", "User not found.")
+
+        fingerprint = str(pending.get("discovered_fingerprint") or "")
+        if fingerprint:
+            for existing in data["devices"].values():
+                if not isinstance(existing, dict):
+                    continue
+                if bool(existing.get("revoked", False)):
+                    continue
+                if str(existing.get("fingerprint") or "") == fingerprint:
+                    raise AuthError(409, "device_claim_conflict", "A device with this fingerprint is already linked.")
 
         device_id = str(uuid.uuid4())
         permissions = _as_list(user.get("permissions"))

@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BellForge Device Onboarding</title>
+  <style>
+    :root {
+      --bg: #f3eee2;
+      --ink: #1f2a32;
+      --muted: #5c6771;
+      --panel: #fffcf6;
+      --line: #d9ceba;
+      --accent: #155a87;
+      --accent-2: #1d7d58;
+      --danger: #9b2f2f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 10%, rgba(248, 207, 149, 0.34), transparent 28%),
+        radial-gradient(circle at 90% 8%, rgba(141, 190, 224, 0.33), transparent 25%),
+        linear-gradient(180deg, #f8f3e9 0%, #efe3d1 100%);
+      padding: 1.25rem;
+    }
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      gap: 1rem;
+    }
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 252, 246, 0.95);
+      padding: 1rem 1.2rem;
+      box-shadow: 0 12px 30px rgba(43, 34, 22, 0.09);
+    }
+    h1 {
+      margin: 0 0 0.4rem;
+      font-size: clamp(1.4rem, 3.4vw, 2.4rem);
+      color: #14384f;
+    }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: 0 10px 26px rgba(44, 36, 24, 0.06);
+      padding: 1rem;
+    }
+    .card h2 {
+      margin: 0 0 0.65rem;
+      font-size: 1.1rem;
+      color: #1f4157;
+    }
+    .muted {
+      margin: 0 0 0.7rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.55rem;
+      font-size: 0.86rem;
+      color: #3f4c57;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    input, textarea, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.58rem 0.65rem;
+      font: inherit;
+    }
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      font-size: 0.86rem;
+    }
+    .row {
+      display: grid;
+      gap: 0.6rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .row-3 {
+      display: grid;
+      gap: 0.6rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+    button.secondary {
+      background: var(--accent-2);
+    }
+    button.danger {
+      background: var(--danger);
+    }
+    .code {
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      font-size: clamp(1.5rem, 3vw, 2.3rem);
+      letter-spacing: 0.2em;
+      background: #f0ece2;
+      border: 1px dashed #bda887;
+      border-radius: 12px;
+      padding: 0.75rem;
+      text-align: center;
+      margin: 0.55rem 0;
+    }
+    .tokens {
+      font-family: "Consolas", "Cascadia Mono", monospace;
+      font-size: 0.84rem;
+      word-break: break-all;
+      background: #ecf4fa;
+      border: 1px solid #c0d5e5;
+      border-radius: 10px;
+      padding: 0.6rem;
+      min-height: 2.4rem;
+    }
+    .qr-shell {
+      min-height: 240px;
+      border-radius: 14px;
+      border: 1px solid #c4d3df;
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0.6rem;
+    }
+    #pairing-qr {
+      width: 230px;
+      height: 230px;
+      max-width: 100%;
+    }
+    .status {
+      min-height: 1.25rem;
+      color: #114a70;
+      font-size: 0.93rem;
+    }
+    @media (max-width: 720px) {
+      .row, .row-3 { grid-template-columns: 1fr; }
+      .code { letter-spacing: 0.1em; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>BellForge Pairing Console</h1>
+      <p class="muted">Create a pairing session, display a short-lived code and QR payload, then claim and complete registration from a signed-in user token.</p>
+      <p class="muted">Routes: <strong>/api/devices/pairing/init</strong>, <strong>/api/devices/pairing/claim-code</strong>, <strong>/api/devices/pairing/claim-qr</strong>, <strong>/api/devices/pairing/status</strong>.</p>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Device Pairing Init</h2>
+        <p class="muted">Use this on unauthenticated devices. The server returns a single-use code plus a signed token for QR flow.</p>
+        <label for="device-name">Device Name</label>
+        <input id="device-name" value="Pi Classroom" />
+        <label for="device-fingerprint">Device Fingerprint</label>
+        <input id="device-fingerprint" value="FP-CLASSROOM-101" />
+        <label for="device-network">Network ID</label>
+        <input id="device-network" value="building-a" />
+        <div class="row">
+          <button id="pairing-init">Create Pairing Session</button>
+          <button id="copy-token" class="secondary">Copy Pairing Token</button>
+        </div>
+        <div class="code" id="pairing-code">--------</div>
+        <div class="tokens" id="pairing-token">Pairing token appears here.</div>
+        <div class="qr-shell" style="margin-top:0.6rem;">
+          <img id="pairing-qr" alt="Pairing QR Code" />
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Claim By User</h2>
+        <p class="muted">Provide a user access token from login. Claim by code or QR token, then poll status from the device side.</p>
+        <label for="user-token">User Access Token</label>
+        <textarea id="user-token" placeholder="Paste a user access token (JWT)"></textarea>
+        <div class="row-3">
+          <div>
+            <label for="claim-org">Org ID</label>
+            <input id="claim-org" value="default-org" />
+          </div>
+          <div>
+            <label for="claim-classroom">Classroom ID</label>
+            <input id="claim-classroom" value="room-101" />
+          </div>
+          <div>
+            <label for="claim-code">Pairing Code</label>
+            <input id="claim-code" placeholder="8-digit code" />
+          </div>
+        </div>
+        <div class="row">
+          <button id="claim-code-btn">Claim By Code</button>
+          <button id="claim-qr-btn" class="secondary">Claim By QR Token</button>
+        </div>
+        <div class="row" style="margin-top:0.6rem;">
+          <button id="status-btn">Check Pairing Status</button>
+          <button id="poll-btn" class="secondary">Start Polling</button>
+        </div>
+        <p class="status" id="onboarding-status">Ready.</p>
+        <div class="tokens" id="status-result">Status response appears here.</div>
+      </section>
+    </div>
+  </div>
+
+  <script src="/client/js/onboarding.js"></script>
+</body>
+</html>
