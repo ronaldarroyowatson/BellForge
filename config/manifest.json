@@ -1,6 +1,6 @@
 {
-  "version": "0.1.44",
-  "generated_at": "2026-04-14T19:27:49Z",
+  "version": "0.1.45",
+  "generated_at": "2026-04-14T19:28:37Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -151,7 +151,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "16cd88e772fef9f11ebe3fa5bf04550e3ada47e76c82c4d4ec98b825b0bb4794",
+      "sha256": "8dfa0e3f86a3b60eca509ebd0a6162818289277170e9ead0aab874e07074f2dc",
       "size": 226
     },
     "scripts/bellforge-backend.service": {
@@ -187,8 +187,8 @@
       "size": 3317
     },
     "scripts/convert_ppk_to_openssh.ps1": {
-      "sha256": "75b7daba7ca48d6171cb6d36624074ed1b53f341a819525eb7c7967ff0efeb5e",
-      "size": 3392
+      "sha256": "f0972e2d207415fa33155c12217cd1043e66f4581d40c49ff54c24ae80900de2",
+      "size": 3289
     },
     "scripts/deploy_display_fixes.sh": {
       "sha256": "a7fac3e2e90c41b2b9fd832f210071a8a587d0d54aa29474926a99d5be1822d8",
@@ -215,8 +215,8 @@
       "size": 3359
     },
     "scripts/pi_remote_triage.ps1": {
-      "sha256": "bc395dda308326f6b8ea8a254045d0c197746da1374a217428c409a3ab16bb50",
-      "size": 3245
+      "sha256": "8eb46b431d7b6e583f02db2b39656c6425ece23baa540070c7e2225d7a9bc244",
+      "size": 3162
     },
     "scripts/post_boot_capture.sh": {
       "sha256": "114381978df6a376d15d6e74771426378a243d7140dd2e319dcde29c3cdff695",
