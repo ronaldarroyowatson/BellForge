@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from updater.agent import UpdateAgent, UpdaterSettings
+from updater.agent import UpdateAgent, UpdaterSettings, sha256_file
 
 
 class UpdaterAgentTests(unittest.TestCase):
@@ -149,6 +149,15 @@ class UpdaterAgentTests(unittest.TestCase):
         staged_file = release_dir / "files" / "client" / "settings.html"
         self.assertTrue(staged_file.is_file())
         self.assertEqual(staged_file.read_bytes(), good_bytes)
+
+    def test_sha256_file_normalizes_line_endings_for_text_files(self) -> None:
+        lf_path = self.install_dir / "client" / "status.html"
+        crlf_path = self.install_dir / "client" / "settings.html"
+        lf_path.parent.mkdir(parents=True, exist_ok=True)
+        lf_path.write_bytes(b"<div>hello</div>\n<span>world</span>\n")
+        crlf_path.write_bytes(b"<div>hello</div>\r\n<span>world</span>\r\n")
+
+        self.assertEqual(sha256_file(lf_path), sha256_file(crlf_path))
 
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import httpx
 
 SETTINGS_PATH = Path(os.environ.get("BELLFORGE_SETTINGS", "/opt/bellforge/config/settings.json"))
+TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh"}
 
 
 @dataclass(slots=True)
@@ -96,9 +97,11 @@ def configure_logging(log_file: Path) -> logging.Logger:
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(65536), b""):
-            digest.update(chunk)
+    data = path.read_bytes()
+    if path.suffix.lower() in TEXT_SUFFIXES or path.name in {"Dockerfile", ".env"}:
+        data = data.replace(b"\r\n", b"\n")
+    for index in range(0, len(data), 65536):
+        digest.update(data[index:index + 65536])
     return digest.hexdigest()
 
 
