@@ -484,9 +484,16 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
     def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
         return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
+    using_sudo = False
     cmd = command_map[action]
     if action in privileged_actions and helper_script.is_file():
-        cmd = [str(helper_script), action]
+        cmd = ["sudo", str(helper_script), action]
+        using_sudo = True
+
+    if action in privileged_actions and not helper_script.is_file():
+        # Helper script not yet deployed — sudo the direct fallback command.
+        cmd = ["sudo"] + cmd
+        using_sudo = True
 
     result = _run(cmd)
     current_euid = os.geteuid() if hasattr(os, "geteuid") else -1
@@ -499,11 +506,12 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
             "permission denied" in stderr.lower()
             or "interactive authentication required" in stderr.lower()
             or "a terminal is required to read the password" in stderr.lower()
+            or "must run as root" in stderr.lower()
         )
     )
 
     if permission_denied and not stderr:
-        stderr = "Insufficient privileges for this action. Run BellForge as root via systemd."
+        stderr = "Insufficient privileges for this action. Ensure sudoers rule exists for self_heal_root.sh."
 
     return {
         "timestamp": _utc_now(),
@@ -512,6 +520,6 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
         "returncode": result.returncode,
         "stdout": result.stdout.strip(),
         "stderr": stderr,
-        "used_sudo": False,
+        "used_sudo": using_sudo,
         "permission_denied": permission_denied,
     }

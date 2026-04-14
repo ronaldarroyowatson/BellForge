@@ -312,16 +312,18 @@ async def trigger_update_check_now(project_root: Path) -> dict[str, Any]:
         result["stage_message"] = result["message"]
         return result
 
+    # Note a staged update in the result but do NOT block — always forward the
+    # trigger so the agent can re-check for a newer release on top of what is
+    # staged.  This prevents the "race condition" where the manual check-now
+    # button appeared to do nothing because the guard returned early.
     if bool(state.get("staged_update_pending", False)):
         staged_version = state.get("staged_release_version")
-        result["message"] = (
-            f"Update already staged for next startup ({staged_version})."
+        result["stage_reason"] = "re-check-over-staged"
+        result["stage_message"] = (
+            f"Update {staged_version} is staged; re-triggering check for any newer release."
             if staged_version
-            else "Update already staged for next startup."
+            else "Update staged; re-triggering check for any newer release."
         )
-        result["stage_reason"] = "already-staged"
-        result["stage_message"] = result["message"]
-        return result
 
     status_code, error_message = await _post_trigger_url(trigger_url)
     result["status_code"] = status_code
