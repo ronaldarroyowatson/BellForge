@@ -257,6 +257,46 @@ class UpdateAgent:
                 async for chunk in response.aiter_bytes(65536):
                     handle.write(chunk)
 
+    async def _download_verified_file(
+        self,
+        client: httpx.AsyncClient,
+        relative_path: str,
+        destination: Path,
+        expected_hash: str,
+        *,
+        cache_token: str | None = None,
+    ) -> int:
+        attempts = max(2, self.settings.max_retries + 1)
+        last_hash = ""
+
+        for attempt in range(1, attempts + 1):
+            token = cache_token if attempt == 1 else uuid.uuid4().hex
+            if destination.exists():
+                destination.unlink()
+
+            await self._download_file(client, relative_path, destination, cache_token=token)
+
+            actual_hash = sha256_file(destination)
+            if actual_hash == expected_hash:
+                if attempt > 1:
+                    self.log.info(f"Recovered from hash mismatch for {relative_path} on retry {attempt}/{attempts}")
+                return attempt
+
+            last_hash = actual_hash
+            self.log.warning(
+                "Hash mismatch after download for %s on attempt %s/%s (expected=%s actual=%s). Purging corrupt payload and retrying.",
+                relative_path,
+                attempt,
+                attempts,
+                expected_hash,
+                actual_hash,
+            )
+
+        raise RuntimeError(
+            f"Hash mismatch after download: {relative_path} "
+            f"(expected {expected_hash}, last actual {last_hash})"
+        )
+
     def _changed_files(self, manifest_files: dict[str, Any]) -> list[str]:
         changed: list[str] = []
         for rel_path, metadata in manifest_files.items():
@@ -292,12 +332,14 @@ class UpdateAgent:
         for rel_path in changed_files:
             destination = files_dir / rel_path
             self.log.info(f"Downloading {rel_path}")
-            await self._download_file(client, rel_path, destination, cache_token=cache_token)
-
             expected_hash = str(manifest_files[rel_path].get("sha256", ""))
-            actual_hash = sha256_file(destination)
-            if actual_hash != expected_hash:
-                raise RuntimeError(f"Hash mismatch after download: {rel_path}")
+            await self._download_verified_file(
+                client,
+                rel_path,
+                destination,
+                expected_hash,
+                cache_token=cache_token,
+            )
 
             bytes_downloaded += destination.stat().st_size
             self._write_progress(bytes_downloaded, bytes_total)

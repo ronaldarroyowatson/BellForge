@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import subprocess
@@ -104,6 +105,50 @@ class UpdaterAgentTests(unittest.TestCase):
         self.assertEqual(commands[2], ["systemctl", "restart", "bellforge-backend.service"])
         self.assertEqual(commands[3], ["systemctl", "restart", "bellforge-client.service"])
         self.assertFalse((self.staging_dir / "pending_update.json").exists())
+
+    def test_stage_downloads_retries_hash_mismatch_with_fresh_download(self) -> None:
+        agent = UpdateAgent(self.settings, self.logger)
+        release_dir = self.staging_dir / "releases" / "9.9.9"
+        release_dir.mkdir(parents=True, exist_ok=True)
+
+        good_bytes = b"<html>correct payload</html>\n"
+        bad_bytes = b"<html>stale payload</html>\n"
+        expected_hash = __import__("hashlib").sha256(good_bytes).hexdigest()
+
+        manifest_files = {
+            "client/settings.html": {
+                "sha256": expected_hash,
+                "size": len(good_bytes),
+            }
+        }
+
+        attempts: list[str | None] = []
+
+        async def fake_download(_client, _relative_path: str, destination: Path, *, cache_token: str | None = None) -> None:
+            attempts.append(cache_token)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            payload = bad_bytes if len(attempts) == 1 else good_bytes
+            destination.write_bytes(payload)
+
+        async def run_test() -> None:
+            with patch.object(agent, "_download_file", side_effect=fake_download):
+                await agent._stage_downloads(
+                    client=None,
+                    release_dir=release_dir,
+                    changed_files=["client/settings.html"],
+                    manifest_files=manifest_files,
+                    cache_token="initial-token",
+                )
+
+        asyncio.run(run_test())
+
+        self.assertEqual(len(attempts), 2)
+        self.assertEqual(attempts[0], "initial-token")
+        self.assertNotEqual(attempts[1], "initial-token")
+
+        staged_file = release_dir / "files" / "client" / "settings.html"
+        self.assertTrue(staged_file.is_file())
+        self.assertEqual(staged_file.read_bytes(), good_bytes)
 
 
 if __name__ == "__main__":
