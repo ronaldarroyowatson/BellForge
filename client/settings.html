@@ -406,30 +406,30 @@
       color: var(--muted);
       background: #ffffff;
     }
-    .dcs-status-mini {
-      display: grid;
-      grid-template-columns: repeat(10, minmax(0, 1fr));
-      grid-auto-rows: 8px;
-      gap: 8px;
-      min-height: 160px;
+    .status-preview-controls {
+      display: flex;
+      gap: var(--dcs-space-2);
+      flex-wrap: wrap;
     }
-    .dcs-status-mini__card {
-      background: var(--surface);
+    .status-preview-shell {
+      position: relative;
       border: 1px solid var(--line);
-      border-radius: calc(var(--dcs-card-radius) * 0.75);
-      box-shadow: 0 calc(8px * var(--dcs-shadow-intensity)) calc(16px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.07);
-      padding: 8px;
-      display: grid;
-      align-content: start;
-      gap: 4px;
-      color: var(--text);
-      font-size: 0.74rem;
+      border-radius: calc(var(--dcs-card-radius) * 0.8);
+      overflow: hidden;
+      background: color-mix(in srgb, var(--surface) 90%, #f8fbff);
+      min-height: 320px;
     }
-    .dcs-status-mini__card strong {
-      font-size: 0.72rem;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      color: var(--accent);
+    .status-preview-frame {
+      width: 100%;
+      height: 420px;
+      border: 0;
+      background: #ffffff;
+      transform-origin: top left;
+    }
+    .status-preview-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin: 0;
     }
     .dcs-preview-toggle {
       width: auto;
@@ -644,11 +644,17 @@
             <article class="dcs-preview-card">
               <div class="dcs-preview-card__header">
                 <h3 class="dcs-preview-card__title">Status Page Preview</h3>
-                <span class="dcs-chip">Auto Arrange</span>
+                <div class="status-preview-controls">
+                  <button id="designStatusAutoArrange" class="secondary dcs-preview-toggle" type="button">Auto Arrange</button>
+                  <button id="designStatusReloadMirror" class="secondary dcs-preview-toggle" type="button">Reload Mirror</button>
+                </div>
               </div>
               <div class="dcs-preview-card__body">
-                <p class="dcs-preview-card__meta">Miniature status layout showing Fibonacci width, vertical packing, and token effects.</p>
-                <div id="designStatusPreview" class="dcs-status-mini"></div>
+                <p class="dcs-preview-card__meta">Live mirror of the real Status Page. Drag cards, collapse or expand, and run Auto Arrange to sync layout with all open status views immediately.</p>
+                <div class="status-preview-shell">
+                  <iframe id="designStatusMirror" class="status-preview-frame" title="BellForge Status Page Live Mirror" loading="lazy"></iframe>
+                </div>
+                <p id="designStatusMirrorNote" class="status-preview-note">Mirror idle.</p>
               </div>
             </article>
           </div>
@@ -680,6 +686,9 @@
 
   <script>
     const REFRESH_MS = 5000;
+    const STATUS_LAYOUT_STORAGE_KEY = "bellforge.status.fibo-cards.v1";
+    const STATUS_LAYOUT_COMMAND_KEY = "bellforge.status.layout-command.v1";
+    const DESIGN_CONTROLS_LIVE_KEY = "bellforge.design-controls.live.v1";
     const DESIGN_DEFAULTS = {
       theme: "warm",
       font_scale: 1.0,
@@ -744,7 +753,10 @@
       designPreviewToggle: document.getElementById("designPreviewToggle"),
       designPreviewTitle: document.getElementById("designPreviewTitle"),
       designPreviewBody: document.getElementById("designPreviewBody"),
-      designStatusPreview: document.getElementById("designStatusPreview"),
+      designStatusMirror: document.getElementById("designStatusMirror"),
+      designStatusMirrorNote: document.getElementById("designStatusMirrorNote"),
+      designStatusAutoArrange: document.getElementById("designStatusAutoArrange"),
+      designStatusReloadMirror: document.getElementById("designStatusReloadMirror"),
       designControlResult: document.getElementById("designControlResult"),
       designReset: document.getElementById("designReset"),
       displayHealResult: document.getElementById("displayHealResult"),
@@ -766,6 +778,7 @@
 
     let lastLogPayload = null;
     let refreshPromise = null;
+    let statusMirrorMessageBound = false;
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
@@ -1127,34 +1140,64 @@
       elements.designPreviewSummary.textContent = `Theme ${state.theme} | Font ${state.font_scale.toFixed(2)}x | UI ${state.ui_scale.toFixed(2)}x | Status ${state.status_page_scale.toFixed(2)}x`;
     }
 
-    function renderStatusPreviewMini(state) {
-      if (!elements.designStatusPreview) return;
-      const miniCards = [
-        { key: "hero", title: "Hero", weight: 5, copy: "Largest slot" },
-        { key: "links", title: "Links", weight: 3, copy: "Mid slot" },
-        { key: "stats", title: "Stats", weight: 2, copy: "Compact" },
-        { key: "diag", title: "Diagnostics", weight: 1, copy: "Collapsed" },
-      ];
-      const rows = miniCards.length === 4 ? [2, 2] : [3, 1];
-      const html = [];
-      let cursor = 0;
-      rows.forEach((rowSize) => {
-        const ratios = rowSize === 2 ? [3, 2] : [5, 3, 2];
-        const normalized = rowSize === 2 ? [6, 4] : [5, 3, 2];
-        miniCards.slice(cursor, cursor + rowSize).forEach((card, index) => {
-          const rowSpan = Math.max(4, Math.round((card.weight + 2) * 2));
-          html.push(`<article class="dcs-status-mini__card" style="grid-column: span ${normalized[index] || 10}; grid-row: span ${rowSpan};"><strong>${card.title}</strong><span>${card.copy}</span></article>`);
+    function broadcastStatusLayoutCommand(commandType, payload = {}) {
+      const command = {
+        type: commandType,
+        payload,
+        source: "settings-preview",
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(STATUS_LAYOUT_COMMAND_KEY, JSON.stringify(command));
+      if (elements.designStatusMirror?.contentWindow) {
+        elements.designStatusMirror.contentWindow.postMessage({ type: "bellforge-status-layout-command", command }, window.location.origin);
+      }
+      console.log("[Fibonacci Layout] preview-to-status sync event", command);
+    }
+
+    function initStatusMirror() {
+      if (!elements.designStatusMirror) {
+        return;
+      }
+      const mirrorUrl = new URL("/status", window.location.origin);
+      mirrorUrl.searchParams.set("view", "display");
+      mirrorUrl.searchParams.set("mirror", "1");
+      elements.designStatusMirror.src = mirrorUrl.toString();
+      elements.designStatusMirrorNote.textContent = "Loading real status mirror...";
+
+      elements.designStatusMirror.onload = () => {
+        elements.designStatusMirrorNote.textContent = "Mirror loaded. Drag cards in the preview to reorder real status layout.";
+        broadcastStatusLayoutCommand("sync-request", {});
+      };
+
+      if (!statusMirrorMessageBound) {
+        window.addEventListener("message", (event) => {
+          if (event.origin !== window.location.origin) return;
+          if (!event.data || event.data.type !== "bellforge-status-layout-state") return;
+          const snapshot = event.data.payload || {};
+          const size = Array.isArray(snapshot.registry) ? snapshot.registry.length : 0;
+          elements.designStatusMirrorNote.textContent = `Mirror synced with ${size} cards. Last update ${new Date().toLocaleTimeString()}.`;
+          console.log("[Fibonacci Layout] card registry load", snapshot.registry || []);
+          console.log("[Fibonacci Layout] card state load", snapshot.state || {});
         });
-        cursor += rowSize;
-      });
-      elements.designStatusPreview.innerHTML = html.join("");
+        statusMirrorMessageBound = true;
+      }
     }
 
     function renderDesignPreview(state) {
       if (!elements.designPreviewCard) return;
       elements.designPreviewTitle.textContent = `${state.theme} preview`;
       elements.designPreviewBody.textContent = `Radius ${state.card_radius_px}px, spacing ${Math.round(state.ui_scale * 100)}%, glow ${state.shadow_intensity.toFixed(2)}x, status fit ${state.status_page_scale.toFixed(2)}x.`;
-      renderStatusPreviewMini(state);
+      localStorage.setItem(DESIGN_CONTROLS_LIVE_KEY, JSON.stringify({
+        source: "settings",
+        timestamp: Date.now(),
+        payload: state,
+      }));
+      if (elements.designStatusMirror?.contentWindow) {
+        elements.designStatusMirror.contentWindow.postMessage({
+          type: "bellforge-design-controls",
+          payload: state,
+        }, window.location.origin);
+      }
     }
 
     function applyDesignControls(state) {
@@ -1539,11 +1582,35 @@
       elements.designPreviewToggle.textContent = elements.designPreviewCard.classList.contains("is-collapsed") ? "Expand" : "Collapse";
       console.log("[Fibonacci Layout] preview card toggled", { collapsed: elements.designPreviewCard.classList.contains("is-collapsed") });
     });
+    elements.designStatusAutoArrange.addEventListener("click", () => {
+      elements.designStatusMirrorNote.textContent = "Running Auto Arrange with real Fibonacci engine...";
+      broadcastStatusLayoutCommand("auto-arrange", {});
+    });
+    elements.designStatusReloadMirror.addEventListener("click", () => {
+      initStatusMirror();
+      broadcastStatusLayoutCommand("sync-request", {});
+    });
+
+    window.addEventListener("storage", (event) => {
+      if (event.key !== STATUS_LAYOUT_STORAGE_KEY || !event.newValue) {
+        return;
+      }
+      try {
+        const snapshot = JSON.parse(event.newValue);
+        const state = snapshot && typeof snapshot === "object" ? snapshot : {};
+        const count = Object.keys(state).length;
+        elements.designStatusMirrorNote.textContent = `Status layout synced across views (${count} cards) at ${new Date().toLocaleTimeString()}.`;
+        console.log("[Fibonacci Layout] preview-to-status sync event", { count, source: "storage" });
+      } catch {
+        elements.designStatusMirrorNote.textContent = "Status layout sync event received.";
+      }
+    });
 
     elements.manualRefresh.addEventListener("click", () => refreshAll({ manual: true }));
 
     syncDisplayPreferenceLabels();
     pushDesignControlsToForm(DESIGN_DEFAULTS);
+    initStatusMirror();
     const settingsAdaptiveLayout = createFibonacciAdaptiveLayout({
       container: document.getElementById("settingsCardGrid"),
       cardSelector: "[data-fibo-card]",

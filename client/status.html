@@ -468,6 +468,13 @@
       gap: 8px;
       user-select: none;
     }
+    .card-titlebar[draggable="true"] {
+      cursor: grab;
+    }
+    .is-dragging {
+      opacity: 0.6;
+      transform: scale(0.99);
+    }
     .card-titlebar:hover {
       opacity: 0.85;
     }
@@ -816,6 +823,9 @@
 
   <script>
     const REFRESH_MS = 10000;
+    const STATUS_LAYOUT_STORAGE_KEY = "bellforge.status.fibo-cards.v1";
+    const STATUS_LAYOUT_COMMAND_KEY = "bellforge.status.layout-command.v1";
+    const DESIGN_CONTROLS_LIVE_KEY = "bellforge.design-controls.live.v1";
     const params = new URLSearchParams(window.location.search);
     const isDisplayView = params.get("view") === "display";
     const advancedDetails = document.querySelector(".advanced");
@@ -878,7 +888,6 @@
       const rowUnit = options.rowUnit || 8;
       const collapsedHeight = options.collapsedHeight || 56;
 
-      // Debug logger
       const logger = {
         enabled: localStorage.getItem("bellforge.debug.fibo") === "true",
         log(msg, data) {
@@ -889,22 +898,33 @@
       };
 
       if (!container) {
-        return { recompute() {} };
+        return {
+          recompute() {},
+          autoArrange() {},
+          applyRemoteState() {},
+          emitLayoutSnapshot() {},
+        };
       }
 
       container.classList.add("fibo-adaptive-grid");
-  container.style.setProperty("--fibo-row-unit", `${rowUnit}px`);
+      container.style.setProperty("--fibo-row-unit", `${rowUnit}px`);
 
       const cards = Array.from(container.querySelectorAll(cardSelector));
       const state = JSON.parse(localStorage.getItem(storageKey) || "{}");
       let frameToken = 0;
-  const layoutCache = { columns: 0, rows: [], weights: {}, spans: {}, heights: {} };
+      let isApplyingRemoteState = false;
+      let skipPersistOnce = false;
+      let pendingAutoArrange = false;
+      let dragSourceKey = "";
+      const layoutCache = { columns: 0, rows: [], weights: {}, spans: {}, heights: {} };
       const resizeObserver = new ResizeObserver(() => scheduleRecompute());
 
       function flushCaches() {
         layoutCache.columns = 0;
+        layoutCache.rows = [];
         layoutCache.weights = {};
         layoutCache.spans = {};
+        layoutCache.heights = {};
       }
 
       function columnsFor(width) {
@@ -929,18 +949,16 @@
         const multilineText = (contentEl.textContent.match(/\n/g) || []).length;
 
         if (svg || canvas) {
-          weight = 5; // Graphs/charts
+          weight = 5;
         } else if (details) {
-          weight = 3; // Details open
+          weight = 3;
         } else if (multilineText > 3) {
-          weight = 3; // Multi-line content
+          weight = 3;
         } else if (contentEl.textContent.trim().length === 0) {
-          weight = 0; // Empty
-        } else {
-          weight = 1;
+          weight = 0;
         }
 
-        logger.log("Card weight calculated", { card: keyFor(card), weight });
+        logger.log("card weight calculations", { card: keyFor(card), weight });
         return weight;
       }
 
@@ -953,7 +971,7 @@
         const computed = getComputedStyle(card);
         const verticalPadding = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
         const total = Math.ceil(titlebarHeight + contentHeight + verticalPadding);
-        logger.log("Card height calculated", { card: keyFor(card), height: total });
+        logger.log("width/height calculations", { card: keyFor(card), height: total });
         return total;
       }
 
@@ -1014,13 +1032,23 @@
       }
 
       function readCardState(card) {
-        return state[keyFor(card)] || { collapsed: false, hidden: false };
+        return state[keyFor(card)] || { collapsed: false, hidden: false, order: Number.MAX_SAFE_INTEGER };
       }
 
-      function writeCardState(card, nextState) {
-        state[keyFor(card)] = { ...readCardState(card), ...nextState };
+      function persistState(reason) {
+        if (isApplyingRemoteState || skipPersistOnce) {
+          skipPersistOnce = false;
+          return;
+        }
         localStorage.setItem(storageKey, JSON.stringify(state));
-        logger.log(`Card state updated: ${keyFor(card)}`, nextState);
+        logger.log("grid reflow events", { reason, state });
+      }
+
+      function writeCardState(card, nextState, reason = "card-state") {
+        const key = keyFor(card);
+        state[key] = { ...readCardState(card), ...nextState };
+        persistState(reason);
+        logger.log("card state load", { card: key, state: state[key] });
       }
 
       function applyState(card) {
@@ -1029,6 +1057,44 @@
         card.classList.toggle("is-hidden", !!cardState.hidden);
         if (card.matches("details")) {
           card.open = !cardState.collapsed;
+        }
+      }
+
+      function designTokensSnapshot() {
+        const rootStyles = getComputedStyle(document.documentElement);
+        return {
+          theme: document.documentElement.getAttribute("data-design-theme") || "warm",
+          radius: rootStyles.getPropertyValue("--bf-card-radius").trim(),
+          spacing: rootStyles.getPropertyValue("--bf-ui-scale").trim(),
+          glow: rootStyles.getPropertyValue("--bf-shadow-scale").trim(),
+          stroke: rootStyles.getPropertyValue("--line").trim(),
+          motionDuration: rootStyles.getPropertyValue("--motion-duration").trim(),
+          motionEasing: rootStyles.getPropertyValue("--motion-easing").trim(),
+          statusFit: rootStyles.getPropertyValue("--bf-status-page-scale").trim(),
+        };
+      }
+
+      function emitLayoutSnapshot(reason = "sync") {
+        const registry = cards.map((card, index) => ({
+          key: keyFor(card),
+          title: titleFor(card),
+          order: readCardState(card).order ?? index,
+          collapsed: !!readCardState(card).collapsed,
+          hidden: !!readCardState(card).hidden,
+          weight: layoutCache.weights[keyFor(card)] ?? null,
+          spans: layoutCache.spans[keyFor(card)] ?? null,
+        }));
+        logger.log("card registry load", registry);
+        const payload = {
+          reason,
+          registry,
+          state,
+          tokens: designTokensSnapshot(),
+          layoutCache,
+          timestamp: Date.now(),
+        };
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: "bellforge-status-layout-state", payload }, window.location.origin);
         }
       }
 
@@ -1049,13 +1115,40 @@
           button.className = "hidden-card-pill";
           button.textContent = `Show ${titleFor(card)}`;
           button.addEventListener("click", () => {
-            writeCardState(card, { hidden: false });
+            writeCardState(card, { hidden: false }, "show-hidden");
             applyState(card);
             renderDock();
             scheduleRecompute();
           });
           dock.appendChild(button);
         }
+      }
+
+      function reorderCards(draggedKey, targetKey) {
+        if (!draggedKey || !targetKey || draggedKey === targetKey) {
+          return;
+        }
+        const ordered = cards.slice().sort((a, b) => {
+          const aState = readCardState(a);
+          const bState = readCardState(b);
+          const aOrder = Number.isFinite(aState.order) ? aState.order : cards.indexOf(a);
+          const bOrder = Number.isFinite(bState.order) ? bState.order : cards.indexOf(b);
+          return aOrder - bOrder;
+        });
+        const fromIndex = ordered.findIndex((card) => keyFor(card) === draggedKey);
+        const toIndex = ordered.findIndex((card) => keyFor(card) === targetKey);
+        if (fromIndex < 0 || toIndex < 0) {
+          return;
+        }
+        const [moved] = ordered.splice(fromIndex, 1);
+        ordered.splice(toIndex, 0, moved);
+        ordered.forEach((card, index) => {
+          const key = keyFor(card);
+          state[key] = { ...readCardState(card), order: index };
+        });
+        logger.log("drag-and-drop events", { draggedKey, targetKey, ordered: ordered.map((card) => keyFor(card)) });
+        persistState("drag-drop");
+        scheduleRecompute();
       }
 
       function recompute() {
@@ -1073,22 +1166,33 @@
         if (visibleCards.length === 0) {
           logger.log("No visible cards, rendering dock only");
           renderDock();
+          emitLayoutSnapshot("empty-layout");
           return;
         }
 
-        const weightedCards = visibleCards
-          .map((card, index) => {
-            const weight = calculateContentWeight(card);
-            const height = measuredCardHeight(card);
-            layoutCache.weights[keyFor(card)] = weight;
-            layoutCache.heights[keyFor(card)] = height;
-            return { card, index, weight, height };
-          })
-          .sort((left, right) => {
+        let weightedCards = visibleCards.map((card, index) => {
+          const weight = calculateContentWeight(card);
+          const height = measuredCardHeight(card);
+          const cardState = readCardState(card);
+          const explicitOrder = Number.isFinite(cardState.order) ? cardState.order : index;
+          layoutCache.weights[keyFor(card)] = weight;
+          layoutCache.heights[keyFor(card)] = height;
+          return { card, index, weight, height, explicitOrder };
+        });
+
+        if (pendingAutoArrange) {
+          weightedCards = weightedCards.sort((left, right) => {
             if (right.weight !== left.weight) return right.weight - left.weight;
             if (right.height !== left.height) return right.height - left.height;
             return left.index - right.index;
           });
+          logger.log("auto-arrange events", { mode: "weight-first" });
+        } else {
+          weightedCards = weightedCards.sort((left, right) => {
+            if (left.explicitOrder !== right.explicitOrder) return left.explicitOrder - right.explicitOrder;
+            return left.index - right.index;
+          });
+        }
 
         const rows = partitionRows(weightedCards.length, config.maxPerRow);
         layoutCache.rows = rows.slice();
@@ -1106,13 +1210,15 @@
             if (isDisplayView) {
               entry.card.style.gridRow = "auto";
             }
-            layoutCache.spans[keyFor(entry.card)] = {
+            const cardKey = keyFor(entry.card);
+            state[cardKey] = { ...readCardState(entry.card), order: cursor + itemIndex };
+            layoutCache.spans[cardKey] = {
               col: ratios[itemIndex] || 1,
               row: rowSpan,
               order: cursor + itemIndex,
             };
-            logger.log("Fibonacci slot assigned", {
-              card: keyFor(entry.card),
+            logger.log("Fibonacci slot assignments", {
+              card: cardKey,
               rowIndex,
               colSpan: ratios[itemIndex] || 1,
               rowSpan,
@@ -1122,13 +1228,40 @@
           cursor += rowSize;
         });
 
-        logger.log("Grid reflow complete", { tracks: config.tracks, visibleCount: visibleCards.length });
         renderDock();
+        persistState(pendingAutoArrange ? "auto-arrange" : "reflow");
+        logger.log("grid reflow events", { tracks: config.tracks, visibleCount: visibleCards.length });
+        emitLayoutSnapshot(pendingAutoArrange ? "auto-arrange" : "reflow");
+        pendingAutoArrange = false;
       }
 
       function scheduleRecompute() {
         if (frameToken) return;
         frameToken = requestAnimationFrame(recompute);
+      }
+
+      function attachDragHandlers(handle, card) {
+        handle.setAttribute("draggable", "true");
+        handle.addEventListener("dragstart", (event) => {
+          dragSourceKey = keyFor(card);
+          event.dataTransfer?.setData("text/plain", dragSourceKey);
+          event.dataTransfer?.setDragImage(card, 20, 20);
+          card.classList.add("is-dragging");
+          logger.log("drag-and-drop events", { action: "dragstart", card: dragSourceKey });
+        });
+        handle.addEventListener("dragend", () => {
+          card.classList.remove("is-dragging");
+          dragSourceKey = "";
+        });
+        handle.addEventListener("dragover", (event) => {
+          event.preventDefault();
+        });
+        handle.addEventListener("drop", (event) => {
+          event.preventDefault();
+          const draggedKey = event.dataTransfer?.getData("text/plain") || dragSourceKey;
+          const targetKey = keyFor(card);
+          reorderCards(draggedKey, targetKey);
+        });
       }
 
       function injectControls(card) {
@@ -1147,10 +1280,10 @@
 
           hideButton.addEventListener("click", (e) => {
             e.stopPropagation();
-            writeCardState(card, { hidden: true });
+            writeCardState(card, { hidden: true }, "hide");
             applyState(card);
             renderDock();
-            logger.log("Card hidden", { card: keyFor(card) });
+            logger.log("expand/collapse events", { action: "hide", card: keyFor(card) });
             scheduleRecompute();
           });
 
@@ -1163,10 +1296,11 @@
             detailsContent.appendChild(summary.nextSibling);
           }
           card.appendChild(detailsContent);
+          attachDragHandlers(summary, card);
           summary.addEventListener("click", () => {
             setTimeout(() => {
-              writeCardState(card, { collapsed: !card.open });
-              logger.log("Card collapse toggled", { card: keyFor(card), collapsed: !card.open });
+              writeCardState(card, { collapsed: !card.open }, "toggle-collapse");
+              logger.log("expand/collapse events", { card: keyFor(card), collapsed: !card.open });
               scheduleRecompute();
             }, 0);
           });
@@ -1207,10 +1341,10 @@
 
           hideButton.addEventListener("click", (e) => {
             e.stopPropagation();
-            writeCardState(card, { hidden: true });
+            writeCardState(card, { hidden: true }, "hide");
             applyState(card);
             renderDock();
-            logger.log("Card hidden", { card: keyFor(card) });
+            logger.log("expand/collapse events", { action: "hide", card: keyFor(card) });
             scheduleRecompute();
           });
 
@@ -1220,17 +1354,49 @@
 
           card.appendChild(titlebar);
           card.appendChild(content);
+          attachDragHandlers(titlebar, card);
           titlebar.addEventListener("click", () => {
             const current = readCardState(card);
-            writeCardState(card, { collapsed: !current.collapsed });
+            writeCardState(card, { collapsed: !current.collapsed }, "toggle-collapse");
             applyState(card);
-            logger.log("Card collapse toggled", { card: keyFor(card), collapsed: !current.collapsed });
+            logger.log("expand/collapse events", { card: keyFor(card), collapsed: !current.collapsed });
             scheduleRecompute();
           });
         }
       }
 
+      function applyRemoteState(remoteState, reason = "remote-sync") {
+        if (!remoteState || typeof remoteState !== "object") {
+          return;
+        }
+        isApplyingRemoteState = true;
+        for (const [cardKey, cardState] of Object.entries(remoteState)) {
+          state[cardKey] = {
+            ...state[cardKey],
+            ...cardState,
+          };
+        }
+        isApplyingRemoteState = false;
+        skipPersistOnce = true;
+        logger.log("preview-to-status sync events", { reason, remoteState });
+        scheduleRecompute();
+      }
+
+      function autoArrange() {
+        pendingAutoArrange = true;
+        logger.log("auto-arrange events", { action: "command-received" });
+        scheduleRecompute();
+      }
+
       for (const card of cards) {
+        const key = keyFor(card);
+        if (!state[key]) {
+          state[key] = {
+            collapsed: false,
+            hidden: false,
+            order: cards.indexOf(card),
+          };
+        }
         injectControls(card);
         applyState(card);
         resizeObserver.observe(card);
@@ -1247,10 +1413,18 @@
       window.addEventListener("resize", scheduleRecompute);
       scheduleRecompute();
 
-      return { 
+      return {
         recompute: scheduleRecompute,
-        getLayoutCache() { return { ...layoutCache }; },
-        flushLayoutCache() { flushCaches(); scheduleRecompute(); },
+        autoArrange,
+        applyRemoteState,
+        emitLayoutSnapshot,
+        getLayoutCache() {
+          return { ...layoutCache };
+        },
+        flushLayoutCache() {
+          flushCaches();
+          scheduleRecompute();
+        },
       };
     }
 
@@ -1442,6 +1616,30 @@
       }
     }
 
+    function consumeLiveDesignControlsFromStorage() {
+      try {
+        const raw = localStorage.getItem(DESIGN_CONTROLS_LIVE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.payload) {
+          console.log("[Fibonacci Layout] token application events", parsed.payload);
+          applyDesignControls(parsed.payload);
+        }
+      } catch {
+        // no-op
+      }
+    }
+
+    function parseLayoutCommand(raw) {
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (!parsed || typeof parsed !== "object") return null;
+        return parsed;
+      } catch {
+        return null;
+      }
+    }
+
     async function refresh() {
       try {
         const response = await fetch("/api/device/status", { cache: "no-store" });
@@ -1505,15 +1703,81 @@
       container: document.querySelector(".wrap"),
       cardSelector: "[data-fibo-card]",
       hiddenDock: document.getElementById("statusHiddenCardDock"),
-      storageKey: "bellforge.status.fibo-cards.v1",
+      storageKey: STATUS_LAYOUT_STORAGE_KEY,
       rowUnit: 8,
       collapsedHeight: 56,
+    });
+
+    let lastCommandTimestamp = 0;
+
+    function handleLayoutCommand(command, source = "unknown") {
+      if (!command || typeof command !== "object") return;
+      if (Number(command.timestamp) && Number(command.timestamp) === lastCommandTimestamp) {
+        return;
+      }
+      if (Number(command.timestamp)) {
+        lastCommandTimestamp = Number(command.timestamp);
+      }
+
+      if (command.type === "sync-request") {
+        statusAdaptiveLayout.emitLayoutSnapshot(`sync-request:${source}`);
+        return;
+      }
+      if (command.type === "auto-arrange") {
+        statusAdaptiveLayout.autoArrange();
+        return;
+      }
+      if (command.type === "apply-state" && command.payload && typeof command.payload === "object") {
+        statusAdaptiveLayout.applyRemoteState(command.payload, `command:${source}`);
+      }
+    }
+
+    window.addEventListener("message", (event) => {
+      if (event.origin !== window.location.origin || !event.data) {
+        return;
+      }
+      if (event.data.type === "bellforge-status-layout-command") {
+        handleLayoutCommand(event.data.command, "postMessage");
+      }
+      if (event.data.type === "bellforge-design-controls" && event.data.payload) {
+        console.log("[Fibonacci Layout] token application events", event.data.payload);
+        applyDesignControls(event.data.payload);
+        statusAdaptiveLayout.recompute();
+      }
+    });
+
+    window.addEventListener("storage", (event) => {
+      if (event.key === STATUS_LAYOUT_COMMAND_KEY && event.newValue) {
+        const command = parseLayoutCommand(event.newValue);
+        if (command) {
+          handleLayoutCommand(command, "storage");
+        }
+        return;
+      }
+
+      if (event.key === STATUS_LAYOUT_STORAGE_KEY && event.newValue) {
+        const remoteState = parseLayoutCommand(event.newValue);
+        if (remoteState && typeof remoteState === "object") {
+          statusAdaptiveLayout.applyRemoteState(remoteState, "storage-state");
+        }
+        return;
+      }
+
+      if (event.key === DESIGN_CONTROLS_LIVE_KEY && event.newValue) {
+        const payload = parseLayoutCommand(event.newValue);
+        if (payload && payload.payload) {
+          console.log("[Fibonacci Layout] token application events", payload.payload);
+          applyDesignControls(payload.payload);
+          statusAdaptiveLayout.recompute();
+        }
+      }
     });
 
     advancedDetails.addEventListener("toggle", () => statusAdaptiveLayout.recompute());
 
     scheduleDiagnosticsCarousel();
     refreshDisplayPreferences();
+    consumeLiveDesignControlsFromStorage();
     refresh();
     setInterval(refreshDisplayPreferences, REFRESH_MS);
     setInterval(refresh, REFRESH_MS);
