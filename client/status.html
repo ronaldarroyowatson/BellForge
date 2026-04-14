@@ -11,6 +11,8 @@
       --bf-card-radius: 24px;
       --bf-shadow-scale: 1;
       --bf-status-page-scale: 0.92;
+      --bf-space-6: 56px;
+      --fibo-row-unit: 8px;
       --bg: #f5efe5;
       --paper: rgba(255, 251, 244, 0.92);
       --panel: #fffdf8;
@@ -400,27 +402,40 @@
     }
     .wrap.fibo-adaptive-grid {
       display: grid;
-      grid-template-columns: repeat(var(--fibo-columns, 3), minmax(280px, 1fr));
+      grid-template-columns: repeat(var(--fibo-columns, 10), minmax(0, 1fr));
+      grid-auto-rows: var(--fibo-row-unit);
       grid-auto-flow: dense;
       gap: 16px;
       align-items: start;
     }
     .wrap.fibo-adaptive-grid > [data-fibo-card] {
       margin: 0;
-      grid-column: span var(--fibo-span, 1);
+      grid-column: span var(--fibo-col-span, 1);
+      grid-row: span var(--fibo-row-span, 18);
+      order: var(--fibo-order, 0);
       position: relative;
       transition: transform var(--motion-duration) var(--motion-easing), 
                   box-shadow var(--motion-duration) var(--motion-easing), 
                   opacity var(--motion-duration) var(--motion-easing),
-                  min-height var(--motion-collapse-duration) var(--motion-collapse-easing);
+                  min-height var(--motion-collapse-duration) var(--motion-collapse-easing),
+                  grid-column var(--motion-reflow-duration) var(--motion-reflow-easing),
+                  grid-row var(--motion-reflow-duration) var(--motion-reflow-easing);
+    }
+    .wrap.fibo-adaptive-grid > [data-fibo-card]:not(.card) {
+      background: var(--paper);
+      border: 1px solid rgba(215, 200, 181, 0.9);
+      border-radius: var(--bf-card-radius);
+      box-shadow: 0 calc(18px * var(--bf-shadow-scale)) calc(36px * var(--bf-shadow-scale)) rgba(27, 39, 49, 0.10);
+      padding: 18px;
     }
     .wrap.fibo-adaptive-grid > [data-fibo-card].is-collapsed {
-      min-height: auto;
+      min-height: var(--bf-space-6);
     }
     .wrap.fibo-adaptive-grid > [data-fibo-card].is-collapsed .card-content {
       max-height: 0;
       overflow: hidden;
       opacity: 0;
+      margin-top: 0;
       transition: max-height var(--motion-collapse-duration) var(--motion-collapse-easing),
                   opacity var(--motion-collapse-duration) var(--motion-collapse-easing);
     }
@@ -429,6 +444,13 @@
       opacity: 1;
       transition: max-height var(--motion-expand-duration) var(--motion-expand-easing),
                   opacity var(--motion-expand-duration) var(--motion-expand-easing);
+    }
+    .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.hero,
+    .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.stats,
+    .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.url-panel,
+    .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.onboarding-qr-panel {
+      margin: 0;
+      padding: 0;
     }
     .wrap.fibo-adaptive-grid > [data-fibo-card].is-expanded {
       transform: translateY(-1px);
@@ -441,19 +463,20 @@
       justify-content: space-between;
       align-items: center;
       cursor: pointer;
+      min-height: calc(var(--bf-space-6) - 18px);
       padding: 2px 0;
+      gap: 8px;
       user-select: none;
     }
     .card-titlebar:hover {
       opacity: 0.85;
     }
     .card-tools {
-      position: absolute;
-      top: 10px;
-      right: 10px;
+      position: relative;
       display: inline-flex;
       gap: 6px;
       z-index: 6;
+      flex-shrink: 0;
     }
     .card-tool {
       border: 1px solid #b8c1c9;
@@ -504,12 +527,12 @@
       margin-bottom: 12px;
     }
     body.display-view .wrap.fibo-adaptive-grid {
-      grid-template-columns: repeat(var(--fibo-columns, 2), minmax(300px, 1fr));
+      grid-template-columns: repeat(var(--fibo-columns, 5), minmax(0, 1fr));
       gap: 12px;
     }
     body.display-view .wrap.fibo-adaptive-grid > [data-fibo-card] {
       grid-row: auto !important;
-      grid-column: span var(--fibo-span, 1) !important;
+      grid-column: span var(--fibo-col-span, 1) !important;
       margin-bottom: 0;
     }
     body.display-view .hero-main,
@@ -852,7 +875,8 @@
       const cardSelector = options.cardSelector;
       const dock = options.hiddenDock;
       const storageKey = options.storageKey;
-      const fib = [1, 1, 2, 3, 5, 8, 13, 21];
+      const rowUnit = options.rowUnit || 8;
+      const collapsedHeight = options.collapsedHeight || 56;
 
       // Debug logger
       const logger = {
@@ -869,11 +893,12 @@
       }
 
       container.classList.add("fibo-adaptive-grid");
+  container.style.setProperty("--fibo-row-unit", `${rowUnit}px`);
 
       const cards = Array.from(container.querySelectorAll(cardSelector));
       const state = JSON.parse(localStorage.getItem(storageKey) || "{}");
       let frameToken = 0;
-      const layoutCache = { columns: 0, weights: {}, spans: {} };
+  const layoutCache = { columns: 0, rows: [], weights: {}, spans: {}, heights: {} };
       const resizeObserver = new ResizeObserver(() => scheduleRecompute());
 
       function flushCaches() {
@@ -882,37 +907,20 @@
         layoutCache.spans = {};
       }
 
-      function nearestFib(value) {
-        let nearest = fib[0];
-        let distance = Math.abs(value - nearest);
-        for (const candidate of fib) {
-          const d = Math.abs(value - candidate);
-          if (d < distance) {
-            nearest = candidate;
-            distance = d;
-          }
-        }
-        return nearest;
-      }
-
       function columnsFor(width) {
         if (isDisplayView) {
-          if (width >= 1380) return 3;
-          if (width >= 860) return 2;
-          return 1;
+          if (width >= 860) return { tracks: 5, maxPerRow: 2 };
+          return { tracks: 1, maxPerRow: 1 };
         }
-        if (width >= 1540) return 5;
-        if (width >= 1240) return 4;
-        if (width >= 900) return 3;
-        if (width >= 660) return 2;
-        return 1;
+        if (width >= 1240) return { tracks: 10, maxPerRow: 3 };
+        if (width >= 660) return { tracks: 5, maxPerRow: 2 };
+        return { tracks: 1, maxPerRow: 1 };
       }
 
       function calculateContentWeight(card) {
         const collapsed = card.classList.contains("is-collapsed");
-        if (collapsed) return 1; // Collapsed cards get minimum weight
+        if (collapsed) return 1;
 
-        // Determine content type weight
         let weight = 1;
         const contentEl = card.querySelector(".card-content") || card;
         const svg = contentEl.querySelector("svg");
@@ -929,10 +937,66 @@
         } else if (contentEl.textContent.trim().length === 0) {
           weight = 0; // Empty
         } else {
-          weight = 1; // Single-line or minimal content
+          weight = 1;
         }
 
-        return nearestFib(weight);
+        logger.log("Card weight calculated", { card: keyFor(card), weight });
+        return weight;
+      }
+
+      function measuredCardHeight(card) {
+        if (card.classList.contains("is-collapsed")) {
+          return collapsedHeight;
+        }
+        const titlebarHeight = card.querySelector(".card-titlebar")?.offsetHeight || 34;
+        const contentHeight = card.querySelector(".card-content")?.scrollHeight || 0;
+        const computed = getComputedStyle(card);
+        const verticalPadding = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
+        const total = Math.ceil(titlebarHeight + contentHeight + verticalPadding);
+        logger.log("Card height calculated", { card: keyFor(card), height: total });
+        return total;
+      }
+
+      function partitionRows(count, maxPerRow) {
+        if (maxPerRow <= 1) return Array(count).fill(1);
+        const rows = [];
+        let remaining = count;
+        while (remaining > 0) {
+          if (maxPerRow === 3 && remaining === 4) {
+            rows.push(2, 2);
+            break;
+          }
+          const next = Math.min(maxPerRow, remaining);
+          rows.push(next);
+          remaining -= next;
+        }
+        return rows;
+      }
+
+      function widthRatios(rowSize, tracks) {
+        if (rowSize <= 1) return [tracks];
+        if (rowSize === 2) return [3, 2];
+        if (rowSize === 3) return [5, 3, 2];
+        return [5, 3, 2];
+      }
+
+      function normalizeRatios(ratios, tracks) {
+        const total = ratios.reduce((sum, value) => sum + value, 0) || 1;
+        const base = ratios.map((ratio) => Math.max(1, Math.floor((ratio / total) * tracks)));
+        let used = base.reduce((sum, value) => sum + value, 0);
+        let index = 0;
+        while (used < tracks) {
+          base[index % base.length] += 1;
+          used += 1;
+          index += 1;
+        }
+        while (used > tracks) {
+          const target = base.findIndex((value) => value > 1);
+          if (target === -1) break;
+          base[target] -= 1;
+          used -= 1;
+        }
+        return base;
       }
 
       function titleFor(card) {
@@ -963,6 +1027,9 @@
         const cardState = readCardState(card);
         card.classList.toggle("is-collapsed", !!cardState.collapsed);
         card.classList.toggle("is-hidden", !!cardState.hidden);
+        if (card.matches("details")) {
+          card.open = !cardState.collapsed;
+        }
       }
 
       function renderDock() {
@@ -999,9 +1066,9 @@
         for (const card of cards) applyState(card);
 
         const visibleCards = cards.filter((card) => !card.classList.contains("is-hidden"));
-        const columns = columnsFor(container.clientWidth || window.innerWidth);
-        layoutCache.columns = columns;
-        container.style.setProperty("--fibo-columns", String(columns));
+        const config = columnsFor(container.clientWidth || window.innerWidth);
+        layoutCache.columns = config.tracks;
+        container.style.setProperty("--fibo-columns", String(config.tracks));
 
         if (visibleCards.length === 0) {
           logger.log("No visible cards, rendering dock only");
@@ -1009,33 +1076,53 @@
           return;
         }
 
-        const weights = visibleCards.map((card, idx) => {
-          const w = calculateContentWeight(card);
-          layoutCache.weights[keyFor(card)] = w;
-          return w;
+        const weightedCards = visibleCards
+          .map((card, index) => {
+            const weight = calculateContentWeight(card);
+            const height = measuredCardHeight(card);
+            layoutCache.weights[keyFor(card)] = weight;
+            layoutCache.heights[keyFor(card)] = height;
+            return { card, index, weight, height };
+          })
+          .sort((left, right) => {
+            if (right.weight !== left.weight) return right.weight - left.weight;
+            if (right.height !== left.height) return right.height - left.height;
+            return left.index - right.index;
+          });
+
+        const rows = partitionRows(weightedCards.length, config.maxPerRow);
+        layoutCache.rows = rows.slice();
+        logger.log("Grid row partition computed", { rows, tracks: config.tracks });
+
+        let cursor = 0;
+        rows.forEach((rowSize, rowIndex) => {
+          const rowCards = weightedCards.slice(cursor, cursor + rowSize);
+          const ratios = normalizeRatios(widthRatios(rowSize, config.tracks), config.tracks);
+          rowCards.forEach((entry, itemIndex) => {
+            const rowSpan = Math.max(1, Math.ceil(entry.height / rowUnit));
+            entry.card.style.setProperty("--fibo-col-span", String(ratios[itemIndex] || 1));
+            entry.card.style.setProperty("--fibo-row-span", String(rowSpan));
+            entry.card.style.setProperty("--fibo-order", String(cursor + itemIndex));
+            if (isDisplayView) {
+              entry.card.style.gridRow = "auto";
+            }
+            layoutCache.spans[keyFor(entry.card)] = {
+              col: ratios[itemIndex] || 1,
+              row: rowSpan,
+              order: cursor + itemIndex,
+            };
+            logger.log("Fibonacci slot assigned", {
+              card: keyFor(entry.card),
+              rowIndex,
+              colSpan: ratios[itemIndex] || 1,
+              rowSpan,
+              order: cursor + itemIndex,
+            });
+          });
+          cursor += rowSize;
         });
 
-        const maxWeight = Math.max(...weights, 1);
-        logger.log(`Recalculated weights for ${visibleCards.length} cards`, { maxWeight });
-
-        visibleCards.forEach((card, index) => {
-          const collapsed = card.classList.contains("is-collapsed");
-          const baseSpan = Math.round((weights[index] / maxWeight) * columns);
-          let span = clamp(baseSpan, 1, columns);
-
-          // Collapsed cards always get minimum span
-          if (collapsed) {
-            span = 1;
-          }
-
-          layoutCache.spans[keyFor(card)] = span;
-          card.style.setProperty("--fibo-span", String(span));
-          if (isDisplayView) {
-            card.style.gridRow = "auto";
-          }
-        });
-
-        logger.log("Layout recompute complete", { columns, visibleCount: visibleCards.length });
+        logger.log("Grid reflow complete", { tracks: config.tracks, visibleCount: visibleCards.length });
         renderDock();
       }
 
@@ -1047,17 +1134,9 @@
       function injectControls(card) {
         if (card.querySelector(".card-titlebar")) return;
 
-        const heading = card.querySelector("h1, h2, h3");
-        if (!heading && !card.matches("details")) return;
-
-        // For details elements, wrap with titlebar
         if (card.matches("details")) {
           const summary = card.querySelector("summary");
           if (!summary) return;
-
-          const titlebar = document.createElement("div");
-          titlebar.className = "card-titlebar";
-
           const tools = document.createElement("div");
           tools.className = "card-tools";
 
@@ -1071,44 +1150,52 @@
             writeCardState(card, { hidden: true });
             applyState(card);
             renderDock();
+            logger.log("Card hidden", { card: keyFor(card) });
             scheduleRecompute();
           });
 
           tools.appendChild(hideButton);
-          titlebar.appendChild(summary.cloneNode(true));
-          titlebar.appendChild(tools);
-
-          // Append custom titlebar after summary
-          summary.parentNode.insertBefore(titlebar, summary.nextSibling);
-          summary.style.display = "none";
-
-          // Click titlebar to toggle details
-          titlebar.addEventListener("click", () => {
-            const current = readCardState(card);
-            writeCardState(card, { collapsed: !current.collapsed });
-            applyState(card);
-            scheduleRecompute();
+          summary.classList.add("card-titlebar");
+          summary.appendChild(tools);
+          const detailsContent = document.createElement("div");
+          detailsContent.className = "card-content";
+          while (summary.nextSibling) {
+            detailsContent.appendChild(summary.nextSibling);
+          }
+          card.appendChild(detailsContent);
+          summary.addEventListener("click", () => {
+            setTimeout(() => {
+              writeCardState(card, { collapsed: !card.open });
+              logger.log("Card collapse toggled", { card: keyFor(card), collapsed: !card.open });
+              scheduleRecompute();
+            }, 0);
           });
         } else {
-          // For regular sections with heading
-          if (!card.querySelector(".card-content")) {
-            const content = document.createElement("div");
-            content.className = "card-content";
-            while (card.childNodes.length > 0 && !card.firstChild.matches("h1, h2, h3")) {
-              content.appendChild(card.firstChild);
+          const directHeading = card.querySelector(":scope > h1, :scope > h2, :scope > h3");
+          const title = directHeading ? directHeading.textContent.trim() : titleFor(card);
+          const content = document.createElement("div");
+          content.className = "card-content";
+          if (card.classList.contains("hero")) content.classList.add("hero");
+          if (card.classList.contains("stats")) content.classList.add("stats");
+          if (card.classList.contains("url-panel")) content.classList.add("url-panel");
+          if (card.classList.contains("onboarding-qr-panel")) content.classList.add("onboarding-qr-panel");
+
+          while (card.firstChild) {
+            const node = card.firstChild;
+            if (node === directHeading) {
+              card.removeChild(node);
+              continue;
             }
-            if (content.childNodes.length > 0) {
-              card.appendChild(content);
-            }
+            content.appendChild(node);
           }
 
           const titlebar = document.createElement("div");
           titlebar.className = "card-titlebar";
 
-          const titleWrapper = document.createElement("div");
-          titleWrapper.style.flex = "1";
-          const headingClone = heading.cloneNode(true);
-          titleWrapper.appendChild(headingClone);
+          const headingEl = document.createElement("h2");
+          headingEl.textContent = title;
+          headingEl.style.margin = "0";
+          headingEl.style.flex = "1";
 
           const tools = document.createElement("div");
           tools.className = "card-tools";
@@ -1123,21 +1210,21 @@
             writeCardState(card, { hidden: true });
             applyState(card);
             renderDock();
+            logger.log("Card hidden", { card: keyFor(card) });
             scheduleRecompute();
           });
 
           tools.appendChild(hideButton);
-          titlebar.appendChild(titleWrapper);
+          titlebar.appendChild(headingEl);
           titlebar.appendChild(tools);
 
-          // Insert titlebar at the beginning
-          card.insertBefore(titlebar, card.firstChild);
-
-          // Click titlebar to toggle collapsed state
+          card.appendChild(titlebar);
+          card.appendChild(content);
           titlebar.addEventListener("click", () => {
             const current = readCardState(card);
             writeCardState(card, { collapsed: !current.collapsed });
             applyState(card);
+            logger.log("Card collapse toggled", { card: keyFor(card), collapsed: !current.collapsed });
             scheduleRecompute();
           });
         }
@@ -1187,6 +1274,8 @@
       document.documentElement.style.setProperty("--bf-card-radius", `${cardRadius}px`);
       document.documentElement.style.setProperty("--bf-shadow-scale", String(shadowScale));
       document.documentElement.style.setProperty("--bf-status-page-scale", String(statusPageScale));
+      document.documentElement.style.setProperty("--bf-space-6", `${Math.round(56 * uiScale)}px`);
+      console.log("[Fibonacci Layout] token application", { theme, fontScale, uiScale, cardRadius, shadowScale, statusPageScale });
     }
 
     function pill(text, level) {
@@ -1417,6 +1506,8 @@
       cardSelector: "[data-fibo-card]",
       hiddenDock: document.getElementById("statusHiddenCardDock"),
       storageKey: "bellforge.status.fibo-cards.v1",
+      rowUnit: 8,
+      collapsedHeight: 56,
     });
 
     advancedDetails.addEventListener("toggle", () => statusAdaptiveLayout.recompute());

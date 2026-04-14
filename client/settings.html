@@ -9,6 +9,7 @@
       --bg-a: #f8f2e5;
       --bg-b: #d7e6ef;
       --surface: #fffdfa;
+      --surface-2: color-mix(in srgb, var(--surface) 92%, #eef3f8);
       --line: #d7ccc0;
       --text: #1d2730;
       --muted: #5c6974;
@@ -29,6 +30,13 @@
       --motion-collapse-easing: cubic-bezier(0.4, 0, 0.2, 1);
       --motion-reflow-duration: 140ms;
       --motion-reflow-easing: cubic-bezier(0.4, 0, 0.2, 1);
+      --dcs-space-1: 4px;
+      --dcs-space-2: 8px;
+      --dcs-space-3: 12px;
+      --dcs-space-4: 16px;
+      --dcs-space-5: 20px;
+      --dcs-space-6: 56px;
+      --fibo-row-unit: 8px;
     }
     :root[data-design-theme="ocean"] {
       --bg-a: #e8f3fa;
@@ -166,7 +174,8 @@
       gap: 14px;
     }
     .grid.fibo-adaptive-grid {
-      grid-template-columns: repeat(var(--fibo-columns, 2), minmax(260px, 1fr));
+      grid-template-columns: repeat(var(--fibo-columns, 10), minmax(0, 1fr));
+      grid-auto-rows: var(--fibo-row-unit);
       grid-auto-flow: dense;
       align-items: start;
     }
@@ -176,27 +185,34 @@
       border-radius: var(--dcs-card-radius);
       box-shadow: 0 calc(10px * var(--dcs-shadow-intensity)) calc(20px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.08);
       padding: calc(14px * var(--dcs-ui-scale));
-      min-height: 200px;
+      min-height: var(--card-min-height, 200px);
       position: relative;
-      grid-column: span var(--fibo-span, 1);
+      grid-column: span var(--fibo-col-span, 1);
+      grid-row: span var(--fibo-row-span, 18);
+      order: var(--fibo-order, 0);
       transition: transform var(--motion-duration) var(--motion-easing), 
                   box-shadow var(--motion-duration) var(--motion-easing), 
                   opacity var(--motion-duration) var(--motion-easing),
-                  min-height var(--motion-collapse-duration) var(--motion-collapse-easing);
+                  min-height var(--motion-collapse-duration) var(--motion-collapse-easing),
+                  grid-column var(--motion-reflow-duration) var(--motion-reflow-easing),
+                  grid-row var(--motion-reflow-duration) var(--motion-reflow-easing);
     }
     .card.is-collapsed {
-      min-height: auto;
+      --card-min-height: var(--dcs-space-6);
+      align-self: start;
     }
     .card.is-collapsed .card-content {
       max-height: 0;
       overflow: hidden;
       opacity: 0;
+      margin-top: 0;
       transition: max-height var(--motion-collapse-duration) var(--motion-collapse-easing),
                   opacity var(--motion-collapse-duration) var(--motion-collapse-easing);
     }
     .card .card-content {
       max-height: 100%;
       opacity: 1;
+      overflow: hidden;
       transition: max-height var(--motion-expand-duration) var(--motion-expand-easing),
                   opacity var(--motion-expand-duration) var(--motion-expand-easing);
     }
@@ -212,7 +228,9 @@
       justify-content: space-between;
       align-items: center;
       cursor: pointer;
+      min-height: calc(var(--dcs-space-6) - (2 * var(--dcs-space-3)));
       padding: 2px 0;
+      gap: var(--dcs-space-2);
       user-select: none;
     }
     .card-titlebar:hover {
@@ -220,6 +238,7 @@
     }
     .card-tools {
       position: relative;
+      flex-shrink: 0;
       display: inline-flex;
       gap: 6px;
       z-index: 2;
@@ -312,21 +331,72 @@
       grid-column: 1 / -1;
     }
     .logs {
-      grid-column: 1 / -1;
+      min-height: 260px;
     }
     .dcs-preview {
       margin-top: 10px;
-      border: 1px solid var(--line);
-      background: color-mix(in srgb, var(--surface) 78%, #ffffff);
-      border-radius: clamp(8px, calc(var(--dcs-card-radius) * 0.8), 20px);
-      padding: 10px;
       display: grid;
-      gap: 8px;
+      gap: var(--dcs-space-3);
+    }
+    .dcs-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--dcs-space-3);
+    }
+    .dcs-preview-card {
+      background: color-mix(in srgb, var(--surface) 92%, #ffffff);
+      border: 1px solid var(--line);
+      border-radius: var(--dcs-card-radius);
+      box-shadow: 0 calc(10px * var(--dcs-shadow-intensity)) calc(20px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.08);
+      padding: var(--dcs-space-4);
+      display: grid;
+      gap: var(--dcs-space-3);
+      transition: border-radius var(--motion-duration) var(--motion-easing), box-shadow var(--motion-duration) var(--motion-easing), transform var(--motion-expand-duration) var(--motion-expand-easing);
+    }
+    .dcs-preview-card.is-collapsed .dcs-preview-card__body {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+    }
+    .dcs-preview-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--dcs-space-2);
+      min-height: calc(var(--dcs-space-6) - (2 * var(--dcs-space-3)));
+    }
+    .dcs-preview-card__title {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--accent);
+    }
+    .dcs-preview-card__body {
+      display: grid;
+      gap: var(--dcs-space-3);
+      transition: max-height var(--motion-expand-duration) var(--motion-expand-easing), opacity var(--motion-expand-duration) var(--motion-expand-easing);
+    }
+    .dcs-preview-card__meta {
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+    .dcs-preview-card__sample {
+      border: 1px solid var(--line);
+      border-radius: calc(var(--dcs-card-radius) * 0.8);
+      background: var(--surface-2);
+      padding: var(--dcs-space-3);
+      display: grid;
+      gap: var(--dcs-space-2);
+    }
+    .dcs-preview-card__body-copy {
+      margin: 0;
+      color: var(--text);
+      line-height: 1.45;
     }
     .dcs-preview__chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: var(--dcs-space-2);
     }
     .dcs-chip {
       border: 1px solid var(--line);
@@ -335,6 +405,35 @@
       font-size: 0.82rem;
       color: var(--muted);
       background: #ffffff;
+    }
+    .dcs-status-mini {
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      grid-auto-rows: 8px;
+      gap: 8px;
+      min-height: 160px;
+    }
+    .dcs-status-mini__card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: calc(var(--dcs-card-radius) * 0.75);
+      box-shadow: 0 calc(8px * var(--dcs-shadow-intensity)) calc(16px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.07);
+      padding: 8px;
+      display: grid;
+      align-content: start;
+      gap: 4px;
+      color: var(--text);
+      font-size: 0.74rem;
+    }
+    .dcs-status-mini__card strong {
+      font-size: 0.72rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .dcs-preview-toggle {
+      width: auto;
+      margin: 0;
     }
     #logOutput {
       margin-top: 10px;
@@ -518,15 +617,42 @@
           <button type="submit">Save Design Controls</button>
           <button id="designReset" class="secondary" type="button">Reset Defaults</button>
         </form>
-        <div class="dcs-preview" aria-live="polite">
+        <section class="dcs-preview" aria-live="polite">
           <strong>Live Preview</strong>
           <div id="designPreviewSummary" class="mono">Theme warm | Font 1.00x | UI 1.00x</div>
-          <div class="dcs-preview__chips">
-            <span class="dcs-chip">Card corners</span>
-            <span class="dcs-chip">Spacing density</span>
-            <span class="dcs-chip">Status page fit</span>
+          <div class="dcs-preview-grid">
+            <article id="designPreviewCard" class="dcs-preview-card">
+              <div class="dcs-preview-card__header">
+                <h3 class="dcs-preview-card__title">Token Preview Card</h3>
+                <button id="designPreviewToggle" class="secondary dcs-preview-toggle" type="button">Collapse</button>
+              </div>
+              <div class="dcs-preview-card__body">
+                <p class="dcs-preview-card__meta">This is a real card sample using the active radius, spacing, stroke, glow, typography, and motion tokens.</p>
+                <div class="dcs-preview-card__sample">
+                  <strong id="designPreviewTitle">BellForge Preview</strong>
+                  <p id="designPreviewBody" class="dcs-preview-card__body-copy">Adjust the sliders to see corner radius, spacing density, and shadow depth update in real time.</p>
+                  <div class="dcs-preview__chips">
+                    <span class="dcs-chip">Radius</span>
+                    <span class="dcs-chip">Spacing</span>
+                    <span class="dcs-chip">Glow</span>
+                    <span class="dcs-chip">Stroke</span>
+                    <span class="dcs-chip">Motion</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <article class="dcs-preview-card">
+              <div class="dcs-preview-card__header">
+                <h3 class="dcs-preview-card__title">Status Page Preview</h3>
+                <span class="dcs-chip">Auto Arrange</span>
+              </div>
+              <div class="dcs-preview-card__body">
+                <p class="dcs-preview-card__meta">Miniature status layout showing Fibonacci width, vertical packing, and token effects.</p>
+                <div id="designStatusPreview" class="dcs-status-mini"></div>
+              </div>
+            </article>
           </div>
-        </div>
+        </section>
         <p id="designControlResult" class="mono"></p>
       </article>
 
@@ -614,6 +740,11 @@
       designStatusPageScale: document.getElementById("designStatusPageScale"),
       designStatusPageScaleValue: document.getElementById("designStatusPageScaleValue"),
       designPreviewSummary: document.getElementById("designPreviewSummary"),
+      designPreviewCard: document.getElementById("designPreviewCard"),
+      designPreviewToggle: document.getElementById("designPreviewToggle"),
+      designPreviewTitle: document.getElementById("designPreviewTitle"),
+      designPreviewBody: document.getElementById("designPreviewBody"),
+      designStatusPreview: document.getElementById("designStatusPreview"),
       designControlResult: document.getElementById("designControlResult"),
       designReset: document.getElementById("designReset"),
       displayHealResult: document.getElementById("displayHealResult"),
@@ -645,7 +776,8 @@
       const cardSelector = options.cardSelector;
       const dock = options.hiddenDock;
       const storageKey = options.storageKey;
-      const fib = [1, 1, 2, 3, 5, 8, 13, 21];
+      const rowUnit = options.rowUnit || 8;
+      const collapsedHeight = options.collapsedHeight || 56;
       
       // Debug logger
       const logger = {
@@ -662,11 +794,12 @@
       }
 
       container.classList.add("fibo-adaptive-grid");
+  container.style.setProperty("--fibo-row-unit", `${rowUnit}px`);
 
       const cards = Array.from(container.querySelectorAll(cardSelector));
       const state = JSON.parse(localStorage.getItem(storageKey) || "{}");
       let frameToken = 0;
-      const layoutCache = { columns: 0, weights: {}, spans: {} };
+  const layoutCache = { columns: 0, rows: [], weights: {}, spans: {}, heights: {} };
       const resizeObserver = new ResizeObserver(() => scheduleRecompute());
 
       function flushCaches() {
@@ -675,32 +808,16 @@
         layoutCache.spans = {};
       }
 
-      function nearestFib(value) {
-        let nearest = fib[0];
-        let distance = Math.abs(value - nearest);
-        for (const candidate of fib) {
-          const d = Math.abs(value - candidate);
-          if (d < distance) {
-            nearest = candidate;
-            distance = d;
-          }
-        }
-        return nearest;
-      }
-
       function columnsFor(width) {
-        if (width >= 1500) return 5;
-        if (width >= 1180) return 4;
-        if (width >= 880) return 3;
-        if (width >= 620) return 2;
-        return 1;
+        if (width >= 1180) return { tracks: 10, maxPerRow: 3 };
+        if (width >= 620) return { tracks: 5, maxPerRow: 2 };
+        return { tracks: 1, maxPerRow: 1 };
       }
 
       function calculateContentWeight(card) {
         const collapsed = card.classList.contains("is-collapsed");
-        if (collapsed) return 1; // Collapsed cards get minimum weight
+        if (collapsed) return 1;
 
-        // Determine content type weight
         let weight = 1;
         const contentEl = card.querySelector(".card-content") || card;
         const svg = contentEl.querySelector("svg");
@@ -714,10 +831,71 @@
         } else if (contentEl.textContent.trim().length === 0) {
           weight = 0; // Empty
         } else {
-          weight = 1; // Single-line or minimal content
+          weight = 1;
         }
 
-        return nearestFib(weight);
+        logger.log("Card weight calculated", { card: keyFor(card), weight });
+        return weight;
+      }
+
+      function measuredCardHeight(card) {
+        if (card.classList.contains("is-collapsed")) {
+          return collapsedHeight;
+        }
+        const titlebarHeight = card.querySelector(".card-titlebar")?.offsetHeight || 32;
+        const contentHeight = card.querySelector(".card-content")?.scrollHeight || 0;
+        const computed = getComputedStyle(card);
+        const verticalPadding = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
+        const total = Math.ceil(titlebarHeight + contentHeight + verticalPadding);
+        logger.log("Card height calculated", { card: keyFor(card), height: total });
+        return total;
+      }
+
+      function partitionRows(count, maxPerRow) {
+        if (maxPerRow <= 1) return Array(count).fill(1);
+        const rows = [];
+        let remaining = count;
+        while (remaining > 0) {
+          if (maxPerRow === 3 && remaining === 4) {
+            rows.push(2, 2);
+            break;
+          }
+          if (maxPerRow === 3 && remaining % 3 === 1 && remaining > 4) {
+            rows.push(3);
+            remaining -= 3;
+            continue;
+          }
+          const next = Math.min(maxPerRow, remaining);
+          rows.push(next);
+          remaining -= next;
+        }
+        return rows;
+      }
+
+      function widthRatios(rowSize, tracks) {
+        if (rowSize <= 1) return [tracks];
+        if (rowSize === 2) return [3, 2];
+        if (rowSize === 3) return [5, 3, 2];
+        return [5, 3, 2];
+      }
+
+      function normalizeRatios(ratios, tracks) {
+        const total = ratios.reduce((sum, value) => sum + value, 0) || 1;
+        const base = ratios.map((ratio) => Math.max(1, Math.floor((ratio / total) * tracks)));
+        let used = base.reduce((sum, value) => sum + value, 0);
+        let index = 0;
+        while (used < tracks) {
+          base[index % base.length] += 1;
+          used += 1;
+          index += 1;
+        }
+        while (used > tracks) {
+          const target = base.findIndex((value) => value > 1);
+          if (target === -1) break;
+          base[target] -= 1;
+          used -= 1;
+        }
+        return base;
       }
 
       function titleFor(card) {
@@ -784,9 +962,9 @@
         for (const card of cards) applyState(card);
 
         const visibleCards = cards.filter((card) => !card.classList.contains("is-hidden"));
-        const columns = columnsFor(container.clientWidth || window.innerWidth);
-        layoutCache.columns = columns;
-        container.style.setProperty("--fibo-columns", String(columns));
+        const config = columnsFor(container.clientWidth || window.innerWidth);
+        layoutCache.columns = config.tracks;
+        container.style.setProperty("--fibo-columns", String(config.tracks));
 
         if (visibleCards.length === 0) {
           logger.log("No visible cards, rendering dock only");
@@ -794,30 +972,50 @@
           return;
         }
 
-        const weights = visibleCards.map((card, idx) => {
-          const w = calculateContentWeight(card);
-          layoutCache.weights[keyFor(card)] = w;
-          return w;
+        const weightedCards = visibleCards
+          .map((card, index) => {
+            const weight = calculateContentWeight(card);
+            const height = measuredCardHeight(card);
+            layoutCache.weights[keyFor(card)] = weight;
+            layoutCache.heights[keyFor(card)] = height;
+            return { card, index, weight, height };
+          })
+          .sort((left, right) => {
+            if (right.weight !== left.weight) return right.weight - left.weight;
+            if (right.height !== left.height) return right.height - left.height;
+            return left.index - right.index;
+          });
+
+        const rows = partitionRows(weightedCards.length, config.maxPerRow);
+        layoutCache.rows = rows.slice();
+        logger.log("Grid row partition computed", { rows, tracks: config.tracks });
+
+        let cursor = 0;
+        rows.forEach((rowSize, rowIndex) => {
+          const rowCards = weightedCards.slice(cursor, cursor + rowSize);
+          const ratios = normalizeRatios(widthRatios(rowSize, config.tracks), config.tracks);
+          rowCards.forEach((entry, itemIndex) => {
+            const rowSpan = Math.max(1, Math.ceil(entry.height / rowUnit));
+            entry.card.style.setProperty("--fibo-col-span", String(ratios[itemIndex] || 1));
+            entry.card.style.setProperty("--fibo-row-span", String(rowSpan));
+            entry.card.style.setProperty("--fibo-order", String(cursor + itemIndex));
+            layoutCache.spans[keyFor(entry.card)] = {
+              col: ratios[itemIndex] || 1,
+              row: rowSpan,
+              order: cursor + itemIndex,
+            };
+            logger.log("Fibonacci slot assigned", {
+              card: keyFor(entry.card),
+              rowIndex,
+              colSpan: ratios[itemIndex] || 1,
+              rowSpan,
+              order: cursor + itemIndex,
+            });
+          });
+          cursor += rowSize;
         });
 
-        const maxWeight = Math.max(...weights, 1);
-        logger.log(`Recalculated weights for ${visibleCards.length} cards`, { maxWeight });
-
-        visibleCards.forEach((card, index) => {
-          const collapsed = card.classList.contains("is-collapsed");
-          const baseSpan = Math.round((weights[index] / maxWeight) * columns);
-          let span = clamp(baseSpan, 1, columns);
-
-          // Collapsed cards always get minimum span
-          if (collapsed) {
-            span = 1;
-          }
-
-          layoutCache.spans[keyFor(card)] = span;
-          card.style.setProperty("--fibo-span", String(span));
-        });
-
-        logger.log("Layout recompute complete", { columns, visibleCount: visibleCards.length });
+        logger.log("Grid reflow complete", { tracks: config.tracks, visibleCount: visibleCards.length });
         renderDock();
       }
 
@@ -864,6 +1062,7 @@
           writeCardState(card, { hidden: true });
           applyState(card);
           renderDock();
+          logger.log("Card hidden", { card: keyFor(card) });
           scheduleRecompute();
         });
 
@@ -879,6 +1078,7 @@
           const current = readCardState(card);
           writeCardState(card, { collapsed: !current.collapsed });
           applyState(card);
+          logger.log("Card collapse toggled", { card: keyFor(card), collapsed: !current.collapsed });
           scheduleRecompute();
         });
       }
@@ -927,6 +1127,36 @@
       elements.designPreviewSummary.textContent = `Theme ${state.theme} | Font ${state.font_scale.toFixed(2)}x | UI ${state.ui_scale.toFixed(2)}x | Status ${state.status_page_scale.toFixed(2)}x`;
     }
 
+    function renderStatusPreviewMini(state) {
+      if (!elements.designStatusPreview) return;
+      const miniCards = [
+        { key: "hero", title: "Hero", weight: 5, copy: "Largest slot" },
+        { key: "links", title: "Links", weight: 3, copy: "Mid slot" },
+        { key: "stats", title: "Stats", weight: 2, copy: "Compact" },
+        { key: "diag", title: "Diagnostics", weight: 1, copy: "Collapsed" },
+      ];
+      const rows = miniCards.length === 4 ? [2, 2] : [3, 1];
+      const html = [];
+      let cursor = 0;
+      rows.forEach((rowSize) => {
+        const ratios = rowSize === 2 ? [3, 2] : [5, 3, 2];
+        const normalized = rowSize === 2 ? [6, 4] : [5, 3, 2];
+        miniCards.slice(cursor, cursor + rowSize).forEach((card, index) => {
+          const rowSpan = Math.max(4, Math.round((card.weight + 2) * 2));
+          html.push(`<article class="dcs-status-mini__card" style="grid-column: span ${normalized[index] || 10}; grid-row: span ${rowSpan};"><strong>${card.title}</strong><span>${card.copy}</span></article>`);
+        });
+        cursor += rowSize;
+      });
+      elements.designStatusPreview.innerHTML = html.join("");
+    }
+
+    function renderDesignPreview(state) {
+      if (!elements.designPreviewCard) return;
+      elements.designPreviewTitle.textContent = `${state.theme} preview`;
+      elements.designPreviewBody.textContent = `Radius ${state.card_radius_px}px, spacing ${Math.round(state.ui_scale * 100)}%, glow ${state.shadow_intensity.toFixed(2)}x, status fit ${state.status_page_scale.toFixed(2)}x.`;
+      renderStatusPreviewMini(state);
+    }
+
     function applyDesignControls(state) {
       const normalized = normalizeDesignControls(state);
       const root = document.documentElement;
@@ -935,7 +1165,15 @@
       root.style.setProperty("--dcs-ui-scale", String(normalized.ui_scale));
       root.style.setProperty("--dcs-card-radius", `${normalized.card_radius_px}px`);
       root.style.setProperty("--dcs-shadow-intensity", String(normalized.shadow_intensity));
+      root.style.setProperty("--dcs-space-1", `${Math.round(4 * normalized.ui_scale)}px`);
+      root.style.setProperty("--dcs-space-2", `${Math.round(8 * normalized.ui_scale)}px`);
+      root.style.setProperty("--dcs-space-3", `${Math.round(12 * normalized.ui_scale)}px`);
+      root.style.setProperty("--dcs-space-4", `${Math.round(16 * normalized.ui_scale)}px`);
+      root.style.setProperty("--dcs-space-5", `${Math.round(20 * normalized.ui_scale)}px`);
+      root.style.setProperty("--dcs-space-6", `${Math.round(56 * normalized.ui_scale)}px`);
+      console.log("[Fibonacci Layout] token application", normalized);
       updateDesignControlLabels(normalized);
+      renderDesignPreview(normalized);
       return normalized;
     }
 
@@ -1296,6 +1534,11 @@
     elements.designShadowIntensity.addEventListener("input", syncDesignControlLabels);
     elements.designStatusPageScale.addEventListener("input", syncDesignControlLabels);
     elements.designReset.addEventListener("click", resetDesignControls);
+    elements.designPreviewToggle.addEventListener("click", () => {
+      elements.designPreviewCard.classList.toggle("is-collapsed");
+      elements.designPreviewToggle.textContent = elements.designPreviewCard.classList.contains("is-collapsed") ? "Expand" : "Collapse";
+      console.log("[Fibonacci Layout] preview card toggled", { collapsed: elements.designPreviewCard.classList.contains("is-collapsed") });
+    });
 
     elements.manualRefresh.addEventListener("click", () => refreshAll({ manual: true }));
 
@@ -1306,6 +1549,8 @@
       cardSelector: "[data-fibo-card]",
       hiddenDock: document.getElementById("settingsHiddenCardDock"),
       storageKey: "bellforge.settings.fibo-cards.v1",
+      rowUnit: 8,
+      collapsedHeight: 56,
     });
     refreshAll();
     setInterval(refreshAll, REFRESH_MS);
