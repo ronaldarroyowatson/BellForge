@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -490,30 +489,7 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
         cmd = [str(helper_script), action]
 
     result = _run(cmd)
-    used_sudo = False
-
-    # Services run as user bellforge, so actions that touch systemd/reboot/GPU
-    # often require sudo privileges.
     current_euid = os.geteuid() if hasattr(os, "geteuid") else -1
-
-    if action in privileged_actions and result.returncode != 0 and current_euid != 0 and shutil.which("sudo"):
-        sudo_result = _run(["sudo", "-n", *cmd])
-        used_sudo = True
-        if sudo_result.returncode == 0:
-            result = sudo_result
-        else:
-            combined_stderr = "\n".join(
-                part for part in [result.stderr.strip(), sudo_result.stderr.strip()] if part
-            )
-            combined_stdout = "\n".join(
-                part for part in [result.stdout.strip(), sudo_result.stdout.strip()] if part
-            )
-            result = subprocess.CompletedProcess(
-                args=["sudo", "-n", *cmd],
-                returncode=sudo_result.returncode,
-                stdout=combined_stdout,
-                stderr=combined_stderr,
-            )
 
     stderr = result.stderr.strip()
     permission_denied = (
@@ -523,12 +499,11 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
             "permission denied" in stderr.lower()
             or "interactive authentication required" in stderr.lower()
             or "a terminal is required to read the password" in stderr.lower()
-            or "sudo:" in stderr.lower()
         )
     )
 
     if permission_denied and not stderr:
-        stderr = "Insufficient privileges for this action. Run repair.sh to enforce bellforge self-heal sudoers policy."
+        stderr = "Insufficient privileges for this action. Run BellForge as root via systemd."
 
     return {
         "timestamp": _utc_now(),
@@ -537,6 +512,6 @@ def run_self_heal(action: SelfHealAction) -> dict[str, Any]:
         "returncode": result.returncode,
         "stdout": result.stdout.strip(),
         "stderr": stderr,
-        "used_sudo": used_sudo,
+        "used_sudo": False,
         "permission_denied": permission_denied,
     }

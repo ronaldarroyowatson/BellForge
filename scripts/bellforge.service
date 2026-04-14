@@ -1,0 +1,21 @@
+[Unit]
+Description=BellForge Root Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/lib/bellforge
+Environment=PYTHONUNBUFFERED=1
+Environment=BELLFORGE_SETTINGS=/opt/bellforge/config/settings.json
+Environment=BELLFORGE_STAGING_DIR=/opt/bellforge/.staging
+Environment=BELLFORGE_INSTALL_DIR=/opt/bellforge
+ExecStart=/usr/local/bin/bellforge agent
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bellforge
+
+[Install]
+WantedBy=multi-user.target

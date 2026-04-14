@@ -6,6 +6,11 @@
   <title>BellForge Device Status</title>
   <style>
     :root {
+      --bf-font-scale: 1;
+      --bf-ui-scale: 1;
+      --bf-card-radius: 24px;
+      --bf-shadow-scale: 1;
+      --bf-status-page-scale: 0.92;
       --bg: #f5efe5;
       --paper: rgba(255, 251, 244, 0.92);
       --panel: #fffdf8;
@@ -19,11 +24,42 @@
       --accent-soft: #e2eef7;
       --shadow: 0 18px 36px rgba(27, 39, 49, 0.10);
     }
+    :root[data-design-theme="ocean"] {
+      --bg: #edf5fb;
+      --paper: rgba(246, 252, 255, 0.92);
+      --panel: #fbfeff;
+      --text: #10293d;
+      --muted: #4e687d;
+      --line: #b9cfe3;
+      --accent: #0f5d8f;
+      --accent-soft: #e4f2fd;
+    }
+    :root[data-design-theme="forest"] {
+      --bg: #f0f5ea;
+      --paper: rgba(251, 255, 249, 0.92);
+      --panel: #fbfffa;
+      --text: #1a2f21;
+      --muted: #4d6754;
+      --line: #bfd2bc;
+      --accent: #1f6a41;
+      --accent-soft: #e4f2e4;
+    }
+    :root[data-design-theme="high-contrast"] {
+      --bg: #efefef;
+      --paper: rgba(255, 255, 255, 0.96);
+      --panel: #ffffff;
+      --text: #111111;
+      --muted: #2d2d2d;
+      --line: #464646;
+      --accent: #0f4ea3;
+      --accent-soft: #e6eef9;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
       color: var(--text);
+      font-size: calc(16px * var(--bf-font-scale));
       font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       background:
         radial-gradient(circle at 10% 12%, rgba(235, 198, 140, 0.35) 0%, transparent 30%),
@@ -33,7 +69,7 @@
     .wrap {
       max-width: 1240px;
       margin: 0 auto;
-      padding: 24px;
+      padding: calc(24px * var(--bf-ui-scale));
     }
     .hero {
       display: grid;
@@ -45,8 +81,8 @@
     .card {
       background: var(--paper);
       border: 1px solid rgba(215, 200, 181, 0.9);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
+      border-radius: var(--bf-card-radius);
+      box-shadow: 0 calc(18px * var(--bf-shadow-scale)) calc(36px * var(--bf-shadow-scale)) rgba(27, 39, 49, 0.10);
       backdrop-filter: blur(8px);
     }
     .hero-main {
@@ -356,6 +392,9 @@
     body.display-view .wrap {
       max-width: 1280px;
       padding: 14px 18px;
+      width: calc(100% / var(--bf-status-page-scale));
+      transform: scale(var(--bf-status-page-scale));
+      transform-origin: top center;
       display: grid;
       grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
       gap: 12px;
@@ -696,6 +735,32 @@
       advancedDetails.open = true;
     }
 
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function applyDesignControls(designControls) {
+      if (!designControls) {
+        return;
+      }
+
+      const theme = ["warm", "ocean", "forest", "high-contrast"].includes(designControls.theme)
+        ? designControls.theme
+        : "warm";
+      const fontScale = Number(clamp(Number(designControls.font_scale || 1), 0.85, 1.35).toFixed(2));
+      const uiScale = Number(clamp(Number(designControls.ui_scale || 1), 0.8, 1.2).toFixed(2));
+      const cardRadius = Math.round(clamp(Number(designControls.card_radius_px || 24), 6, 28));
+      const shadowScale = Number(clamp(Number(designControls.shadow_intensity || 1), 0, 1.6).toFixed(2));
+      const statusPageScale = Number(clamp(Number(designControls.status_page_scale || 0.92), 0.75, 1).toFixed(2));
+
+      document.documentElement.setAttribute("data-design-theme", theme);
+      document.documentElement.style.setProperty("--bf-font-scale", String(fontScale));
+      document.documentElement.style.setProperty("--bf-ui-scale", String(uiScale));
+      document.documentElement.style.setProperty("--bf-card-radius", `${cardRadius}px`);
+      document.documentElement.style.setProperty("--bf-shadow-scale", String(shadowScale));
+      document.documentElement.style.setProperty("--bf-status-page-scale", String(statusPageScale));
+    }
+
     function pill(text, level) {
       return `<span class="pill ${level}">${text}</span>`;
     }
@@ -853,6 +918,7 @@
         if (!response.ok) return;
         const data = await response.json();
         diagnosticsRotationMs = Math.max(4000, Number(data.diagnostics_rotation_seconds || 8) * 1000);
+        applyDesignControls(data.design_controls);
         scheduleDiagnosticsCarousel();
       } catch (error) {
         // Leave the current carousel timing in place.

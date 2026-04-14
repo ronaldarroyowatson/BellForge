@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import urllib.error
@@ -16,6 +17,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from privilege_doctor import check_privileges
 
 
 SERVICE_UNITS = {
@@ -62,7 +65,7 @@ def unit_status(unit: str) -> dict[str, Any]:
 
 
 def unit_control(unit: str, action: str) -> dict[str, Any]:
-    cmd = ["sudo", "systemctl", action, unit]
+    cmd = ["systemctl", action, unit]
     rc, out, err = run_cmd(cmd)
     return {
         "unit": unit,
@@ -177,17 +180,6 @@ def cmd_display_status(args: argparse.Namespace) -> int:
 
 def cmd_display_heal(args: argparse.Namespace) -> int:
     base = args.base_url.rstrip("/")
-    local_fallback: dict[str, list[str]] = {
-        "enable-client": ["sudo", "systemctl", "enable", "--now", "bellforge-client.service"],
-        "restart-client": ["sudo", "systemctl", "restart", "bellforge-client.service"],
-        "restart-lightdm": ["sudo", "systemctl", "restart", "lightdm.service"],
-        "reboot": ["sudo", "/sbin/reboot"],
-        "reset-gpu": ["sudo", "sh", "-c", "echo 1 > /sys/class/drm/*/reset 2>/dev/null || true"],
-        "clear-framebuffer": ["sudo", "sh", "-c", "fbset -c 16 2>/dev/null || true"],
-        "force-hdmi-mode": ["sudo", "sh", "-c", "xrandr --output HDMI-1 --mode 1920x1080 --rate 60 2>/dev/null || true; systemctl restart lightdm"],
-        "cold-reboot": ["sudo", "sh", "-c", "sleep 2; /sbin/reboot"],
-    }
-
     try:
         payload = fetch_json(
             f"{base}/api/display/self-heal",
@@ -198,25 +190,6 @@ def cmd_display_heal(args: argparse.Namespace) -> int:
         if payload.get("ok"):
             print_json(payload)
             return 0
-
-        stderr_text = str(payload.get("stderr", ""))
-        if "Interactive authentication required" in stderr_text:
-            cmd = local_fallback[args.action]
-            rc, out, err = run_cmd(cmd)
-            fallback_payload = {
-                "timestamp": utc_now(),
-                "action": args.action,
-                "api_result": payload,
-                "local_fallback": {
-                    "ok": rc == 0,
-                    "returncode": rc,
-                    "stdout": out,
-                    "stderr": err,
-                    "command": cmd,
-                },
-            }
-            print_json(fallback_payload)
-            return 0 if rc == 0 else 1
 
         print_json(payload)
         return 1
@@ -275,6 +248,76 @@ def cmd_triage(args: argparse.Namespace) -> int:
     )
 
     return 0 if service_ok and display_health in {"ok", "warn"} else 1
+
+
+def _print_doctor_report(report: dict[str, Any]) -> None:
+    print(f"Doctor report timestamp: {report.get('timestamp')}")
+    print(f"Service target: {report.get('service')}")
+    print()
+    for item in report.get("results", []):
+        status = "PASS" if item.get("ok") else "FAIL"
+        print(f"[{status}] {item.get('name')}: {item.get('detail')}")
+        if not item.get("ok") and item.get("recommendation"):
+            print(f"  Fix: {item.get('recommendation')}")
+    print()
+    print(f"Overall: {'PASS' if report.get('overall_ok') else 'FAIL'}")
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    report = check_privileges(service_name=args.service)
+    if args.json:
+        print_json(report)
+    else:
+        _print_doctor_report(report)
+    return 0 if report.get("overall_ok") else 1
+
+
+def verify_installation(service_name: str) -> dict[str, Any]:
+    doctor_report = check_privileges(service_name=service_name)
+    active_rc, active_out, active_err = run_cmd(["systemctl", "is-active", service_name])
+    show_rc, show_out, show_err = run_cmd(["systemctl", "show", service_name, "--property=User", "--value"])
+    run_user = show_out.strip() if show_rc == 0 else ""
+    runs_as_root = run_user in {"", "root"}
+
+    summary = {
+        "service": service_name,
+        "doctor": doctor_report,
+        "service_active": active_rc == 0 and active_out.strip() == "active",
+        "service_active_detail": active_out or active_err,
+        "service_run_user": run_user or "root(default)",
+        "service_runs_as_root": runs_as_root,
+    }
+    summary["overall_ok"] = bool(
+        summary["doctor"].get("overall_ok")
+        and summary["service_active"]
+        and summary["service_runs_as_root"]
+    )
+    return summary
+
+
+def cmd_verify_installation(args: argparse.Namespace) -> int:
+    report = verify_installation(service_name=args.service)
+    print("Installation verification")
+    print(f"- service active: {'PASS' if report['service_active'] else 'FAIL'} ({report['service_active_detail']})")
+    print(f"- service runs as root: {'PASS' if report['service_runs_as_root'] else 'FAIL'} ({report['service_run_user']})")
+    print(f"- doctor checks: {'PASS' if report['doctor']['overall_ok'] else 'FAIL'}")
+    print(f"Final summary: {'SUCCESS' if report['overall_ok'] else 'FAIL'}")
+    return 0 if report["overall_ok"] else 1
+
+
+def cmd_agent(args: argparse.Namespace) -> int:
+    project_root = Path(__file__).resolve().parents[1]
+    agent_path = project_root / "updater" / "agent.py"
+    if not agent_path.is_file():
+        print(f"updater agent not found at {agent_path}", file=sys.stderr)
+        return 2
+
+    python_bin = Path("/opt/bellforge/.venv/bin/python")
+    if not python_bin.is_file():
+        python_bin = Path(sys.executable)
+
+    os.execv(str(python_bin), [str(python_bin), str(agent_path)])
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -337,6 +380,18 @@ def build_parser() -> argparse.ArgumentParser:
     triage.add_argument("--journal-lines", type=int, default=80)
     triage.add_argument("--save", default="/tmp/bellforge-triage.json")
     triage.set_defaults(func=cmd_triage)
+
+    doctor = sub.add_parser("doctor", help="Run privilege diagnostics for root/systemd operations")
+    doctor.add_argument("--service", default="bellforge.service")
+    doctor.add_argument("--json", action="store_true")
+    doctor.set_defaults(func=cmd_doctor)
+
+    verify = sub.add_parser("verify-installation", help="Verify service/root install state")
+    verify.add_argument("--service", default="bellforge.service")
+    verify.set_defaults(func=cmd_verify_installation)
+
+    agent = sub.add_parser("agent", help="Run the BellForge updater agent process")
+    agent.set_defaults(func=cmd_agent)
 
     return parser
 

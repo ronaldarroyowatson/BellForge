@@ -44,6 +44,12 @@ class DisplaySelfHealPayload(BaseModel):
 class DisplayPreferencesPayload(BaseModel):
     overscan_percent: int | None = Field(default=None, ge=85, le=100)
     diagnostics_rotation_seconds: int | None = Field(default=None, ge=4, le=30)
+    theme: Literal["warm", "ocean", "forest", "high-contrast"] | None = None
+    font_scale: float | None = Field(default=None, ge=0.85, le=1.35)
+    ui_scale: float | None = Field(default=None, ge=0.8, le=1.2)
+    card_radius_px: int | None = Field(default=None, ge=6, le=28)
+    shadow_intensity: float | None = Field(default=None, ge=0.0, le=1.6)
+    status_page_scale: float | None = Field(default=None, ge=0.75, le=1.0)
 
 
 def _error_detail(message: str) -> dict[str, str]:
@@ -143,6 +149,12 @@ async def update_display_preferences_route(payload: DisplayPreferencesPayload) -
             _PROJECT_ROOT,
             overscan_percent=payload.overscan_percent,
             diagnostics_rotation_seconds=payload.diagnostics_rotation_seconds,
+            theme=payload.theme,
+            font_scale=payload.font_scale,
+            ui_scale=payload.ui_scale,
+            card_radius_px=payload.card_radius_px,
+            shadow_intensity=payload.shadow_intensity,
+            status_page_scale=payload.status_page_scale,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Display preference update failed: {exc}")) from exc

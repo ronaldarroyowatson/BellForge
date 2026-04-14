@@ -16,19 +16,60 @@
       --warn: #a56f19;
       --bad: #be2f2f;
       --accent: #134f78;
+      --dcs-font-scale: 1;
+      --dcs-ui-scale: 1;
+      --dcs-card-radius: 14px;
+      --dcs-shadow-intensity: 1;
+    }
+    :root[data-design-theme="ocean"] {
+      --bg-a: #e8f3fa;
+      --bg-b: #ccdfef;
+      --surface: #f8fcff;
+      --line: #b8d0e4;
+      --text: #10293d;
+      --muted: #4f6b82;
+      --accent: #0f5d8f;
+      --good: #0c7b57;
+      --warn: #9e6a16;
+      --bad: #ba2c2c;
+    }
+    :root[data-design-theme="forest"] {
+      --bg-a: #eef5e8;
+      --bg-b: #d6e7d3;
+      --surface: #fbfffa;
+      --line: #bfd3bc;
+      --text: #1b2f22;
+      --muted: #4c6855;
+      --accent: #1f6a41;
+      --good: #1c7c46;
+      --warn: #89611a;
+      --bad: #a53434;
+    }
+    :root[data-design-theme="high-contrast"] {
+      --bg-a: #f3f3f3;
+      --bg-b: #dbdbdb;
+      --surface: #ffffff;
+      --line: #454545;
+      --text: #101010;
+      --muted: #2f2f2f;
+      --accent: #0f4ea3;
+      --good: #0a6a2a;
+      --warn: #8b5b00;
+      --bad: #9a1d1d;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+      font-size: calc(16px * var(--dcs-font-scale));
       color: var(--text);
       background: linear-gradient(145deg, var(--bg-a) 0%, var(--bg-b) 100%);
       min-height: 100vh;
     }
     .wrap {
-      max-width: 1180px;
+      max-width: calc(1180px * var(--dcs-ui-scale));
       margin: 0 auto;
-      padding: 22px;
+      padding: calc(22px * var(--dcs-ui-scale));
     }
     .head {
       display: flex;
@@ -71,7 +112,7 @@
     }
     button, select, input {
       border: 1px solid #aabac8;
-      border-radius: 8px;
+      border-radius: clamp(6px, calc(var(--dcs-card-radius) * 0.55), 16px);
       padding: 8px 10px;
       font: inherit;
       background: #fff;
@@ -118,9 +159,9 @@
     .card {
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 14px;
-      box-shadow: 0 10px 20px rgba(10, 24, 37, 0.08);
-      padding: 14px;
+      border-radius: var(--dcs-card-radius);
+      box-shadow: 0 calc(10px * var(--dcs-shadow-intensity)) calc(20px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.08);
+      padding: calc(14px * var(--dcs-ui-scale));
       min-height: 200px;
     }
     .card h2 {
@@ -167,6 +208,28 @@
     }
     .logs {
       grid-column: 1 / -1;
+    }
+    .dcs-preview {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--surface) 78%, #ffffff);
+      border-radius: clamp(8px, calc(var(--dcs-card-radius) * 0.8), 20px);
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+    .dcs-preview__chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .dcs-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      background: #ffffff;
     }
     #logOutput {
       margin-top: 10px;
@@ -303,6 +366,63 @@
         <p id="displayHealResult" class="mono"></p>
       </article>
 
+      <article class="card">
+        <h2>Design Control System</h2>
+        <p class="helper">Tune visual scale, theme, and panel styling for every BellForge web page, including the headless status screen.</p>
+        <form id="designControlsForm" class="form-grid">
+          <label class="full">Theme Preset
+            <select id="designTheme">
+              <option value="warm">Warm Classroom</option>
+              <option value="ocean">Ocean Blue</option>
+              <option value="forest">Forest Green</option>
+              <option value="high-contrast">High Contrast</option>
+            </select>
+          </label>
+          <label class="full">Font Scale
+            <div class="range-wrap">
+              <input id="designFontScale" type="range" min="85" max="135" step="1" value="100" />
+              <strong id="designFontScaleValue" class="mono">1.00x</strong>
+            </div>
+          </label>
+          <label class="full">UI Scale
+            <div class="range-wrap">
+              <input id="designUiScale" type="range" min="80" max="120" step="1" value="100" />
+              <strong id="designUiScaleValue" class="mono">1.00x</strong>
+            </div>
+          </label>
+          <label class="full">Card Radius
+            <div class="range-wrap">
+              <input id="designCardRadius" type="range" min="6" max="28" step="1" value="14" />
+              <strong id="designCardRadiusValue" class="mono">14px</strong>
+            </div>
+          </label>
+          <label class="full">Shadow Intensity
+            <div class="range-wrap">
+              <input id="designShadowIntensity" type="range" min="0" max="160" step="1" value="100" />
+              <strong id="designShadowIntensityValue" class="mono">1.00x</strong>
+            </div>
+          </label>
+          <label class="full">Status Page Fit (Headless)
+            <div class="range-wrap">
+              <input id="designStatusPageScale" type="range" min="75" max="100" step="1" value="92" />
+              <strong id="designStatusPageScaleValue" class="mono">0.92x</strong>
+            </div>
+          </label>
+          <button type="submit">Save Design Controls</button>
+          <button id="designReset" class="secondary" type="button">Reset Defaults</button>
+        </form>
+        <div class="dcs-preview" aria-live="polite">
+          <strong>Live Preview</strong>
+          <div id="designPreviewSummary" class="mono">Theme warm | Font 1.00x | UI 1.00x</div>
+          <div class="dcs-preview__chips">
+            <span class="dcs-chip">Card corners</span>
+            <span class="dcs-chip">Spacing density</span>
+            <span class="dcs-chip">Status page fit</span>
+          </div>
+        </div>
+        <p id="designControlResult" class="mono"></p>
+      </article>
+
       <article class="card logs">
         <h2>Debug Service & Logger</h2>
         <div class="controls">
@@ -327,6 +447,14 @@
 
   <script>
     const REFRESH_MS = 5000;
+    const DESIGN_DEFAULTS = {
+      theme: "warm",
+      font_scale: 1.0,
+      ui_scale: 1.0,
+      card_radius_px: 14,
+      shadow_intensity: 1.0,
+      status_page_scale: 0.92,
+    };
     const lastRefreshed = document.getElementById("lastRefreshed");
 
     const elements = {
@@ -366,6 +494,21 @@
       displayRotation: document.getElementById("displayRotation"),
       displayRotationValue: document.getElementById("displayRotationValue"),
       displayPrefsResult: document.getElementById("displayPrefsResult"),
+      designControlsForm: document.getElementById("designControlsForm"),
+      designTheme: document.getElementById("designTheme"),
+      designFontScale: document.getElementById("designFontScale"),
+      designFontScaleValue: document.getElementById("designFontScaleValue"),
+      designUiScale: document.getElementById("designUiScale"),
+      designUiScaleValue: document.getElementById("designUiScaleValue"),
+      designCardRadius: document.getElementById("designCardRadius"),
+      designCardRadiusValue: document.getElementById("designCardRadiusValue"),
+      designShadowIntensity: document.getElementById("designShadowIntensity"),
+      designShadowIntensityValue: document.getElementById("designShadowIntensityValue"),
+      designStatusPageScale: document.getElementById("designStatusPageScale"),
+      designStatusPageScaleValue: document.getElementById("designStatusPageScaleValue"),
+      designPreviewSummary: document.getElementById("designPreviewSummary"),
+      designControlResult: document.getElementById("designControlResult"),
+      designReset: document.getElementById("designReset"),
       displayHealResult: document.getElementById("displayHealResult"),
       healEnableClient: document.getElementById("healEnableClient"),
       healRestartClient: document.getElementById("healRestartClient"),
@@ -385,6 +528,64 @@
 
     let lastLogPayload = null;
     let refreshPromise = null;
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function normalizeDesignControls(raw = {}) {
+      return {
+        theme: ["warm", "ocean", "forest", "high-contrast"].includes(raw.theme) ? raw.theme : DESIGN_DEFAULTS.theme,
+        font_scale: Number(clamp(Number(raw.font_scale ?? DESIGN_DEFAULTS.font_scale), 0.85, 1.35).toFixed(2)),
+        ui_scale: Number(clamp(Number(raw.ui_scale ?? DESIGN_DEFAULTS.ui_scale), 0.8, 1.2).toFixed(2)),
+        card_radius_px: Math.round(clamp(Number(raw.card_radius_px ?? DESIGN_DEFAULTS.card_radius_px), 6, 28)),
+        shadow_intensity: Number(clamp(Number(raw.shadow_intensity ?? DESIGN_DEFAULTS.shadow_intensity), 0.0, 1.6).toFixed(2)),
+        status_page_scale: Number(clamp(Number(raw.status_page_scale ?? DESIGN_DEFAULTS.status_page_scale), 0.75, 1.0).toFixed(2)),
+      };
+    }
+
+    function updateDesignControlLabels(state) {
+      elements.designFontScaleValue.textContent = `${state.font_scale.toFixed(2)}x`;
+      elements.designUiScaleValue.textContent = `${state.ui_scale.toFixed(2)}x`;
+      elements.designCardRadiusValue.textContent = `${state.card_radius_px}px`;
+      elements.designShadowIntensityValue.textContent = `${state.shadow_intensity.toFixed(2)}x`;
+      elements.designStatusPageScaleValue.textContent = `${state.status_page_scale.toFixed(2)}x`;
+      elements.designPreviewSummary.textContent = `Theme ${state.theme} | Font ${state.font_scale.toFixed(2)}x | UI ${state.ui_scale.toFixed(2)}x | Status ${state.status_page_scale.toFixed(2)}x`;
+    }
+
+    function applyDesignControls(state) {
+      const normalized = normalizeDesignControls(state);
+      const root = document.documentElement;
+      root.setAttribute("data-design-theme", normalized.theme);
+      root.style.setProperty("--dcs-font-scale", String(normalized.font_scale));
+      root.style.setProperty("--dcs-ui-scale", String(normalized.ui_scale));
+      root.style.setProperty("--dcs-card-radius", `${normalized.card_radius_px}px`);
+      root.style.setProperty("--dcs-shadow-intensity", String(normalized.shadow_intensity));
+      updateDesignControlLabels(normalized);
+      return normalized;
+    }
+
+    function collectDesignControlsFromForm() {
+      return normalizeDesignControls({
+        theme: elements.designTheme.value,
+        font_scale: Number(elements.designFontScale.value) / 100,
+        ui_scale: Number(elements.designUiScale.value) / 100,
+        card_radius_px: Number(elements.designCardRadius.value),
+        shadow_intensity: Number(elements.designShadowIntensity.value) / 100,
+        status_page_scale: Number(elements.designStatusPageScale.value) / 100,
+      });
+    }
+
+    function pushDesignControlsToForm(state) {
+      const normalized = normalizeDesignControls(state);
+      elements.designTheme.value = normalized.theme;
+      elements.designFontScale.value = String(Math.round(normalized.font_scale * 100));
+      elements.designUiScale.value = String(Math.round(normalized.ui_scale * 100));
+      elements.designCardRadius.value = String(normalized.card_radius_px);
+      elements.designShadowIntensity.value = String(Math.round(normalized.shadow_intensity * 100));
+      elements.designStatusPageScale.value = String(Math.round(normalized.status_page_scale * 100));
+      applyDesignControls(normalized);
+    }
 
     function setManualRefreshBusy(isBusy, options = {}) {
       const disableButton = options.disableButton === true;
@@ -422,6 +623,10 @@
     function syncDisplayPreferenceLabels() {
       elements.displayScaleValue.textContent = `${elements.displayScale.value}%`;
       elements.displayRotationValue.textContent = `${elements.displayRotation.value}s`;
+    }
+
+    function syncDesignControlLabels() {
+      applyDesignControls(collectDesignControlsFromForm());
     }
 
     async function fetchJson(url, options) {
@@ -545,6 +750,7 @@
       const data = await fetchJson("/api/display/preferences");
       elements.displayScale.value = String(data.overscan_percent || 96);
       elements.displayRotation.value = String(data.diagnostics_rotation_seconds || 8);
+      pushDesignControlsToForm(data.design_controls || DESIGN_DEFAULTS);
       syncDisplayPreferenceLabels();
     }
 
@@ -565,6 +771,30 @@
       } catch (error) {
         elements.displayPrefsResult.textContent = "Display preference update failed.";
       }
+    }
+
+    async function saveDesignControls(event) {
+      event.preventDefault();
+      const designControls = collectDesignControlsFromForm();
+      applyDesignControls(designControls);
+      elements.designControlResult.textContent = "Saving design controls...";
+      try {
+        const result = await fetchJson("/api/display/preferences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(designControls),
+        });
+        const persisted = normalizeDesignControls(result.design_controls || designControls);
+        pushDesignControlsToForm(persisted);
+        elements.designControlResult.textContent = result.message || "Design controls saved.";
+      } catch (error) {
+        elements.designControlResult.textContent = "Design control update failed.";
+      }
+    }
+
+    function resetDesignControls() {
+      pushDesignControlsToForm(DESIGN_DEFAULTS);
+      elements.designControlResult.textContent = "Design controls reset locally. Click Save Design Controls to persist.";
     }
 
     async function runDisplaySelfHeal(action) {
@@ -684,10 +914,19 @@
     elements.displayPrefsForm.addEventListener("submit", saveDisplayPreferences);
     elements.displayScale.addEventListener("input", syncDisplayPreferenceLabels);
     elements.displayRotation.addEventListener("input", syncDisplayPreferenceLabels);
+    elements.designControlsForm.addEventListener("submit", saveDesignControls);
+    elements.designTheme.addEventListener("change", syncDesignControlLabels);
+    elements.designFontScale.addEventListener("input", syncDesignControlLabels);
+    elements.designUiScale.addEventListener("input", syncDesignControlLabels);
+    elements.designCardRadius.addEventListener("input", syncDesignControlLabels);
+    elements.designShadowIntensity.addEventListener("input", syncDesignControlLabels);
+    elements.designStatusPageScale.addEventListener("input", syncDesignControlLabels);
+    elements.designReset.addEventListener("click", resetDesignControls);
 
     elements.manualRefresh.addEventListener("click", () => refreshAll({ manual: true }));
 
     syncDisplayPreferenceLabels();
+    pushDesignControlsToForm(DESIGN_DEFAULTS);
     refreshAll();
     setInterval(refreshAll, REFRESH_MS);
   </script>

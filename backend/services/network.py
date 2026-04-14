@@ -49,14 +49,7 @@ def _run_cmd(command: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def _run_cmd_root(command: list[str]) -> subprocess.CompletedProcess[str]:
-    if not sys.platform.startswith("linux"):
-        return _run_cmd(command)
-
-    direct = _run_cmd(command)
-    if direct.returncode == 0:
-        return direct
-
-    return _run_cmd(["sudo", "-n", *command])
+    return _run_cmd(command)
 
 
 def _usable_ipv4(value: str | None) -> str | None:
