@@ -20,6 +20,15 @@
       --dcs-ui-scale: 1;
       --dcs-card-radius: 14px;
       --dcs-shadow-intensity: 1;
+      /* DSC Motion Tokens */
+      --motion-duration: 220ms;
+      --motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
+      --motion-expand-duration: 260ms;
+      --motion-expand-easing: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --motion-collapse-duration: 180ms;
+      --motion-collapse-easing: cubic-bezier(0.4, 0, 0.2, 1);
+      --motion-reflow-duration: 140ms;
+      --motion-reflow-easing: cubic-bezier(0.4, 0, 0.2, 1);
     }
     :root[data-design-theme="ocean"] {
       --bg-a: #e8f3fa;
@@ -156,6 +165,11 @@
       grid-template-columns: repeat(2, minmax(300px, 1fr));
       gap: 14px;
     }
+    .grid.fibo-adaptive-grid {
+      grid-template-columns: repeat(var(--fibo-columns, 2), minmax(260px, 1fr));
+      grid-auto-flow: dense;
+      align-items: start;
+    }
     .card {
       background: var(--surface);
       border: 1px solid var(--line);
@@ -163,6 +177,97 @@
       box-shadow: 0 calc(10px * var(--dcs-shadow-intensity)) calc(20px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.08);
       padding: calc(14px * var(--dcs-ui-scale));
       min-height: 200px;
+      position: relative;
+      grid-column: span var(--fibo-span, 1);
+      transition: transform var(--motion-duration) var(--motion-easing), 
+                  box-shadow var(--motion-duration) var(--motion-easing), 
+                  opacity var(--motion-duration) var(--motion-easing),
+                  min-height var(--motion-collapse-duration) var(--motion-collapse-easing);
+    }
+    .card.is-collapsed {
+      min-height: auto;
+    }
+    .card.is-collapsed .card-content {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-height var(--motion-collapse-duration) var(--motion-collapse-easing),
+                  opacity var(--motion-collapse-duration) var(--motion-collapse-easing);
+    }
+    .card .card-content {
+      max-height: 100%;
+      opacity: 1;
+      transition: max-height var(--motion-expand-duration) var(--motion-expand-easing),
+                  opacity var(--motion-expand-duration) var(--motion-expand-easing);
+    }
+    .card.is-expanded {
+      transform: translateY(-1px);
+      box-shadow: 0 calc(14px * var(--dcs-shadow-intensity)) calc(30px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.14);
+    }
+    .card.is-hidden {
+      display: none;
+    }
+    .card-titlebar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      padding: 2px 0;
+      user-select: none;
+    }
+    .card-titlebar:hover {
+      opacity: 0.85;
+    }
+    .card-tools {
+      position: relative;
+      display: inline-flex;
+      gap: 6px;
+      z-index: 2;
+    }
+    .card-tool {
+      border: 1px solid #b8c1c9;
+      background: #f4f7fa;
+      color: #294252;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      padding: 4px 8px;
+      line-height: 1;
+      cursor: pointer;
+      transition: background-color var(--motion-duration) var(--motion-easing),
+                  color var(--motion-duration) var(--motion-easing);
+    }
+    .card-tool:hover {
+      background: #e8ecf0;
+      color: #1a2a38;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+    }
+    .card.is-collapsed h2 {
+      margin: 0;
+    }
+    .hidden-card-dock {
+      margin: 0 0 12px;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px dashed #b9c7d3;
+      background: rgba(255, 255, 255, 0.65);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: #3b4d5c;
+      font-size: 0.84rem;
+    }
+    .hidden-card-pill {
+      border: 1px solid #b3c2cf;
+      background: #f7fafc;
+      color: #2a3f50;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 0.78rem;
+      cursor: pointer;
     }
     .card h2 {
       margin: 0 0 10px;
@@ -279,8 +384,10 @@
       </div>
     </section>
 
-    <section class="grid">
-      <article class="card">
+    <section id="settingsHiddenCardDock" class="hidden-card-dock" hidden></section>
+
+    <section id="settingsCardGrid" class="grid">
+      <article class="card" data-fibo-card data-card-key="network" data-card-title="Network Settings">
         <h2>Network Settings</h2>
         <div class="row"><span>Current SSID</span><strong id="ssid">-</strong></div>
         <div class="row"><span>Signal Strength</span><strong id="signal">-</strong></div>
@@ -302,14 +409,14 @@
         <p id="networkUpdateMessage" class="mono"></p>
       </article>
 
-      <article class="card">
+      <article class="card" data-fibo-card data-card-key="authentication" data-card-title="Authentication">
         <h2>Authentication</h2>
         <div class="row"><span>Credentials (masked)</span><strong id="credentials" class="mono">-</strong></div>
         <div class="row"><span>Authentication Status</span><span id="authStatus" class="status warn">Unknown</span></div>
         <div class="row"><span>Last Attempt</span><strong id="lastAuth" class="mono">-</strong></div>
       </article>
 
-      <article class="card">
+      <article class="card" data-fibo-card data-card-key="autoupdater" data-card-title="Autoupdater Status">
         <h2>Autoupdater Status</h2>
         <p class="helper">The updater checks at boot, keeps polling in the background, and this button forces an immediate check when you need it.</p>
         <div class="stack-controls">
@@ -332,7 +439,7 @@
         <p id="updaterCheckResult" class="mono"></p>
       </article>
 
-      <article class="card">
+      <article class="card" data-fibo-card data-card-key="display-pipeline" data-card-title="Display Pipeline">
         <h2>Display Pipeline</h2>
         <p class="helper">Use Screen Fit to compensate for TV overscan. Lower values shrink the picture slightly so the top and bottom are not clipped.</p>
         <div class="row"><span>Overall Health</span><span id="displayHealth" class="status warn">Unknown</span></div>
@@ -366,7 +473,7 @@
         <p id="displayHealResult" class="mono"></p>
       </article>
 
-      <article class="card">
+      <article class="card" data-fibo-card data-card-key="design-controls" data-card-title="Design Control System">
         <h2>Design Control System</h2>
         <p class="helper">Tune visual scale, theme, and panel styling for every BellForge web page, including the headless status screen.</p>
         <form id="designControlsForm" class="form-grid">
@@ -423,7 +530,7 @@
         <p id="designControlResult" class="mono"></p>
       </article>
 
-      <article class="card logs">
+      <article class="card logs" data-fibo-card data-card-key="logs" data-card-title="Debug Service & Logger">
         <h2>Debug Service & Logger</h2>
         <div class="controls">
           <label>Service
@@ -531,6 +638,273 @@
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
+    }
+
+    function createFibonacciAdaptiveLayout(options) {
+      const container = options.container;
+      const cardSelector = options.cardSelector;
+      const dock = options.hiddenDock;
+      const storageKey = options.storageKey;
+      const fib = [1, 1, 2, 3, 5, 8, 13, 21];
+      
+      // Debug logger
+      const logger = {
+        enabled: localStorage.getItem("bellforge.debug.fibo") === "true",
+        log(msg, data) {
+          if (this.enabled) {
+            console.log(`[Fibonacci Layout] ${msg}`, data || "");
+          }
+        },
+      };
+
+      if (!container) {
+        return { recompute() {} };
+      }
+
+      container.classList.add("fibo-adaptive-grid");
+
+      const cards = Array.from(container.querySelectorAll(cardSelector));
+      const state = JSON.parse(localStorage.getItem(storageKey) || "{}");
+      let frameToken = 0;
+      const layoutCache = { columns: 0, weights: {}, spans: {} };
+      const resizeObserver = new ResizeObserver(() => scheduleRecompute());
+
+      function flushCaches() {
+        layoutCache.columns = 0;
+        layoutCache.weights = {};
+        layoutCache.spans = {};
+      }
+
+      function nearestFib(value) {
+        let nearest = fib[0];
+        let distance = Math.abs(value - nearest);
+        for (const candidate of fib) {
+          const d = Math.abs(value - candidate);
+          if (d < distance) {
+            nearest = candidate;
+            distance = d;
+          }
+        }
+        return nearest;
+      }
+
+      function columnsFor(width) {
+        if (width >= 1500) return 5;
+        if (width >= 1180) return 4;
+        if (width >= 880) return 3;
+        if (width >= 620) return 2;
+        return 1;
+      }
+
+      function calculateContentWeight(card) {
+        const collapsed = card.classList.contains("is-collapsed");
+        if (collapsed) return 1; // Collapsed cards get minimum weight
+
+        // Determine content type weight
+        let weight = 1;
+        const contentEl = card.querySelector(".card-content") || card;
+        const svg = contentEl.querySelector("svg");
+        const canvas = contentEl.querySelector("canvas");
+        const multilineText = (contentEl.textContent.match(/\n/g) || []).length;
+
+        if (svg || canvas) {
+          weight = 5; // Graphs/charts
+        } else if (multilineText > 3) {
+          weight = 3; // Multi-line content
+        } else if (contentEl.textContent.trim().length === 0) {
+          weight = 0; // Empty
+        } else {
+          weight = 1; // Single-line or minimal content
+        }
+
+        return nearestFib(weight);
+      }
+
+      function titleFor(card) {
+        const t = card.dataset.cardTitle;
+        if (t) return t;
+        const heading = card.querySelector("h2, h3");
+        return heading ? heading.textContent.trim() : "Card";
+      }
+
+      function keyFor(card) {
+        if (card.dataset.cardKey) return card.dataset.cardKey;
+        const generated = titleFor(card).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `card-${Math.random().toString(16).slice(2, 8)}`;
+        card.dataset.cardKey = generated;
+        return generated;
+      }
+
+      function readCardState(card) {
+        return state[keyFor(card)] || { collapsed: false, hidden: false };
+      }
+
+      function writeCardState(card, nextState) {
+        state[keyFor(card)] = { ...readCardState(card), ...nextState };
+        localStorage.setItem(storageKey, JSON.stringify(state));
+        logger.log(`Card state updated: ${keyFor(card)}`, nextState);
+      }
+
+      function applyState(card) {
+        const cardState = readCardState(card);
+        card.classList.toggle("is-collapsed", !!cardState.collapsed);
+        card.classList.toggle("is-hidden", !!cardState.hidden);
+      }
+
+      function renderDock() {
+        if (!dock) return;
+        const hiddenCards = cards.filter((card) => readCardState(card).hidden);
+        if (hiddenCards.length === 0) {
+          dock.hidden = true;
+          dock.textContent = "";
+          return;
+        }
+
+        dock.hidden = false;
+        dock.innerHTML = "<strong>Hidden cards:</strong>";
+        for (const card of hiddenCards) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "hidden-card-pill";
+          button.textContent = `Show ${titleFor(card)}`;
+          button.addEventListener("click", () => {
+            writeCardState(card, { hidden: false });
+            applyState(card);
+            renderDock();
+            scheduleRecompute();
+          });
+          dock.appendChild(button);
+        }
+      }
+
+      function recompute() {
+        frameToken = 0;
+        flushCaches();
+        logger.log("Recompute started");
+
+        for (const card of cards) applyState(card);
+
+        const visibleCards = cards.filter((card) => !card.classList.contains("is-hidden"));
+        const columns = columnsFor(container.clientWidth || window.innerWidth);
+        layoutCache.columns = columns;
+        container.style.setProperty("--fibo-columns", String(columns));
+
+        if (visibleCards.length === 0) {
+          logger.log("No visible cards, rendering dock only");
+          renderDock();
+          return;
+        }
+
+        const weights = visibleCards.map((card, idx) => {
+          const w = calculateContentWeight(card);
+          layoutCache.weights[keyFor(card)] = w;
+          return w;
+        });
+
+        const maxWeight = Math.max(...weights, 1);
+        logger.log(`Recalculated weights for ${visibleCards.length} cards`, { maxWeight });
+
+        visibleCards.forEach((card, index) => {
+          const collapsed = card.classList.contains("is-collapsed");
+          const baseSpan = Math.round((weights[index] / maxWeight) * columns);
+          let span = clamp(baseSpan, 1, columns);
+
+          // Collapsed cards always get minimum span
+          if (collapsed) {
+            span = 1;
+          }
+
+          layoutCache.spans[keyFor(card)] = span;
+          card.style.setProperty("--fibo-span", String(span));
+        });
+
+        logger.log("Layout recompute complete", { columns, visibleCount: visibleCards.length });
+        renderDock();
+      }
+
+      function scheduleRecompute() {
+        if (frameToken) return;
+        frameToken = requestAnimationFrame(recompute);
+      }
+
+      function injectControls(card) {
+        if (card.querySelector(".card-titlebar")) return;
+
+        const heading = card.querySelector("h2, h3");
+        if (!heading) return;
+
+        // Wrap existing content except heading in .card-content
+        if (!card.querySelector(".card-content")) {
+          const content = document.createElement("div");
+          content.className = "card-content";
+          while (card.childNodes.length > 1) {
+            content.appendChild(card.childNodes[1]);
+          }
+          card.appendChild(content);
+        }
+
+        // Create titlebar with controls
+        const titlebar = document.createElement("div");
+        titlebar.className = "card-titlebar";
+
+        const titleWrapper = document.createElement("div");
+        titleWrapper.style.flex = "1";
+        heading.remove();
+        titleWrapper.appendChild(heading);
+
+        const tools = document.createElement("div");
+        tools.className = "card-tools";
+
+        const hideButton = document.createElement("button");
+        hideButton.type = "button";
+        hideButton.className = "card-tool";
+        hideButton.textContent = "Hide";
+
+        hideButton.addEventListener("click", (e) => {
+          e.stopPropagation();
+          writeCardState(card, { hidden: true });
+          applyState(card);
+          renderDock();
+          scheduleRecompute();
+        });
+
+        tools.appendChild(hideButton);
+        titlebar.appendChild(titleWrapper);
+        titlebar.appendChild(tools);
+
+        // Insert titlebar at the beginning
+        card.insertBefore(titlebar, card.firstChild);
+
+        // Click titlebar to toggle collapsed state
+        titlebar.addEventListener("click", () => {
+          const current = readCardState(card);
+          writeCardState(card, { collapsed: !current.collapsed });
+          applyState(card);
+          scheduleRecompute();
+        });
+      }
+
+      for (const card of cards) {
+        injectControls(card);
+        applyState(card);
+        resizeObserver.observe(card);
+      }
+
+      const mutationObserver = new MutationObserver(() => scheduleRecompute());
+      mutationObserver.observe(container, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "open", "hidden"],
+      });
+
+      window.addEventListener("resize", scheduleRecompute);
+      scheduleRecompute();
+
+      return { 
+        recompute: scheduleRecompute,
+        getLayoutCache() { return { ...layoutCache }; },
+        flushLayoutCache() { flushCaches(); scheduleRecompute(); },
+      };
     }
 
     function normalizeDesignControls(raw = {}) {
@@ -927,8 +1301,15 @@
 
     syncDisplayPreferenceLabels();
     pushDesignControlsToForm(DESIGN_DEFAULTS);
+    const settingsAdaptiveLayout = createFibonacciAdaptiveLayout({
+      container: document.getElementById("settingsCardGrid"),
+      cardSelector: "[data-fibo-card]",
+      hiddenDock: document.getElementById("settingsHiddenCardDock"),
+      storageKey: "bellforge.settings.fibo-cards.v1",
+    });
     refreshAll();
     setInterval(refreshAll, REFRESH_MS);
+    setInterval(() => settingsAdaptiveLayout.recompute(), REFRESH_MS);
   </script>
 </body>
 </html>
