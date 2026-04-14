@@ -1,6 +1,6 @@
 {
-  "version": "0.1.35",
-  "released_at": "2026-04-14T00:00:00Z",
+  "version": "0.1.36",
+  "released_at": "2026-04-14T16:08:21Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
   "notes": "Design Control System integrated into Settings; headless status page layout scaling"

@@ -1,6 +1,6 @@
 {
-  "version": "0.1.35",
-  "generated_at": "2026-04-14T16:07:40Z",
+  "version": "0.1.36",
+  "generated_at": "2026-04-14T16:08:21Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -151,7 +151,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "c5101a0019cccea443aca0d507206a7b5a6e0df362027d51550d639683903ffc",
+      "sha256": "c7ebc1eae307e02d45dc3e778b786d3339aa27c1dc6f712b7116fd4c5333ac24",
       "size": 226
     },
     "scripts/self_heal_root.sh": {
