@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from updater.agent import UpdateAgent, UpdaterSettings, sha256_file
 
@@ -158,6 +158,51 @@ class UpdaterAgentTests(unittest.TestCase):
         crlf_path.write_bytes(b"<div>hello</div>\r\n<span>world</span>\r\n")
 
         self.assertEqual(sha256_file(lf_path), sha256_file(crlf_path))
+
+    def test_run_update_cycle_skips_same_version_manifest_drift(self) -> None:
+        (self.install_dir / "config").mkdir(parents=True, exist_ok=True)
+        (self.install_dir / "config" / "version.json").write_text(
+            json.dumps({"version": "1.0.0"}),
+            encoding="utf-8",
+        )
+        local_file = self.install_dir / "client" / "settings.html"
+        local_file.parent.mkdir(parents=True, exist_ok=True)
+        local_file.write_text("local repaired settings page\n", encoding="utf-8")
+
+        remote_bytes = b"published same-version settings page\n"
+        manifest_files = {
+            "client/settings.html": {
+                "sha256": __import__("hashlib").sha256(remote_bytes).hexdigest(),
+                "size": len(remote_bytes),
+            }
+        }
+
+        agent = UpdateAgent(self.settings, self.logger)
+
+        async def fake_fetch_json(_client, relative_path: str, *, cache_token: str | None = None) -> dict[str, object]:
+            if relative_path == "config/version.json":
+                return {"version": "1.0.0"}
+            if relative_path == "config/manifest.json":
+                return {"version": "1.0.0", "files": manifest_files}
+            raise AssertionError(f"Unexpected fetch path: {relative_path}")
+
+        with (
+            patch.object(agent, "_fetch_json", side_effect=fake_fetch_json),
+            patch.object(agent, "_stage_downloads", new_callable=AsyncMock) as stage_mock,
+        ):
+            asyncio.run(agent.run_update_cycle("manual"))
+
+        stage_mock.assert_not_called()
+        self.assertFalse((self.staging_dir / "pending_update.json").exists())
+
+        state = json.loads((self.staging_dir / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["state"], "idle")
+        self.assertFalse(state["update_available"])
+        self.assertIn("same-version drift updates are skipped", state["message"])
+
+        last_result = json.loads((self.staging_dir / "last_update_result.json").read_text(encoding="utf-8"))
+        self.assertEqual(last_result["result"], "same-version-drift-skipped")
+        self.assertIn("same-version drift updates are skipped", last_result["message"])
 
 
 if __name__ == "__main__":

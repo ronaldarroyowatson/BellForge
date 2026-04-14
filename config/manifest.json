@@ -1,6 +1,6 @@
 {
-  "version": "0.1.47",
-  "generated_at": "2026-04-14T19:32:19Z",
+  "version": "0.1.48",
+  "generated_at": "2026-04-14T20:50:31Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -79,8 +79,8 @@
       "size": 56493
     },
     "backend/services/updater_status.py": {
-      "sha256": "bb8261d09cd68cba7320a7874303c785022654aff573926f7f0cc685485cd198",
-      "size": 15008
+      "sha256": "6828056d2af6add2fa63dac6f21e40d0b221d7236e149c1ea6202278871ebae3",
+      "size": 19074
     },
     "client/auth.html": {
       "sha256": "82a248d112d7795281f64848664f811c23c51fdcbeb29819c16ecf4b413cfe7c",
@@ -119,16 +119,16 @@
       "size": 6978
     },
     "client/settings.html": {
-      "sha256": "3e8edf25b9155667cd5ae3a6eaef154eeb947dcb14de8f9336263ee323efca9a",
-      "size": 67320
+      "sha256": "df56a60a0d3adda5a393cb62370ee50d0f4ed4fb99034d0e54927f004afb0094",
+      "size": 72592
     },
     "client/status.html": {
-      "sha256": "8a421acb8e2a1fae4a8161a35af6ce361c4c5a050fb3997ff15d15e026afa5fb",
-      "size": 62889
+      "sha256": "ae86258f03f276bf602b440abdb57b2a85e5817cf32857e78d348db1e4ef93f5",
+      "size": 64243
     },
     "updater/agent.py": {
-      "sha256": "daf1e386b0e9a8bfb4d66b800a6c1047a9e8b928d63f00b77630f8ec90239d91",
-      "size": 35223
+      "sha256": "ae12e291131f87284e770fcdea945c35520cc82c7db627a475ab1dc020f1dae2",
+      "size": 36717
     },
     "updater/requirements.txt": {
       "sha256": "13c03db805d9f3a3a6db6aa4b8ae9d959bc94fc64322a8f56c136acebf59a901",
@@ -151,8 +151,8 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "8b2ddcadc7e71c713733fe67c943deda32ba1b7d5209743c280140db2e1a039e",
-      "size": 226
+      "sha256": "ef111cbe43614ce1db98b94ebd1259f2291b701daddbd3718c3848cd3a4701b0",
+      "size": 234
     },
     "scripts/bellforge-backend.service": {
       "sha256": "f93a53b7b6a88cfd25a8651f9f989d56df2fcf4c89a15fa96e8d73fcdadc5b7c",
@@ -187,8 +187,8 @@
       "size": 3317
     },
     "scripts/convert_ppk_to_openssh.ps1": {
-      "sha256": "f0972e2d207415fa33155c12217cd1043e66f4581d40c49ff54c24ae80900de2",
-      "size": 3289
+      "sha256": "75b7daba7ca48d6171cb6d36624074ed1b53f341a819525eb7c7967ff0efeb5e",
+      "size": 3392
     },
     "scripts/deploy_display_fixes.sh": {
       "sha256": "a7fac3e2e90c41b2b9fd832f210071a8a587d0d54aa29474926a99d5be1822d8",
@@ -215,8 +215,8 @@
       "size": 3359
     },
     "scripts/pi_remote_triage.ps1": {
-      "sha256": "8eb46b431d7b6e583f02db2b39656c6425ece23baa540070c7e2225d7a9bc244",
-      "size": 3162
+      "sha256": "bc395dda308326f6b8ea8a254045d0c197746da1374a217428c409a3ab16bb50",
+      "size": 3245
     },
     "scripts/post_boot_capture.sh": {
       "sha256": "114381978df6a376d15d6e74771426378a243d7140dd2e319dcde29c3cdff695",

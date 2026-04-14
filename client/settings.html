@@ -10,7 +10,10 @@
       --bg-b: #d7e6ef;
       --surface: #fffdfa;
       --surface-2: color-mix(in srgb, var(--surface) 92%, #eef3f8);
+      --surface-shade-3: color-mix(in srgb, var(--surface) 84%, #e7edf3);
+      --surface-shade-2-shadow: rgba(10, 24, 37, 0.06);
       --line: #d7ccc0;
+      --stroke-default: var(--line);
       --text: #1d2730;
       --muted: #5c6974;
       --good: #197a38;
@@ -20,6 +23,7 @@
       --dcs-font-scale: 1;
       --dcs-ui-scale: 1;
       --dcs-card-radius: 14px;
+      --radius-card: var(--dcs-card-radius);
       --dcs-shadow-intensity: 1;
       /* DSC Motion Tokens */
       --motion-duration: 220ms;
@@ -181,8 +185,8 @@
     }
     .card {
       background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--dcs-card-radius);
+      border: 1px solid var(--stroke-default);
+      border-radius: var(--radius-card);
       box-shadow: 0 calc(10px * var(--dcs-shadow-intensity)) calc(20px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.08);
       padding: calc(14px * var(--dcs-ui-scale));
       min-height: var(--card-min-height, 200px);
@@ -200,6 +204,12 @@
     .card.is-collapsed {
       --card-min-height: var(--dcs-space-6);
       align-self: start;
+      min-height: var(--dcs-space-6);
+      height: var(--dcs-space-6);
+      overflow: hidden;
+      background: var(--surface-shade-3);
+      border-color: var(--stroke-default);
+      box-shadow: 0 calc(6px * var(--dcs-shadow-intensity)) calc(12px * var(--dcs-shadow-intensity)) var(--surface-shade-2-shadow);
     }
     .card.is-collapsed .card-content {
       max-height: 0;
@@ -220,9 +230,6 @@
       transform: translateY(-1px);
       box-shadow: 0 calc(14px * var(--dcs-shadow-intensity)) calc(30px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.14);
     }
-    .card.is-hidden {
-      display: none;
-    }
     .card-titlebar {
       display: flex;
       justify-content: space-between;
@@ -235,6 +242,13 @@
     }
     .card-titlebar:hover {
       opacity: 0.85;
+    }
+    .card-titlegroup {
+      display: flex;
+      align-items: baseline;
+      gap: var(--dcs-space-2);
+      min-width: 0;
+      flex: 1;
     }
     .card-tools {
       position: relative;
@@ -259,34 +273,23 @@
       background: #e8ecf0;
       color: #1a2a38;
     }
+    .card-helper-text {
+      display: none;
+      font-size: 0.74rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .card.is-collapsed .card-helper-text {
+      display: inline-flex;
+    }
     .card h2 {
       margin: 0 0 10px;
       font-size: 1.1rem;
     }
     .card.is-collapsed h2 {
       margin: 0;
-    }
-    .hidden-card-dock {
-      margin: 0 0 12px;
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px dashed #b9c7d3;
-      background: rgba(255, 255, 255, 0.65);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      color: #3b4d5c;
-      font-size: 0.84rem;
-    }
-    .hidden-card-pill {
-      border: 1px solid #b3c2cf;
-      background: #f7fafc;
-      color: #2a3f50;
-      border-radius: 999px;
-      padding: 4px 9px;
-      font-size: 0.78rem;
-      cursor: pointer;
     }
     .card h2 {
       margin: 0 0 10px;
@@ -411,19 +414,42 @@
       gap: var(--dcs-space-2);
       flex-wrap: wrap;
     }
+    .status-preview-card {
+      min-height: var(--dcs-space-6);
+      transition: transform var(--motion-expand-duration) var(--motion-expand-easing),
+                  box-shadow var(--motion-expand-duration) var(--motion-expand-easing),
+                  grid-column var(--motion-reflow-duration) var(--motion-reflow-easing);
+    }
+    .status-preview-card.is-collapsed {
+      min-height: var(--dcs-space-6);
+    }
+    .status-preview-card.is-preview-expanded {
+      grid-column: 1 / -1;
+      z-index: 20;
+      transform: translateY(-2px);
+      box-shadow: 0 calc(16px * var(--dcs-shadow-intensity)) calc(36px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.16);
+    }
     .status-preview-shell {
       position: relative;
       border: 1px solid var(--line);
       border-radius: calc(var(--dcs-card-radius) * 0.8);
       overflow: hidden;
       background: color-mix(in srgb, var(--surface) 90%, #f8fbff);
-      min-height: 320px;
+      min-height: 0;
+      height: 420px;
+      transition: height var(--motion-expand-duration) var(--motion-expand-easing),
+                  min-height var(--motion-expand-duration) var(--motion-expand-easing);
+    }
+    .status-preview-card.is-preview-expanded .status-preview-shell {
+      min-height: min(72vh, 860px);
+      height: min(72vh, 860px);
     }
     .status-preview-frame {
-      width: 100%;
-      height: 420px;
+      width: 133.333%;
+      height: 133.333%;
       border: 0;
       background: #ffffff;
+      transform: scale(0.75);
       transform-origin: top left;
     }
     .status-preview-note {
@@ -454,6 +480,13 @@
       .grid {
         grid-template-columns: 1fr;
       }
+      .status-preview-card.is-preview-expanded {
+        grid-column: auto;
+      }
+      .status-preview-card.is-preview-expanded .status-preview-shell {
+        min-height: 68vh;
+        height: 68vh;
+      }
       .logs {
         grid-column: auto;
       }
@@ -482,8 +515,6 @@
         <span id="lastRefreshed">Auto-refresh every 5 seconds</span>
       </div>
     </section>
-
-    <section id="settingsHiddenCardDock" class="hidden-card-dock" hidden></section>
 
     <section id="settingsCardGrid" class="grid">
       <article class="card" data-fibo-card data-card-key="network" data-card-title="Network Settings">
@@ -641,10 +672,11 @@
                 </div>
               </div>
             </article>
-            <article class="dcs-preview-card">
+            <article id="designStatusPreviewCard" class="dcs-preview-card status-preview-card is-collapsed">
               <div class="dcs-preview-card__header">
                 <h3 class="dcs-preview-card__title">Status Page Preview</h3>
                 <div class="status-preview-controls">
+                  <button id="designStatusPreviewToggle" class="secondary dcs-preview-toggle" type="button" aria-expanded="false">Expand Preview</button>
                   <button id="designStatusAutoArrange" class="secondary dcs-preview-toggle" type="button">Auto Arrange</button>
                   <button id="designStatusReloadMirror" class="secondary dcs-preview-toggle" type="button">Reload Mirror</button>
                 </div>
@@ -654,7 +686,7 @@
                 <div class="status-preview-shell">
                   <iframe id="designStatusMirror" class="status-preview-frame" title="BellForge Status Page Live Mirror" loading="lazy"></iframe>
                 </div>
-                <p id="designStatusMirrorNote" class="status-preview-note">Mirror idle.</p>
+                <p id="designStatusMirrorNote" class="status-preview-note">Preview collapsed. Expand to load the live status mirror.</p>
               </div>
             </article>
           </div>
@@ -753,6 +785,8 @@
       designPreviewToggle: document.getElementById("designPreviewToggle"),
       designPreviewTitle: document.getElementById("designPreviewTitle"),
       designPreviewBody: document.getElementById("designPreviewBody"),
+      designStatusPreviewCard: document.getElementById("designStatusPreviewCard"),
+      designStatusPreviewToggle: document.getElementById("designStatusPreviewToggle"),
       designStatusMirror: document.getElementById("designStatusMirror"),
       designStatusMirrorNote: document.getElementById("designStatusMirrorNote"),
       designStatusAutoArrange: document.getElementById("designStatusAutoArrange"),
@@ -779,6 +813,8 @@
     let lastLogPayload = null;
     let refreshPromise = null;
     let statusMirrorMessageBound = false;
+    let statusMirrorLoaded = false;
+    let updaterAutoRecoveryAttempted = false;
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
@@ -787,12 +823,10 @@
     function createFibonacciAdaptiveLayout(options) {
       const container = options.container;
       const cardSelector = options.cardSelector;
-      const dock = options.hiddenDock;
       const storageKey = options.storageKey;
       const rowUnit = options.rowUnit || 8;
       const collapsedHeight = options.collapsedHeight || 56;
-      
-      // Debug logger
+
       const logger = {
         enabled: localStorage.getItem("bellforge.debug.fibo") === "true",
         log(msg, data) {
@@ -807,18 +841,21 @@
       }
 
       container.classList.add("fibo-adaptive-grid");
-  container.style.setProperty("--fibo-row-unit", `${rowUnit}px`);
+      container.style.setProperty("--fibo-row-unit", `${rowUnit}px`);
 
       const cards = Array.from(container.querySelectorAll(cardSelector));
       const state = JSON.parse(localStorage.getItem(storageKey) || "{}");
       let frameToken = 0;
-  const layoutCache = { columns: 0, rows: [], weights: {}, spans: {}, heights: {} };
-      const resizeObserver = new ResizeObserver(() => scheduleRecompute());
+      const layoutCache = { columns: 0, rows: [], weights: {}, spans: {}, heights: {} };
+      let suppressInternalMutations = false;
+      let internalMutationResetTimer = 0;
 
       function flushCaches() {
         layoutCache.columns = 0;
+        layoutCache.rows = [];
         layoutCache.weights = {};
         layoutCache.spans = {};
+        layoutCache.heights = {};
       }
 
       function columnsFor(width) {
@@ -828,8 +865,9 @@
       }
 
       function calculateContentWeight(card) {
-        const collapsed = card.classList.contains("is-collapsed");
-        if (collapsed) return 1;
+        if (card.classList.contains("is-collapsed")) {
+          return 1;
+        }
 
         let weight = 1;
         const contentEl = card.querySelector(".card-content") || card;
@@ -838,16 +876,14 @@
         const multilineText = (contentEl.textContent.match(/\n/g) || []).length;
 
         if (svg || canvas) {
-          weight = 5; // Graphs/charts
+          weight = 5;
         } else if (multilineText > 3) {
-          weight = 3; // Multi-line content
+          weight = 3;
         } else if (contentEl.textContent.trim().length === 0) {
-          weight = 0; // Empty
-        } else {
-          weight = 1;
+          weight = 0;
         }
 
-        logger.log("Card weight calculated", { card: keyFor(card), weight });
+        logger.log("card footprint calculations", { card: keyFor(card), weight, mode: "weight" });
         return weight;
       }
 
@@ -860,7 +896,7 @@
         const computed = getComputedStyle(card);
         const verticalPadding = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
         const total = Math.ceil(titlebarHeight + contentHeight + verticalPadding);
-        logger.log("Card height calculated", { card: keyFor(card), height: total });
+        logger.log("card footprint calculations", { card: keyFor(card), height: total, mode: "height" });
         return total;
       }
 
@@ -925,111 +961,167 @@
         return generated;
       }
 
+      function normalizeCardState(card, cardState = {}) {
+        const key = keyFor(card);
+        const migratedHidden = cardState.hidden === true;
+        if (migratedHidden) {
+          logger.log("hidden -> collapsed transitions", { card: key, previous: cardState });
+        }
+        return {
+          collapsed: Boolean(cardState.collapsed || migratedHidden),
+          hidden: false,
+          order: Number.isFinite(cardState.order) ? Number(cardState.order) : Number.MAX_SAFE_INTEGER,
+        };
+      }
+
       function readCardState(card) {
-        return state[keyFor(card)] || { collapsed: false, hidden: false };
+        const key = keyFor(card);
+        const normalized = normalizeCardState(card, state[key] || {});
+        state[key] = normalized;
+        return normalized;
       }
 
       function writeCardState(card, nextState) {
-        state[keyFor(card)] = { ...readCardState(card), ...nextState };
+        const key = keyFor(card);
+        state[key] = normalizeCardState(card, { ...readCardState(card), ...nextState });
         localStorage.setItem(storageKey, JSON.stringify(state));
-        logger.log(`Card state updated: ${keyFor(card)}`, nextState);
+        logger.log("preview-to-status sync events", { card: key, nextState: state[key] });
+      }
+
+      function updateCardChrome(card) {
+        const cardState = readCardState(card);
+        const helper = card.querySelector(".card-helper-text");
+        if (helper) {
+          helper.hidden = !cardState.collapsed;
+          helper.textContent = "hidden";
+        }
+        const toggle = card.querySelector('[data-card-action="collapse-toggle"]');
+        if (toggle) {
+          toggle.textContent = cardState.collapsed ? "Expand" : "Collapse";
+          toggle.setAttribute("aria-expanded", cardState.collapsed ? "false" : "true");
+        }
       }
 
       function applyState(card) {
         const cardState = readCardState(card);
         card.classList.toggle("is-collapsed", !!cardState.collapsed);
-        card.classList.toggle("is-hidden", !!cardState.hidden);
+        card.classList.remove("is-hidden");
+        updateCardChrome(card);
       }
 
-      function renderDock() {
-        if (!dock) return;
-        const hiddenCards = cards.filter((card) => readCardState(card).hidden);
-        if (hiddenCards.length === 0) {
-          dock.hidden = true;
-          dock.textContent = "";
-          return;
-        }
+      function toggleCollapsed(card, reason = "toggle-collapse") {
+        const current = readCardState(card);
+        writeCardState(card, { collapsed: !current.collapsed, hidden: false });
+        applyState(card);
+        logger.log("preview-to-status sync events", { reason, card: keyFor(card), collapsed: !current.collapsed });
+        scheduleRecompute();
+      }
 
-        dock.hidden = false;
-        dock.innerHTML = "<strong>Hidden cards:</strong>";
-        for (const card of hiddenCards) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "hidden-card-pill";
-          button.textContent = `Show ${titleFor(card)}`;
-          button.addEventListener("click", () => {
-            writeCardState(card, { hidden: false });
-            applyState(card);
-            renderDock();
-            scheduleRecompute();
-          });
-          dock.appendChild(button);
+      function appendHelperText(titleGroup) {
+        const helper = document.createElement("span");
+        helper.className = "card-helper-text";
+        helper.hidden = true;
+        helper.textContent = "hidden";
+        titleGroup.appendChild(helper);
+        return helper;
+      }
+
+      function createToolButton() {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "card-tool";
+        button.dataset.cardAction = "collapse-toggle";
+        button.textContent = "Collapse";
+        return button;
+      }
+
+      function bindToolButton(button, card) {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          toggleCollapsed(card, "collapse-toggle");
+        });
+      }
+
+      function beginInternalMutationWindow() {
+        suppressInternalMutations = true;
+        if (internalMutationResetTimer) {
+          clearTimeout(internalMutationResetTimer);
         }
+      }
+
+      function endInternalMutationWindow() {
+        internalMutationResetTimer = window.setTimeout(() => {
+          suppressInternalMutations = false;
+          internalMutationResetTimer = 0;
+        }, 0);
       }
 
       function recompute() {
         frameToken = 0;
-        flushCaches();
-        logger.log("Recompute started");
+        beginInternalMutationWindow();
+        try {
+          flushCaches();
+          logger.log("preview-to-status sync events", { reason: "recompute-start" });
 
-        for (const card of cards) applyState(card);
+          for (const card of cards) applyState(card);
 
-        const visibleCards = cards.filter((card) => !card.classList.contains("is-hidden"));
-        const config = columnsFor(container.clientWidth || window.innerWidth);
-        layoutCache.columns = config.tracks;
-        container.style.setProperty("--fibo-columns", String(config.tracks));
+          const orderedCards = cards.slice();
+          const config = columnsFor(container.clientWidth || window.innerWidth);
+          layoutCache.columns = config.tracks;
+          container.style.setProperty("--fibo-columns", String(config.tracks));
 
-        if (visibleCards.length === 0) {
-          logger.log("No visible cards, rendering dock only");
-          renderDock();
-          return;
-        }
+          if (orderedCards.length === 0) {
+            return;
+          }
 
-        const weightedCards = visibleCards
-          .map((card, index) => {
-            const weight = calculateContentWeight(card);
-            const height = measuredCardHeight(card);
-            layoutCache.weights[keyFor(card)] = weight;
-            layoutCache.heights[keyFor(card)] = height;
-            return { card, index, weight, height };
-          })
-          .sort((left, right) => {
-            if (right.weight !== left.weight) return right.weight - left.weight;
-            if (right.height !== left.height) return right.height - left.height;
-            return left.index - right.index;
-          });
-
-        const rows = partitionRows(weightedCards.length, config.maxPerRow);
-        layoutCache.rows = rows.slice();
-        logger.log("Grid row partition computed", { rows, tracks: config.tracks });
-
-        let cursor = 0;
-        rows.forEach((rowSize, rowIndex) => {
-          const rowCards = weightedCards.slice(cursor, cursor + rowSize);
-          const ratios = normalizeRatios(widthRatios(rowSize, config.tracks), config.tracks);
-          rowCards.forEach((entry, itemIndex) => {
-            const rowSpan = Math.max(1, Math.ceil(entry.height / rowUnit));
-            entry.card.style.setProperty("--fibo-col-span", String(ratios[itemIndex] || 1));
-            entry.card.style.setProperty("--fibo-row-span", String(rowSpan));
-            entry.card.style.setProperty("--fibo-order", String(cursor + itemIndex));
-            layoutCache.spans[keyFor(entry.card)] = {
-              col: ratios[itemIndex] || 1,
-              row: rowSpan,
-              order: cursor + itemIndex,
-            };
-            logger.log("Fibonacci slot assigned", {
-              card: keyFor(entry.card),
-              rowIndex,
-              colSpan: ratios[itemIndex] || 1,
-              rowSpan,
-              order: cursor + itemIndex,
+          const weightedCards = orderedCards
+            .map((card, index) => {
+              const weight = calculateContentWeight(card);
+              const height = measuredCardHeight(card);
+              layoutCache.weights[keyFor(card)] = weight;
+              layoutCache.heights[keyFor(card)] = height;
+              return { card, index, weight, height };
+            })
+            .sort((left, right) => {
+              if (right.weight !== left.weight) return right.weight - left.weight;
+              if (right.height !== left.height) return right.height - left.height;
+              return left.index - right.index;
             });
-          });
-          cursor += rowSize;
-        });
 
-        logger.log("Grid reflow complete", { tracks: config.tracks, visibleCount: visibleCards.length });
-        renderDock();
+          const rows = partitionRows(weightedCards.length, config.maxPerRow);
+          layoutCache.rows = rows.slice();
+          logger.log("Grid row partition computed", { rows, tracks: config.tracks });
+
+          let cursor = 0;
+          rows.forEach((rowSize, rowIndex) => {
+            const rowCards = weightedCards.slice(cursor, cursor + rowSize);
+            const ratios = normalizeRatios(widthRatios(rowSize, config.tracks), config.tracks);
+            rowCards.forEach((entry, itemIndex) => {
+              const rowSpan = Math.max(1, Math.ceil(entry.height / rowUnit));
+              entry.card.style.setProperty("--fibo-col-span", String(ratios[itemIndex] || 1));
+              entry.card.style.setProperty("--fibo-row-span", String(rowSpan));
+              entry.card.style.setProperty("--fibo-order", String(cursor + itemIndex));
+              layoutCache.spans[keyFor(entry.card)] = {
+                col: ratios[itemIndex] || 1,
+                row: rowSpan,
+                order: cursor + itemIndex,
+              };
+              logger.log("Fibonacci slot assignments", {
+                card: keyFor(entry.card),
+                rowIndex,
+                colSpan: ratios[itemIndex] || 1,
+                rowSpan,
+                order: cursor + itemIndex,
+              });
+            });
+            cursor += rowSize;
+          });
+
+          logger.log("preview-to-status sync events", { reason: "reflow-complete", tracks: config.tracks, cardCount: orderedCards.length });
+        } finally {
+          endInternalMutationWindow();
+        }
       }
 
       function scheduleRecompute() {
@@ -1043,7 +1135,6 @@
         const heading = card.querySelector("h2, h3");
         if (!heading) return;
 
-        // Wrap existing content except heading in .card-content
         if (!card.querySelector(".card-content")) {
           const content = document.createElement("div");
           content.className = "card-content";
@@ -1053,67 +1144,40 @@
           card.appendChild(content);
         }
 
-        // Create titlebar with controls
         const titlebar = document.createElement("div");
         titlebar.className = "card-titlebar";
 
         const titleWrapper = document.createElement("div");
-        titleWrapper.style.flex = "1";
+        titleWrapper.className = "card-titlegroup";
         heading.remove();
         titleWrapper.appendChild(heading);
+        appendHelperText(titleWrapper);
 
         const tools = document.createElement("div");
         tools.className = "card-tools";
 
-        const hideButton = document.createElement("button");
-        hideButton.type = "button";
-        hideButton.className = "card-tool";
-        hideButton.textContent = "Hide";
+        const collapseButton = createToolButton();
+        bindToolButton(collapseButton, card);
 
-        hideButton.addEventListener("click", (e) => {
-          e.stopPropagation();
-          writeCardState(card, { hidden: true });
-          applyState(card);
-          renderDock();
-          logger.log("Card hidden", { card: keyFor(card) });
-          scheduleRecompute();
-        });
-
-        tools.appendChild(hideButton);
+        tools.appendChild(collapseButton);
         titlebar.appendChild(titleWrapper);
         titlebar.appendChild(tools);
-
-        // Insert titlebar at the beginning
         card.insertBefore(titlebar, card.firstChild);
 
-        // Click titlebar to toggle collapsed state
         titlebar.addEventListener("click", () => {
-          const current = readCardState(card);
-          writeCardState(card, { collapsed: !current.collapsed });
-          applyState(card);
-          logger.log("Card collapse toggled", { card: keyFor(card), collapsed: !current.collapsed });
-          scheduleRecompute();
+          toggleCollapsed(card, "titlebar-toggle");
         });
       }
 
       for (const card of cards) {
         injectControls(card);
         applyState(card);
-        resizeObserver.observe(card);
       }
-
-      const mutationObserver = new MutationObserver(() => scheduleRecompute());
-      mutationObserver.observe(container, {
-        subtree: true,
-        childList: true,
-        attributes: true,
-        attributeFilter: ["class", "style", "open", "hidden"],
-      });
 
       window.addEventListener("resize", scheduleRecompute);
       scheduleRecompute();
 
-      return { 
+      return {
         recompute: scheduleRecompute,
         getLayoutCache() { return { ...layoutCache }; },
         flushLayoutCache() { flushCaches(); scheduleRecompute(); },
@@ -1151,13 +1215,14 @@
       if (elements.designStatusMirror?.contentWindow) {
         elements.designStatusMirror.contentWindow.postMessage({ type: "bellforge-status-layout-command", command }, window.location.origin);
       }
-      console.log("[Fibonacci Layout] preview-to-status sync event", command);
+      console.log("[Fibonacci Layout] preview-to-status sync events", command);
     }
 
     function initStatusMirror() {
       if (!elements.designStatusMirror) {
         return;
       }
+      statusMirrorLoaded = true;
       const mirrorUrl = new URL("/status", window.location.origin);
       mirrorUrl.searchParams.set("view", "display");
       mirrorUrl.searchParams.set("mirror", "1");
@@ -1178,9 +1243,32 @@
           elements.designStatusMirrorNote.textContent = `Mirror synced with ${size} cards. Last update ${new Date().toLocaleTimeString()}.`;
           console.log("[Fibonacci Layout] card registry load", snapshot.registry || []);
           console.log("[Fibonacci Layout] card state load", snapshot.state || {});
+          console.log("[Fibonacci Layout] preview-to-status sync events", { reason: snapshot.reason || "snapshot", size });
         });
         statusMirrorMessageBound = true;
       }
+    }
+
+    function setStatusPreviewExpanded(expanded) {
+      const previewCard = elements.designStatusPreviewCard;
+      if (!previewCard) {
+        return;
+      }
+      previewCard.classList.toggle("is-collapsed", !expanded);
+      previewCard.classList.toggle("is-preview-expanded", expanded);
+      elements.designStatusPreviewToggle.textContent = expanded ? "Collapse Preview" : "Expand Preview";
+      elements.designStatusPreviewToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+      if (expanded) {
+        if (!statusMirrorLoaded) {
+          initStatusMirror();
+        } else {
+          broadcastStatusLayoutCommand("sync-request", {});
+          elements.designStatusMirrorNote.textContent = "Live mirror active. Drag cards or collapse them here to update all status views.";
+        }
+      } else {
+        elements.designStatusMirrorNote.textContent = "Preview collapsed. Expand to load the live status mirror.";
+      }
+      console.log("[Fibonacci Layout] preview expansion/collapse", { expanded });
     }
 
     function renderDesignPreview(state) {
@@ -1350,6 +1438,20 @@
       elements.downloadProgress.textContent = `${progress.bytes_downloaded || 0} / ${progress.bytes_total || 0} bytes (${(progress.percent || 0).toFixed(2)}%)`;
       elements.lastUpdateAttempt.textContent = data.last_update_attempt || "Unavailable";
       elements.lastUpdateResult.textContent = data.last_update_result || "unknown";
+
+      if (data.staged_recovery && data.staged_recovery.attempted) {
+        elements.updaterCheckResult.textContent = data.staged_recovery.message || "Attempted staged update recovery.";
+      }
+
+      if (data.staged_update_pending && data.state_active !== true && !updaterAutoRecoveryAttempted) {
+        updaterAutoRecoveryAttempted = true;
+        elements.updaterCheckResult.textContent = "Staged update detected. Attempting updater recovery...";
+        window.setTimeout(() => {
+          checkUpdaterNow().catch(() => {
+            elements.updaterCheckResult.textContent = "Automatic staged-update recovery failed.";
+          });
+        }, 0);
+      }
     }
 
     async function checkUpdaterNow() {
@@ -1362,6 +1464,11 @@
         });
 
         if (result.check_accepted) {
+          if (result.service_restart && result.service_restart.ok) {
+            elements.updaterCheckResult.textContent = result.stage_message || "Restarted updater service to apply staged update.";
+          } else if (result.service_restart && !result.service_restart.ok) {
+            elements.updaterCheckResult.textContent = result.stage_message || result.message || "Updater recovery restart failed; manual check sent.";
+          } else 
           if (result.stage_requested && result.stage_accepted) {
             elements.updaterCheckResult.textContent = result.stage_message || "Manual check accepted and background staging started.";
           } else {
@@ -1582,11 +1689,16 @@
       elements.designPreviewToggle.textContent = elements.designPreviewCard.classList.contains("is-collapsed") ? "Expand" : "Collapse";
       console.log("[Fibonacci Layout] preview card toggled", { collapsed: elements.designPreviewCard.classList.contains("is-collapsed") });
     });
+    elements.designStatusPreviewToggle.addEventListener("click", () => {
+      setStatusPreviewExpanded(elements.designStatusPreviewCard.classList.contains("is-collapsed"));
+    });
     elements.designStatusAutoArrange.addEventListener("click", () => {
+      setStatusPreviewExpanded(true);
       elements.designStatusMirrorNote.textContent = "Running Auto Arrange with real Fibonacci engine...";
       broadcastStatusLayoutCommand("auto-arrange", {});
     });
     elements.designStatusReloadMirror.addEventListener("click", () => {
+      setStatusPreviewExpanded(true);
       initStatusMirror();
       broadcastStatusLayoutCommand("sync-request", {});
     });
@@ -1610,18 +1722,9 @@
 
     syncDisplayPreferenceLabels();
     pushDesignControlsToForm(DESIGN_DEFAULTS);
-    initStatusMirror();
-    const settingsAdaptiveLayout = createFibonacciAdaptiveLayout({
-      container: document.getElementById("settingsCardGrid"),
-      cardSelector: "[data-fibo-card]",
-      hiddenDock: document.getElementById("settingsHiddenCardDock"),
-      storageKey: "bellforge.settings.fibo-cards.v1",
-      rowUnit: 8,
-      collapsedHeight: 56,
-    });
+    setStatusPreviewExpanded(false);
     refreshAll();
     setInterval(refreshAll, REFRESH_MS);
-    setInterval(() => settingsAdaptiveLayout.recompute(), REFRESH_MS);
   </script>
 </body>
 </html>

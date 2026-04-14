@@ -203,7 +203,7 @@ class UpdaterStatusTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(payload["staged_update_pending"])
         self.assertEqual(payload["staged_release_version"], "1.0.3")
 
-    async def test_manual_check_rejects_when_update_already_staged(self) -> None:
+    async def test_manual_check_restarts_updater_when_update_already_staged(self) -> None:
         (self.project_root / ".staging" / "pending_update.json").write_text(
             json.dumps(
                 {
@@ -215,23 +215,31 @@ class UpdaterStatusTests(unittest.IsolatedAsyncioTestCase):
             encoding="utf-8",
         )
 
-        with patch.object(
-            updater_status,
-            "_remote_source_status",
-            return_value={
-                "update_base_url": "https://example.invalid/bellforge",
-                "version_healthy": True,
-                "manifest_healthy": True,
-                "healthy": True,
-                "latest_version": "1.0.3",
-                "manifest_version": "1.0.3",
-                "last_error": None,
-            },
+        with (
+            patch.object(
+                updater_status,
+                "_remote_source_status",
+                return_value={
+                    "update_base_url": "https://example.invalid/bellforge",
+                    "version_healthy": True,
+                    "manifest_healthy": True,
+                    "healthy": True,
+                    "latest_version": "1.0.3",
+                    "manifest_version": "1.0.3",
+                    "last_error": None,
+                },
+            ),
+            patch.object(
+                updater_status,
+                "_restart_service",
+                return_value={"unit": updater_status.UPDATER_SERVICE, "ok": True, "returncode": 0, "stdout": "", "stderr": ""},
+            ),
         ):
             payload = await updater_status.trigger_update_check_now(self.project_root)
 
-        self.assertFalse(payload["check_accepted"])
-        self.assertEqual(payload["stage_reason"], "already-staged")
+        self.assertTrue(payload["check_accepted"])
+        self.assertTrue(payload["stage_accepted"])
+        self.assertEqual(payload["stage_reason"], "apply-pending-on-restart")
 
     async def test_remote_source_status_busts_cache_for_metadata(self) -> None:
         requested_urls: list[str] = []

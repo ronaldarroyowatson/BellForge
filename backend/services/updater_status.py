@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +15,8 @@ import httpx
 
 UPDATER_SERVICE = "bellforge-updater.service"
 ACTIVE_STATES = {"checking", "update-available", "downloading", "staging", "applying", "reboot-pending"}
+_STAGED_RECOVERY_COOLDOWN_SECONDS = 60.0
+_LAST_STAGED_RECOVERY_ATTEMPT_AT = 0.0
 
 
 def _parse_semver(value: str | None) -> tuple[int, int, int]:
@@ -116,6 +120,34 @@ def _service_status(unit: str) -> dict[str, Any]:
     }
 
 
+async def _restart_service(unit: str) -> dict[str, Any]:
+    def _run() -> dict[str, Any]:
+        cmd = ["systemctl", "restart", unit]
+        try:
+            if hasattr(os, "geteuid") and os.geteuid() != 0:
+                cmd = ["sudo", *cmd]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            return {
+                "unit": unit,
+                "ok": result.returncode == 0,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+                "command": cmd,
+            }
+        except FileNotFoundError as exc:
+            return {
+                "unit": unit,
+                "ok": False,
+                "returncode": None,
+                "stdout": "",
+                "stderr": str(exc),
+                "command": cmd,
+            }
+
+    return await asyncio.to_thread(_run)
+
+
 async def _trigger_listener_status(port: int) -> dict[str, Any]:
     try:
         _reader, writer = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), timeout=1.0)
@@ -204,6 +236,46 @@ def _last_update_attempt(project_root: Path) -> str | None:
     return None
 
 
+async def _recover_staged_update_if_needed(state: dict[str, Any], service: dict[str, Any]) -> dict[str, Any] | None:
+    global _LAST_STAGED_RECOVERY_ATTEMPT_AT
+
+    if not bool(state.get("staged_update_pending", False)):
+        return None
+
+    updater_state = str(state.get("state") or "idle")
+    if updater_state in ACTIVE_STATES:
+        return None
+
+    now = time.monotonic()
+    if now - _LAST_STAGED_RECOVERY_ATTEMPT_AT < _STAGED_RECOVERY_COOLDOWN_SECONDS:
+        return {
+            "attempted": False,
+            "reason": "cooldown",
+            "ok": False,
+            "message": "Staged recovery is cooling down before another updater restart attempt.",
+        }
+
+    _LAST_STAGED_RECOVERY_ATTEMPT_AT = now
+    restart_result = await _restart_service(UPDATER_SERVICE)
+    staged_version = state.get("staged_release_version")
+    return {
+        "attempted": True,
+        "reason": "staged-pending-idle",
+        "ok": bool(restart_result.get("ok")),
+        "message": (
+            f"Restarted updater service to apply staged update {staged_version}."
+            if restart_result.get("ok") and staged_version
+            else "Restarted updater service to apply staged update."
+            if restart_result.get("ok")
+            else restart_result.get("stderr")
+            or restart_result.get("stdout")
+            or "Failed to restart updater service for staged recovery."
+        ),
+        "restart": restart_result,
+        "service_active": service.get("active"),
+    }
+
+
 async def get_updater_status(project_root: Path) -> dict[str, Any]:
     settings = _read_settings(project_root)
     current_version = _local_version(project_root)
@@ -213,6 +285,11 @@ async def get_updater_status(project_root: Path) -> dict[str, Any]:
     service = _service_status(UPDATER_SERVICE)
     trigger_port = int(settings.get("trigger_port", 8765))
     trigger_listener = await _trigger_listener_status(trigger_port)
+    staged_recovery = await _recover_staged_update_if_needed(state, service)
+    if staged_recovery and staged_recovery.get("attempted"):
+        state = _staging_state(project_root)
+        service = _service_status(UPDATER_SERVICE)
+        trigger_listener = await _trigger_listener_status(trigger_port)
 
     last_result_any = state.get("last_result")
     last_result_obj: dict[str, Any] = last_result_any if isinstance(last_result_any, dict) else {}
@@ -266,6 +343,7 @@ async def get_updater_status(project_root: Path) -> dict[str, Any]:
         "last_update_attempt": _last_update_attempt(project_root),
         "last_update_result": last_result_obj.get("result", "unknown"),
         "last_update_message": last_result_obj.get("message") or state.get("message") or "",
+        "staged_recovery": staged_recovery,
         "issues": issues,
     }
 
@@ -304,6 +382,7 @@ async def trigger_update_check_now(project_root: Path) -> dict[str, Any]:
         "stage_reason": "pending",
         "stage_message": "Manual update check has not been sent yet.",
         "remote_source": remote_source,
+        "service_restart": None,
     }
 
     if updater_state in ACTIVE_STATES and service.get("active") == "active" and trigger_listener.get("healthy"):
@@ -324,6 +403,29 @@ async def trigger_update_check_now(project_root: Path) -> dict[str, Any]:
             if staged_version
             else "Update staged; re-triggering check for any newer release."
         )
+
+        if updater_state not in ACTIVE_STATES:
+            restart_result = await _restart_service(UPDATER_SERVICE)
+            result["service_restart"] = restart_result
+            if restart_result.get("ok"):
+                result["ok"] = True
+                result["accepted"] = True
+                result["check_accepted"] = True
+                result["stage_accepted"] = True
+                result["stage_reason"] = "apply-pending-on-restart"
+                result["stage_message"] = (
+                    f"Staged update {staged_version} detected. Restarted updater service to apply it."
+                    if staged_version
+                    else "Staged update detected. Restarted updater service to apply it."
+                )
+                result["message"] = result["stage_message"]
+                return result
+            result["stage_reason"] = "restart-failed-rechecking"
+            result["stage_message"] = (
+                restart_result.get("stderr")
+                or restart_result.get("stdout")
+                or "Restarting updater service failed; falling back to trigger check."
+            )
 
     status_code, error_message = await _post_trigger_url(trigger_url)
     result["status_code"] = status_code

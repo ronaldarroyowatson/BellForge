@@ -755,6 +755,40 @@ class UpdateAgent:
             changed_files = self._changed_files(manifest_files)
             has_newer_version = parse_version(remote_version_text) > parse_version(local_version)
 
+            if changed_files and not has_newer_version:
+                if parse_version(remote_version_text) == parse_version(local_version):
+                    message = (
+                        f"Remote manifest differs for BellForge {remote_version_text}, "
+                        "but same-version drift updates are skipped to preserve the live install."
+                    )
+                    result = "same-version-drift-skipped"
+                else:
+                    message = (
+                        f"Remote BellForge {remote_version_text} is not newer than installed {local_version}; "
+                        "skipping manifest drift update."
+                    )
+                    result = "non-newer-version-drift-skipped"
+
+                self.log.warning(message)
+                self._write_state(
+                    "idle",
+                    message,
+                    staging_in_progress=False,
+                    reboot_pending=False,
+                    current_version=local_version,
+                    latest_version=remote_version_text,
+                    trigger_source=trigger_source,
+                    update_available=False,
+                )
+                self._write_last_result(
+                    result,
+                    message,
+                    current_version=local_version,
+                    latest_version=remote_version_text,
+                    trigger_source=trigger_source,
+                )
+                return
+
             if not changed_files and not has_newer_version:
                 self.log.info("No changes detected.")
                 self._write_state(
