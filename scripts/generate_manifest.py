@@ -31,11 +31,7 @@ DEPLOYABLE_DIRS: list[Path] = [
     ROOT / "client",
     ROOT / "updater",
     ROOT / "config",
-]
-
-# Individual files outside DEPLOYABLE_DIRS that are also deployed to the Pi.
-EXTRA_FILES: list[Path] = [
-    ROOT / "scripts" / "self_heal_root.sh",
+    ROOT / "scripts",
 ]
 
 # File extensions to skip (compiled artefacts, editor files, etc.)
@@ -92,18 +88,6 @@ def collect_files() -> dict[str, dict]:
                 "size":   len(canonical_bytes),
             }
             print(f"  {rel}")
-
-    for path in EXTRA_FILES:
-        if not path.is_file():
-            print(f"  WARNING: extra file not found, skipping: {path}")
-            continue
-        rel = path.relative_to(ROOT).as_posix()
-        canonical_bytes = canonical_file_bytes(path)
-        entries[rel] = {
-            "sha256": sha256_file(path),
-            "size":   len(canonical_bytes),
-        }
-        print(f"  {rel}")
 
     return entries
 

@@ -1,6 +1,6 @@
 {
   "version": "0.1.36",
-  "generated_at": "2026-04-14T16:08:21Z",
+  "generated_at": "2026-04-14T16:16:47Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -154,9 +154,101 @@
       "sha256": "c7ebc1eae307e02d45dc3e778b786d3339aa27c1dc6f712b7116fd4c5333ac24",
       "size": 226
     },
+    "scripts/bellforge-backend.service": {
+      "sha256": "f93a53b7b6a88cfd25a8651f9f989d56df2fcf4c89a15fa96e8d73fcdadc5b7c",
+      "size": 716
+    },
+    "scripts/bellforge-client.service": {
+      "sha256": "233e68c5d4f7fb9b64d1999b42794305fb0608d5ce421b0bbd393a1800e021b3",
+      "size": 750
+    },
+    "scripts/bellforge-file-server.service": {
+      "sha256": "457a9447cf8e45ae0dd991d2c850ff6515de2265b01009baa0a5d2e410396f22",
+      "size": 397
+    },
+    "scripts/bellforge-updater.service": {
+      "sha256": "8f71277a26b1c06b3327f7ae168e388ee19c82ea0036cb5e573b5076548d4042",
+      "size": 833
+    },
+    "scripts/bellforge.service": {
+      "sha256": "f643a9989b8fca56dcd2e56141f13634ffb496b37c7644567c1a3d4c2eedf3c4",
+      "size": 541
+    },
+    "scripts/bellforge_cli.py": {
+      "sha256": "0f2b9ee57fc77a36def91809398c4057a6273dcf76c915e0577e70d32d98d1db",
+      "size": 13945
+    },
+    "scripts/bootstrap.sh": {
+      "sha256": "c179ca196c899f61a7edd1b58da86f7e60b89ab0806432ec85166ed2e3d2f7c4",
+      "size": 10222
+    },
+    "scripts/bump_version.py": {
+      "sha256": "e46f5430b3c333ed504e085170b7a9ac16d9dcb1d56ee38573a5922494719508",
+      "size": 3317
+    },
+    "scripts/convert_ppk_to_openssh.ps1": {
+      "sha256": "75b7daba7ca48d6171cb6d36624074ed1b53f341a819525eb7c7967ff0efeb5e",
+      "size": 3392
+    },
+    "scripts/deploy_display_fixes.sh": {
+      "sha256": "a7fac3e2e90c41b2b9fd832f210071a8a587d0d54aa29474926a99d5be1822d8",
+      "size": 4412
+    },
+    "scripts/device_bootstrap_auth.py": {
+      "sha256": "1222678a60bbd37b4870cc7fde16fe45c5080c554f9bfc4ee78ff85372d6a987",
+      "size": 3185
+    },
+    "scripts/display_debug.py": {
+      "sha256": "a95ad96a747de96a1126a6d47c2c479df55e8e88c7a96f46884d3d45ba9ea4c5",
+      "size": 3356
+    },
+    "scripts/generate_manifest.py": {
+      "sha256": "40c977bb648843a5d85580f0db4c54296acadc0b17c6bac3de455bd7bdd3b045",
+      "size": 3694
+    },
+    "scripts/gpu_diagnostics.py": {
+      "sha256": "29c33ba2d65d358e92eaf74c99aa770cd5612041126cd7e0316522412504eefc",
+      "size": 13074
+    },
+    "scripts/install_service.sh": {
+      "sha256": "999dd3d0c7446c7d0aaa40918b1122a11a8adb640190f8b51e68a6f629cf40b3",
+      "size": 3359
+    },
+    "scripts/pi_remote_triage.ps1": {
+      "sha256": "bc395dda308326f6b8ea8a254045d0c197746da1374a217428c409a3ab16bb50",
+      "size": 3245
+    },
+    "scripts/post_boot_capture.sh": {
+      "sha256": "114381978df6a376d15d6e74771426378a243d7140dd2e319dcde29c3cdff695",
+      "size": 3443
+    },
+    "scripts/prepare_release.sh": {
+      "sha256": "346fdcd4f9dadc62c2d64ce5c3462f48f720ff1709dc7228b5819da5523a8d16",
+      "size": 4577
+    },
+    "scripts/privilege_doctor.py": {
+      "sha256": "6a4bf2660abc5fa5b925a8961fedc77236f02c21d4b5bf6fb43c0dba6bc56a33",
+      "size": 6818
+    },
+    "scripts/repair.sh": {
+      "sha256": "523322f9be1ec240d7a16e1bcdad09a7171c5678013ebf9aadce4e939e895722",
+      "size": 12430
+    },
+    "scripts/repair_display.sh": {
+      "sha256": "9f5994fe0873576f367c92c5a27490f761bb4f505d3241f260f37af7e003ef61",
+      "size": 6826
+    },
     "scripts/self_heal_root.sh": {
       "sha256": "5c77e1aefd1b5ba165021ee3700000f615db80fdaaf9384bdab2bc9b1d19b194",
       "size": 929
+    },
+    "scripts/start_kiosk.sh": {
+      "sha256": "5021cf5b7f9935daa9d4851ca7b7a3a31a1a4cb78f48d604a802b5414f809afb",
+      "size": 8878
+    },
+    "scripts/uninstall.sh": {
+      "sha256": "0802985d563e00d9dc7f1495320d203e3a2e59adbed11c1bcb7f2af785594708",
+      "size": 1932
     }
   }
 }
