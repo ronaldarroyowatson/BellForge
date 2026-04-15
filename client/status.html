@@ -886,6 +886,7 @@
       const storageKey = options.storageKey;
       const rowUnit = options.rowUnit || 8;
       const collapsedHeight = options.collapsedHeight || 56;
+      const collapsedHeightToken = options.collapsedHeightToken || "--bf-space-6";
 
       const logger = {
         enabled: localStorage.getItem("bellforge.debug.fibo") === "true",
@@ -927,6 +928,21 @@
         layoutCache.heights = {};
       }
 
+      function numericCssValue(value, fallback) {
+        const parsed = Number.parseFloat(String(value || "").trim());
+        return Number.isFinite(parsed) ? parsed : fallback;
+      }
+
+      function resolveCollapsedHeight(card) {
+        const localValue = card ? getComputedStyle(card).getPropertyValue(collapsedHeightToken).trim() : "";
+        const rootValue = getComputedStyle(document.documentElement).getPropertyValue(collapsedHeightToken).trim();
+        return Math.max(rowUnit, Math.round(numericCssValue(localValue || rootValue, collapsedHeight)));
+      }
+
+      function currentContainerWidth() {
+        return Math.max(0, Math.round(container.clientWidth || container.getBoundingClientRect().width || window.innerWidth || 0));
+      }
+
       function columnsFor(width) {
         if (isDisplayView) {
           if (width >= 860) return { tracks: 5, maxPerRow: 2 };
@@ -963,7 +979,7 @@
 
       function measuredCardHeight(card) {
         if (card.classList.contains("is-collapsed")) {
-          return collapsedHeight;
+          return resolveCollapsedHeight(card);
         }
         const titlebarHeight = card.querySelector(".card-titlebar")?.offsetHeight || 34;
         const contentHeight = card.querySelector(".card-content")?.scrollHeight || 0;
@@ -1084,6 +1100,7 @@
         const cardState = readCardState(card);
         card.classList.toggle("is-collapsed", !!cardState.collapsed);
         card.classList.remove("is-hidden");
+        card.style.setProperty("--fibo-collapsed-height", `${resolveCollapsedHeight(card)}px`);
         if (card.matches("details")) {
           card.open = !cardState.collapsed;
         }
@@ -1132,6 +1149,7 @@
         const current = readCardState(card);
         writeCardState(card, { collapsed: !current.collapsed, hidden: false }, reason);
         applyState(card);
+        logger.log("collapse/expand events", { reason, card: keyFor(card), collapsed: !current.collapsed });
         logger.log("preview-to-status sync events", { reason, card: keyFor(card), collapsed: !current.collapsed });
         scheduleRecompute();
       }
@@ -1213,7 +1231,7 @@
           for (const card of cards) applyState(card);
 
           const layoutCards = cards.slice();
-          const config = columnsFor(container.clientWidth || window.innerWidth);
+          const config = columnsFor(currentContainerWidth() || window.innerWidth);
           layoutCache.columns = config.tracks;
           container.style.setProperty("--fibo-columns", String(config.tracks));
 
@@ -1294,6 +1312,16 @@
         frameToken = requestAnimationFrame(recompute);
       }
 
+      function handleViewportReflow(reason) {
+        logger.log("window resize reflow", {
+          reason,
+          containerWidth: currentContainerWidth(),
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        });
+        scheduleRecompute();
+      }
+
       function attachDragHandlers(handle, card) {
         handle.setAttribute("draggable", "true");
         handle.addEventListener("dragstart", (event) => {
@@ -1349,6 +1377,7 @@
             setTimeout(() => {
               writeCardState(card, { collapsed: !card.open, hidden: false }, "toggle-collapse");
               applyState(card);
+              logger.log("collapse/expand events", { reason: "summary-toggle", card: keyFor(card), collapsed: !card.open });
               logger.log("preview-to-status sync events", { reason: "summary-toggle", card: keyFor(card), collapsed: !card.open });
               scheduleRecompute();
             }, 0);
@@ -1438,7 +1467,17 @@
         applyState(card);
       }
 
-      window.addEventListener("resize", scheduleRecompute);
+      window.addEventListener("resize", () => handleViewportReflow("window-resize"));
+      window.addEventListener("orientationchange", () => handleViewportReflow("orientation-change"));
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", () => handleViewportReflow("visual-viewport-resize"));
+      }
+      if (typeof ResizeObserver === "function") {
+        const resizeObserver = new ResizeObserver(() => {
+          handleViewportReflow("container-resize");
+        });
+        resizeObserver.observe(container);
+      }
       scheduleRecompute();
 
       return {
@@ -1639,6 +1678,7 @@
         diagnosticsRotationMs = Math.max(4000, Number(data.diagnostics_rotation_seconds || 8) * 1000);
         applyDesignControls(data.design_controls);
         scheduleDiagnosticsCarousel();
+        statusAdaptiveLayout.recompute();
       } catch (error) {
         // Leave the current carousel timing in place.
       }
@@ -1652,6 +1692,7 @@
         if (parsed && parsed.payload) {
           console.log("[Fibonacci Layout] token application events", parsed.payload);
           applyDesignControls(parsed.payload);
+          statusAdaptiveLayout.recompute();
         }
       } catch {
         // no-op
