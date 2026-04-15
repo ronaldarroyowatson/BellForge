@@ -18,6 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -29,6 +34,12 @@ jobs:
           pip install -r backend/requirements.txt
           pip install -r updater/requirements.txt
           pip install -r tests/requirements-auth.txt
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Run browser and structural layout gate
+        run: |
+          npm run test:layout
 
       - name: Run auth regression gate
         run: |

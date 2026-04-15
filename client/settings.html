@@ -199,7 +199,7 @@
       min-height: var(--card-min-height, 200px);
       position: relative;
       grid-column: var(--fibo-col-start, auto) / span var(--fibo-col-span, 1);
-      grid-row: span var(--fibo-row-span, 18);
+      grid-row: var(--fibo-row-start, auto) / span var(--fibo-row-span, 18);
       order: var(--fibo-order, 0);
       transition: transform var(--motion-duration) var(--motion-easing), 
                   box-shadow var(--motion-duration) var(--motion-easing), 
@@ -556,8 +556,11 @@
       .grid {
         grid-template-columns: 1fr;
       }
-      .logs {
-        grid-column: auto;
+      .grid.fibo-adaptive-grid {
+        grid-template-columns: repeat(var(--fibo-columns, 5), minmax(0, 1fr));
+      }
+      .grid.fibo-adaptive-grid .logs {
+        grid-column: var(--fibo-col-start, auto) / span var(--fibo-col-span, 1);
       }
       .head {
         flex-direction: column;
@@ -967,16 +970,7 @@
     }
 
     function parseResolutionFromText(value) {
-      const match = String(value || "").match(/(\d{3,5})\s*x\s*(\d{3,5})/i);
-      if (!match) {
-        return null;
-      }
-      const width = Number(match[1]);
-      const height = Number(match[2]);
-      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-        return null;
-      }
-      return { width, height };
+      return window.BellForgeFibonacciLayout.extractResolutionCandidatesFromText(value)[0] || null;
     }
 
     function resolveDisplayResolution(data = {}) {
@@ -985,16 +979,12 @@
       const hdmiCandidates = Array.isArray(data.hdmi_outputs)
         ? data.hdmi_outputs.flatMap((output) => [output.mode, output.current_mode, output.resolution])
         : [];
-      const candidates = [xrandrOutput, ...drmModes, ...hdmiCandidates];
-
-      for (const candidate of candidates) {
-        const parsed = parseResolutionFromText(candidate);
-        if (parsed) {
-          return parsed;
-        }
-      }
-
-      return { width: 1920, height: 1080 };
+      const candidates = [
+        ...window.BellForgeFibonacciLayout.extractResolutionCandidatesFromText(xrandrOutput),
+        ...drmModes.flatMap((mode) => window.BellForgeFibonacciLayout.extractResolutionCandidatesFromText(mode).map((candidate) => ({ ...candidate, preferred: true }))),
+        ...hdmiCandidates.flatMap((value) => window.BellForgeFibonacciLayout.extractResolutionCandidatesFromText(value)),
+      ];
+      return window.BellForgeFibonacciLayout.pickBestResolution(candidates, { width: 1920, height: 1080 });
     }
 
     function updateStatusMirrorViewport() {
@@ -1005,8 +995,8 @@
 
       const nativeWidth = Math.max(320, Number(statusMirrorViewport.nativeWidth) || 1920);
       const nativeHeight = Math.max(240, Number(statusMirrorViewport.nativeHeight) || 1080);
-      const availableWidth = Math.max(320, window.innerWidth - 64);
-      const availableHeight = Math.max(240, window.innerHeight - 180);
+      const availableWidth = Math.max(320, window.innerWidth - 32);
+      const availableHeight = Math.max(240, window.innerHeight - 96);
       const scale = Math.min(availableWidth / nativeWidth, availableHeight / nativeHeight, 1);
       const modalWidth = Math.max(320, Math.round(nativeWidth * scale));
       const modalHeight = Math.max(240, Math.round(nativeHeight * scale));
@@ -1488,6 +1478,25 @@
       rowUnit: 8,
       collapsedHeight: 56,
     });
+
+    window.__bellforgeSettingsLayout = {
+      autoArrange: () => settingsAdaptiveLayout.autoArrange(),
+      recompute: () => settingsAdaptiveLayout.recompute(),
+      resetState: () => settingsAdaptiveLayout.resetState("settings-debug-reset"),
+      getLayoutCache: () => settingsAdaptiveLayout.getLayoutCache(),
+      getSnapshot: () => settingsAdaptiveLayout.getSnapshot(),
+      getState: () => settingsAdaptiveLayout.getState(),
+      storageKey: SETTINGS_LAYOUT_STORAGE_KEY,
+    };
+
+    window.__bellforgeStatusPreview = {
+      open: () => setStatusPreviewExpanded(true),
+      close: () => setStatusPreviewExpanded(false),
+      sync: () => broadcastStatusLayoutCommand("sync-request", {}),
+      autoArrange: () => broadcastStatusLayoutCommand("auto-arrange", {}),
+      getResolution: () => ({ ...statusMirrorViewport }),
+      isOpen: () => Boolean(elements.designStatusPreviewModal && !elements.designStatusPreviewModal.hidden),
+    };
 
     elements.networkForm.addEventListener("submit", async (event) => {
       event.preventDefault();

@@ -414,7 +414,7 @@
     .wrap.fibo-adaptive-grid > [data-fibo-card] {
       margin: 0;
       grid-column: var(--fibo-col-start, auto) / span var(--fibo-col-span, 1);
-      grid-row: span var(--fibo-row-span, 18);
+      grid-row: var(--fibo-row-start, auto) / span var(--fibo-row-span, 18);
       order: var(--fibo-order, 0);
       position: relative;
       transition: transform var(--motion-duration) var(--motion-easing), 
@@ -530,8 +530,8 @@
       gap: 12px;
     }
     body.display-view .wrap.fibo-adaptive-grid > [data-fibo-card] {
-      grid-row: auto !important;
-      grid-column: span var(--fibo-col-span, 1) !important;
+      grid-row: var(--fibo-row-start, auto) / span var(--fibo-row-span, 18) !important;
+      grid-column: var(--fibo-col-start, auto) / span var(--fibo-col-span, 1) !important;
       margin-bottom: 0;
     }
     body.display-view .hero-main,
@@ -1136,6 +1136,20 @@
       rowUnit: 8,
       collapsedHeight: 56,
     });
+
+    window.__bellforgeStatusLayout = {
+      autoArrange: () => statusAdaptiveLayout.autoArrange(),
+      recompute: () => statusAdaptiveLayout.recompute(),
+      resetState: () => statusAdaptiveLayout.resetState("status-debug-reset"),
+      applyRemoteState: (remoteState, reason = "status-debug-apply") => statusAdaptiveLayout.applyRemoteState(remoteState, reason),
+      emitLayoutSnapshot: (reason = "status-debug-snapshot") => statusAdaptiveLayout.emitLayoutSnapshot(reason),
+      getLayoutCache: () => statusAdaptiveLayout.getLayoutCache(),
+      getSnapshot: () => statusAdaptiveLayout.getSnapshot(),
+      getState: () => statusAdaptiveLayout.getState(),
+      storageKey: STATUS_LAYOUT_STORAGE_KEY,
+      commandKey: STATUS_LAYOUT_COMMAND_KEY,
+      mode: isDisplayView ? "status-display" : "status",
+    };
 
     let lastCommandTimestamp = 0;
 

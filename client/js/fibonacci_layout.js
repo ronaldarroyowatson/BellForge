@@ -141,6 +141,108 @@
     return left.index - right.index;
   }
 
+  function extractResolutionCandidatesFromText(value) {
+    const text = String(value || "");
+    if (!text.trim()) {
+      return [];
+    }
+
+    const candidates = [];
+    const currentMatch = text.match(/current\s+(\d{3,5})\s*x\s*(\d{3,5})/i);
+    if (currentMatch) {
+      candidates.push({
+        width: Number(currentMatch[1]),
+        height: Number(currentMatch[2]),
+        active: true,
+        preferred: true,
+        source: "xrandr-current",
+      });
+    }
+
+    const connectedMatch = text.match(/connected(?:\s+primary)?(?:[^\n]*?)(\d{3,5})x(\d{3,5})/i);
+    if (connectedMatch) {
+      candidates.push({
+        width: Number(connectedMatch[1]),
+        height: Number(connectedMatch[2]),
+        active: true,
+        preferred: false,
+        source: "xrandr-connected",
+      });
+    }
+
+    const modeRegex = /(\d{3,5})x(\d{3,5})(?:[^\n]*?)(\*?)(\+?)/g;
+    let match;
+    while ((match = modeRegex.exec(text)) !== null) {
+      candidates.push({
+        width: Number(match[1]),
+        height: Number(match[2]),
+        active: match[3] === "*",
+        preferred: match[4] === "+",
+        source: "mode-list",
+      });
+    }
+
+    return candidates.filter((candidate) => Number.isFinite(candidate.width) && Number.isFinite(candidate.height));
+  }
+
+  function pickBestResolution(candidates, fallback = { width: 1920, height: 1080 }) {
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      return { ...fallback };
+    }
+
+    const normalized = candidates
+      .map((candidate) => ({
+        width: Number(candidate.width),
+        height: Number(candidate.height),
+        active: candidate.active === true,
+        preferred: candidate.preferred === true,
+      }))
+      .filter((candidate) => Number.isFinite(candidate.width) && Number.isFinite(candidate.height) && candidate.width > 0 && candidate.height > 0);
+
+    if (normalized.length === 0) {
+      return { ...fallback };
+    }
+
+    normalized.sort((left, right) => {
+      if (Number(right.active) !== Number(left.active)) {
+        return Number(right.active) - Number(left.active);
+      }
+      if (Number(right.preferred) !== Number(left.preferred)) {
+        return Number(right.preferred) - Number(left.preferred);
+      }
+      const leftArea = left.width * left.height;
+      const rightArea = right.width * right.height;
+      if (rightArea !== leftArea) {
+        return rightArea - leftArea;
+      }
+      return right.width - left.width;
+    });
+
+    return {
+      width: normalized[0].width,
+      height: normalized[0].height,
+    };
+  }
+
+  function canPlaceItem(occupied, rowStart, colStart, rowSpan, colSpan) {
+    for (let row = rowStart; row < rowStart + rowSpan; row += 1) {
+      for (let col = colStart; col < colStart + colSpan; col += 1) {
+        if (occupied.has(`${row}:${col}`)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function markOccupiedCells(occupied, rowStart, colStart, rowSpan, colSpan) {
+    for (let row = rowStart; row < rowStart + rowSpan; row += 1) {
+      for (let col = colStart; col < colStart + colSpan; col += 1) {
+        occupied.add(`${row}:${col}`);
+      }
+    }
+  }
+
   function computeLayoutPlan(entries, options = {}) {
     const tracks = Math.max(1, Number(options.tracks) || 1);
     const maxPerRow = Math.max(1, Number(options.maxPerRow) || 1);
@@ -168,17 +270,20 @@
 
     const rows = buildRecursiveFibonacciRows(weightedEntries.length, maxPerRow);
     const items = [];
+    const occupied = new Set();
     let cursor = 0;
-    let rowStart = 1;
     rows.forEach((rowSize, rowIndex) => {
       const rowEntries = weightedEntries.slice(cursor, cursor + rowSize);
       const ratios = normalizeRatios(ratiosForRowSize(rowSize, tracks), tracks);
       let colStart = 1;
-      let maxRowSpan = 1;
       rowEntries.forEach((entry, itemIndex) => {
         const colSpan = ratios[itemIndex] || 1;
         const rowSpan = Math.max(1, Math.ceil(entry.height / rowUnit));
-        maxRowSpan = Math.max(maxRowSpan, rowSpan);
+        let rowStart = 1;
+        while (!canPlaceItem(occupied, rowStart, colStart, rowSpan, colSpan)) {
+          rowStart += 1;
+        }
+        markOccupiedCells(occupied, rowStart, colStart, rowSpan, colSpan);
         items.push({
           key: entry.key,
           order: cursor + itemIndex,
@@ -196,7 +301,6 @@
         colStart += colSpan;
       });
       cursor += rowSize;
-      rowStart += maxRowSpan;
     });
 
     return {
@@ -212,6 +316,7 @@
       key: item.key,
       order: item.order,
       rowIndex: item.rowIndex,
+      rowStart: item.rowStart,
       colStart: item.colStart,
       colSpan: item.colSpan,
       rowSpan: item.rowSpan,
@@ -476,9 +581,6 @@
       }
 
       const directHeading = card.querySelector(":scope > h1, :scope > h2, :scope > h3");
-      if (!directHeading) {
-        return;
-      }
       const titlebar = document.createElement("div");
       titlebar.className = "card-titlebar";
       const titleGroup = document.createElement("div");
@@ -507,7 +609,7 @@
       if (card.classList.contains("onboarding-qr-panel")) content.classList.add("onboarding-qr-panel");
       while (card.firstChild) {
         const node = card.firstChild;
-        if (node === directHeading) {
+        if (directHeading && node === directHeading) {
           card.removeChild(node);
           continue;
         }
@@ -620,17 +722,27 @@
         card.style.setProperty("--fibo-col-span", String(item.colSpan));
         card.style.setProperty("--fibo-row-span", String(item.rowSpan));
         card.style.setProperty("--fibo-col-start", String(item.colStart));
+        card.style.setProperty("--fibo-row-start", String(item.rowStart));
+        card.dataset.fiboOrder = String(item.order);
+        card.dataset.fiboRowIndex = String(item.rowIndex);
+        card.dataset.fiboRowStart = String(item.rowStart);
+        card.dataset.fiboColStart = String(item.colStart);
+        card.dataset.fiboColSpan = String(item.colSpan);
+        card.dataset.fiboRowSpan = String(item.rowSpan);
+        card.dataset.fiboWeight = String(item.weight);
         const key = ensureCardKey(card);
         layoutCache.spans[key] = {
           col: item.colSpan,
           row: item.rowSpan,
           order: item.order,
           start: item.colStart,
+          rowStart: item.rowStart,
         };
         state[key] = { ...readCardState(card), order: item.order };
         logger.log("Fibonacci slot assignments", {
           card: key,
           rowIndex: item.rowIndex,
+          rowStart: item.rowStart,
           colStart: item.colStart,
           colSpan: item.colSpan,
           rowSpan: item.rowSpan,
@@ -638,6 +750,7 @@
         });
       });
 
+      logger.log("card reflow events", snapshotFromPlan(plan));
       persistState(pendingAutoArrange ? "auto-arrange" : preferImportance ? "default-layout" : "reflow");
       emitLayoutSnapshot(pendingAutoArrange ? "auto-arrange" : preferImportance ? "default-layout" : "reflow");
       pendingAutoArrange = false;
@@ -663,6 +776,16 @@
     function autoArrange() {
       pendingAutoArrange = true;
       logger.log("auto-arrange events", { action: "command-received" });
+      scheduleRecompute();
+    }
+
+    function resetState(reason) {
+      cards.forEach((card) => {
+        state[ensureCardKey(card)] = normalizeCardState({});
+      });
+      pendingAutoArrange = true;
+      logger.log("default layout generation", { reason: reason || "reset-state", action: "state-reset" });
+      persistState(reason || "reset-state");
       scheduleRecompute();
     }
 
@@ -706,6 +829,7 @@
     return {
       recompute: scheduleRecompute,
       autoArrange,
+      resetState,
       applyRemoteState,
       emitLayoutSnapshot,
       getLayoutCache() {
@@ -725,6 +849,9 @@
           preferImportance: false,
         }));
       },
+      getState() {
+        return safeParseJson(JSON.stringify(state), {});
+      },
     };
   }
 
@@ -738,5 +865,7 @@
     snapshotFromPlan,
     createAdaptiveLayout,
     createDefaultTrackResolver,
+    extractResolutionCandidatesFromText,
+    pickBestResolution,
   };
 });

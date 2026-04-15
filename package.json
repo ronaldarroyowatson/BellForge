@@ -2,9 +2,13 @@
   "name": "bellforge",
   "private": true,
   "version": "0.0.0",
+  "devDependencies": {
+    "playwright": "^1.53.0"
+  },
   "scripts": {
     "test": "npm run test:layout && npm run test:auth",
-    "test:layout": "node --test tests/test_layout_engine.js",
+    "test:layout": "node --test tests/test_layout_engine.js && npm run test:layout:browser",
+    "test:layout:browser": "node --test tests/test_layout_browser.js",
     "test:auth": "node tests/run_auth_suite.mjs --coverage",
     "test:auth:parallel": "node tests/run_auth_suite.mjs --parallel"
   }

@@ -11,6 +11,10 @@ Use this workflow for production bugfix cycles and nightly closeout.
 ## 2. Verify the Fix
 
 1. Run targeted tests for changed areas.
+2. Run browser-driven layout verification for any layout, card, token, collapse/expand, drag-and-drop, or preview-modal change:
+   - `npm run test:layout`
+   - This starts or reuses the real backend on `http://127.0.0.1:8000`, opens the real Status and Settings pages in a headless browser, exercises collapse/expand, resize, drag-and-drop, and preview mirroring, then writes DOM geometry and console artifacts under `tests/logs/layout-browser/`.
+   - The browser verifier resets saved layout state and re-runs once after an automatic layout-state repair. If it still fails, do not accept the fix.
 2. Run auth integrity suite (mandatory for any auth/device/account change):
    - `python tests/run_auth_suite.py --coverage`
    - `npm run test:auth`
@@ -36,6 +40,7 @@ BellForge versioning is `X.Y.Z` (major.feature.bugfix). For bugfixes, increment 
 
 Auth gate policy:
 - Do not push bugfix version bumps unless auth suite passes locally.
+- Do not push layout/card/token/preview fixes unless `npm run test:layout` passes locally.
 - CI also enforces this in `.github/workflows/auth-tests.yml`, `.github/workflows/bugfix-smoke.yml`, and `.github/workflows/release.yml`.
 
 Recommended local hook setup:

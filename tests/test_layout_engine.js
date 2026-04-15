@@ -34,6 +34,14 @@ function computeSnapshot(cards, options) {
   return layout.snapshotFromPlan(plan);
 }
 
+function rectanglesOverlap(left, right) {
+  const leftBottom = left.rowStart + left.rowSpan - 1;
+  const rightBottom = right.rowStart + right.rowSpan - 1;
+  const leftRight = left.colStart + left.colSpan - 1;
+  const rightRight = right.colStart + right.colSpan - 1;
+  return !(leftBottom < right.rowStart || rightBottom < left.rowStart || leftRight < right.colStart || rightRight < left.colStart);
+}
+
 const settingsCards = [
   { key: 'display-pipeline', priority: 9, weight: 9, height: 360 },
   { key: 'network', priority: 8, weight: 8, height: 320 },
@@ -109,6 +117,31 @@ test('layout packs tightly with no unused track gaps inside a row', () => {
   }
 });
 
+test('expanding a card pushes cards below it out of the way and collapsing pulls them upward', () => {
+  const collapsed = computeSnapshot([
+    { key: 'hero', priority: 10, weight: 10, height: 56, collapsed: true },
+    { key: 'browser-links', priority: 8, weight: 8, height: 320 },
+    { key: 'onboarding-qr', priority: 7, weight: 7, height: 340 },
+    { key: 'stats', priority: 6, weight: 6, height: 240 },
+    { key: 'advanced', priority: 4, weight: 4, height: 300 },
+  ], { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
+
+  const expanded = computeSnapshot(statusCards, { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
+
+  const collapsedAdvanced = collapsed.find((item) => item.key === 'advanced');
+  const expandedAdvanced = expanded.find((item) => item.key === 'advanced');
+  assert.ok(expandedAdvanced.rowStart > collapsedAdvanced.rowStart);
+});
+
+test('no card overlaps another after autolayout packing', () => {
+  const snapshot = computeSnapshot(settingsCards, { tracks: 10, maxPerRow: 3, rowUnit: 8, preferImportance: true });
+  for (let index = 0; index < snapshot.length; index += 1) {
+    for (let compare = index + 1; compare < snapshot.length; compare += 1) {
+      assert.equal(rectanglesOverlap(snapshot[index], snapshot[compare]), false, `${snapshot[index].key} overlaps ${snapshot[compare].key}`);
+    }
+  }
+});
+
 test('responsive track resolver reflows across breakpoints', () => {
   const resolver = layout.createDefaultTrackResolver('settings');
   assert.deepEqual(resolver(500), { tracks: 1, maxPerRow: 1 });
@@ -153,6 +186,7 @@ test('preview modal is full-screen, uses the real status page, and syncs through
   assert.match(settingsHtml, /mirrorUrl\.searchParams\.set\("mirror", "1"\);/);
   assert.match(settingsHtml, /broadcastStatusLayoutCommand\("auto-arrange", \{\}\);/);
   assert.match(settingsHtml, /bellforge-status-layout-command/);
+  assert.doesNotMatch(settingsHtml, /Target display 320x240 \| Modal viewport 320x240/);
 });
 
 test('status card registry is complete and default priorities match the default readable layout', () => {
@@ -171,6 +205,18 @@ test('token changes and layout events trigger reflow hooks', () => {
   assert.match(settingsHtml, /settingsAdaptiveLayout\.recompute\(\);/);
   assert.match(statusHtml, /statusAdaptiveLayout\.recompute\(\);/);
   assert.match(sharedLayoutSource, /default layout generation/);
+  assert.match(sharedLayoutSource, /card reflow events/);
+});
+
+test('resolution selection prefers the active or largest real display mode over tiny fallback modes', () => {
+  const xrandrOutput = [
+    'Screen 0: minimum 320 x 200, current 1920 x 1080, maximum 8192 x 8192',
+    'HDMI-1 connected primary 1920x1080+0+0 (normal left inverted right x axis y axis) 476mm x 268mm',
+    '   320x240      60.00',
+    '   1920x1080    60.00*+',
+  ].join('\n');
+  const candidates = layout.extractResolutionCandidatesFromText(xrandrOutput);
+  assert.deepEqual(layout.pickBestResolution(candidates), { width: 1920, height: 1080 });
 });
 
 test('default layout snapshots remain stable for settings, status, and preview', () => {

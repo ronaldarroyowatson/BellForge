@@ -19,6 +19,12 @@ bellforge-staging/
 
 # Logs
 *.log
+.coverage
+node_modules/
+tests/logs/
+
+# Generated local runtime state
+config/auth_registry.json
 
 # OS
 .DS_Store

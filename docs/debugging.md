@@ -154,6 +154,26 @@ curl http://localhost:8000/api/files/client/index.html
 open http://localhost:8000/docs
 ```
 
+## Browser Layout Verification (Permanent Gate)
+
+Run this whenever you touch layout, card ordering, collapse/expand behavior, drag-and-drop, preview modal behavior, or design tokens:
+
+```bash
+npm run test:layout
+```
+
+What it does:
+- Starts or reuses the real backend at `http://127.0.0.1:8000`
+- Loads the real Status page, Settings page, and preview modal in headless Chromium
+- Verifies default layout, Fibonacci ratios, collapse/expand reflow, drag-and-drop reorder, viewport reflow at `1920x1080`, `1280x720`, `800x480`, and `480x320`, and preview/layout mirroring
+- Captures DOM geometry, computed styles, slot assignments, preview size calculations, and console debug logs under `tests/logs/layout-browser/`
+- Clears persisted layout state, repairs with automatic auto-arrange/reset, and retries once before failing the run
+
+Rules:
+- Do not accept a layout-related fix until `npm run test:layout` passes.
+- If the browser verifier fails after its automatic repair pass, fix the regression and rerun it.
+- Keep `localStorage` layout keys clear while debugging default-layout issues so the browser verifier measures the true fallback layout.
+
 ---
 
 ## Simulating a Pi update locally (without a real Pi)
