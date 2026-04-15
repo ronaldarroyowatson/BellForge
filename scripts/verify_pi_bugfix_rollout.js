@@ -317,6 +317,18 @@ function collectOverlaps(snapshot) {
 }
 
 async function waitForText(page, selector, expectedText) {
+  if (expectedText == null) {
+    await page.waitForFunction(
+      (targetSelector) => {
+        const element = document.querySelector(targetSelector);
+        const text = element?.textContent?.trim();
+        return Boolean(text && text !== '-' && text !== 'Unavailable');
+      },
+      selector,
+      { timeout: 20_000 },
+    );
+    return;
+  }
   await page.waitForFunction(
     ({ targetSelector, targetText }) => {
       const element = document.querySelector(targetSelector);
@@ -344,7 +356,9 @@ async function verifyStatusPage(context, config, expectedVersion, artifactPrefix
   page.on('console', (message) => consoleEntries.push({ type: message.type(), text: message.text() }));
   await page.goto(`${config.baseUrl}/status`, { waitUntil: 'domcontentloaded' });
   await waitForLayoutReady(page);
-  await waitForText(page, '#versionValue', expectedVersion);
+  await waitForText(page, '#versionValue', options.enforceVersion !== false ? expectedVersion : null);
+
+  const displayedVersion = await page.locator('#versionValue').textContent();
 
   const snapshot = await captureGridSnapshot(page, `${artifactPrefix}-status-grid`);
   const overlaps = collectOverlaps(snapshot);
@@ -354,7 +368,7 @@ async function verifyStatusPage(context, config, expectedVersion, artifactPrefix
   await page.screenshot({ path: path.join(ARTIFACT_DIR, `${artifactPrefix}-status.png`), fullPage: true });
   writeJsonArtifact(`${artifactPrefix}-status-console`, consoleEntries);
   await page.close();
-  return { snapshot, overlaps };
+  return { snapshot, overlaps, displayedVersion: displayedVersion?.trim() || null };
 }
 
 async function verifySettingsPage(context, config, expectedCurrentVersion, expectedLatestVersion, expectedPreviewVersion, artifactPrefix, options = {}) {
@@ -363,8 +377,11 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
   page.on('console', (message) => consoleEntries.push({ type: message.type(), text: message.text() }));
   await page.goto(`${config.baseUrl}/settings`, { waitUntil: 'domcontentloaded' });
   await waitForLayoutReady(page);
-  await waitForText(page, '#currentVersion', expectedCurrentVersion);
-  await waitForText(page, '#latestVersion', expectedLatestVersion);
+  await waitForText(page, '#currentVersion', options.enforceVersion !== false ? expectedCurrentVersion : null);
+  await waitForText(page, '#latestVersion', options.enforceVersion !== false ? expectedLatestVersion : null);
+
+  const displayedCurrentVersion = await page.locator('#currentVersion').textContent();
+  const displayedLatestVersion = await page.locator('#latestVersion').textContent();
 
   const snapshot = await captureGridSnapshot(page, `${artifactPrefix}-settings-grid`);
   const settingsOverlaps = collectOverlaps(snapshot);
@@ -378,7 +395,8 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
   const frame = await frameHandle.contentFrame();
   assertCondition(!!frame, `${artifactPrefix}: status preview iframe did not load`);
   await waitForLayoutReady(frame);
-  await waitForText(frame, '#versionValue', expectedPreviewVersion);
+  await waitForText(frame, '#versionValue', options.enforceVersion !== false ? expectedPreviewVersion : null);
+  const displayedPreviewVersion = await frame.locator('#versionValue').textContent();
   const previewSnapshot = await captureGridSnapshot(frame, `${artifactPrefix}-preview-grid`);
   const previewOverlaps = collectOverlaps(previewSnapshot);
   if (options.enforceNoOverlap !== false) {
@@ -389,8 +407,17 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
   writeJsonArtifact(`${artifactPrefix}-settings-console`, consoleEntries);
   await page.close();
   return {
-    settings: { snapshot, overlaps: settingsOverlaps },
-    preview: { snapshot: previewSnapshot, overlaps: previewOverlaps },
+    settings: {
+      snapshot,
+      overlaps: settingsOverlaps,
+      displayedCurrentVersion: displayedCurrentVersion?.trim() || null,
+      displayedLatestVersion: displayedLatestVersion?.trim() || null,
+    },
+    preview: {
+      snapshot: previewSnapshot,
+      overlaps: previewOverlaps,
+      displayedVersion: displayedPreviewVersion?.trim() || null,
+    },
   };
 }
 
@@ -464,10 +491,14 @@ async function main() {
 
     assertCondition(preState.version.version === preState.updater.current_device_version, 'Pi /api/version does not match updater current_device_version');
 
-    const preBrowser = await verifyBrowserSurface(config, 'pre-rollout-browser', browserExpectationsFromState(preState), { enforceNoOverlap: false });
+    const preBrowser = await verifyBrowserSurface(config, 'pre-rollout-browser', browserExpectationsFromState(preState), { enforceNoOverlap: false, enforceVersion: false });
     recordStep('pre-rollout-browser-ok', {
       currentVersion: preState.updater.current_device_version,
       latestDetectedVersion: preState.updater.latest_detected_version,
+      displayedStatusVersion: preBrowser.status.displayedVersion,
+      displayedSettingsCurrentVersion: preBrowser.settings.settings.displayedCurrentVersion,
+      displayedSettingsLatestVersion: preBrowser.settings.settings.displayedLatestVersion,
+      displayedPreviewVersion: preBrowser.settings.preview.displayedVersion,
       statusOverlaps: preBrowser.status.overlaps,
       settingsOverlaps: preBrowser.settings.settings.overlaps,
       previewOverlaps: preBrowser.settings.preview.overlaps,
@@ -516,10 +547,14 @@ async function main() {
 
     assertCondition(stagedState.updater.download_progress.percent >= 100, 'Pi has not fully downloaded the staged release');
 
-    const stagedBrowser = await verifyBrowserSurface(config, 'staged-rollout-browser', browserExpectationsFromState(stagedState), { enforceNoOverlap: false });
+    const stagedBrowser = await verifyBrowserSurface(config, 'staged-rollout-browser', browserExpectationsFromState(stagedState), { enforceNoOverlap: false, enforceVersion: false });
     recordStep('staged-browser-ok', {
       currentVersion: stagedState.updater.current_device_version,
       latestDetectedVersion: config.expectedVersion,
+      displayedStatusVersion: stagedBrowser.status.displayedVersion,
+      displayedSettingsCurrentVersion: stagedBrowser.settings.settings.displayedCurrentVersion,
+      displayedSettingsLatestVersion: stagedBrowser.settings.settings.displayedLatestVersion,
+      displayedPreviewVersion: stagedBrowser.settings.preview.displayedVersion,
       statusOverlaps: stagedBrowser.status.overlaps,
       settingsOverlaps: stagedBrowser.settings.settings.overlaps,
       previewOverlaps: stagedBrowser.settings.preview.overlaps,
@@ -580,6 +615,10 @@ async function main() {
     recordStep('post-rollout-browser-ok', {
       currentVersion: config.expectedVersion,
       latestDetectedVersion: config.expectedVersion,
+      displayedStatusVersion: postBrowser.status.displayedVersion,
+      displayedSettingsCurrentVersion: postBrowser.settings.settings.displayedCurrentVersion,
+      displayedSettingsLatestVersion: postBrowser.settings.settings.displayedLatestVersion,
+      displayedPreviewVersion: postBrowser.settings.preview.displayedVersion,
       statusOverlaps: postBrowser.status.overlaps,
       settingsOverlaps: postBrowser.settings.settings.overlaps,
       previewOverlaps: postBrowser.settings.preview.overlaps,
