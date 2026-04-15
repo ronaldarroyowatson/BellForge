@@ -52,7 +52,19 @@ Recommended local hook setup:
 1. Open PR to `main`.
 2. Ensure bugfix smoke workflow passes.
 3. Merge to `main`.
-4. Deploy updated files/services to target Pi(s).
+4. Verify the real Pi rollout before closing the bugfix:
+    - Run `npm run verify:pi-rollout -- --pi-host 192.168.2.180 --expected-version X.Y.Z`
+    - The verifier must prove all of these before the bugfix is considered closed:
+       - the Pi detects the new published version (`latest_detected_version`)
+       - the update is fully downloaded and staged (`staged_update_pending=true`, `staged_release_version=X.Y.Z`, download progress at 100%)
+       - the Pi is rebooted and returns to service
+       - the staged update is actually applied (`current_device_version=X.Y.Z`, `staged_update_pending=false`)
+       - the real browser surfaces on the Pi still behave correctly after apply:
+          - `/status`
+          - `/settings`
+          - the live status preview modal / preview card inside Settings
+    - The verifier writes JSON and screenshot evidence under `tests/logs/pi-rollout/`.
+    - Do not close the bugfix if the Pi is already on the expected version unless you intentionally rerun with `--allow-already-current` for audit-only evidence; first-closeout validation must capture stage plus apply.
 
 ## 5. Nightly Closeout
 

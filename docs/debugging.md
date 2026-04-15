@@ -60,6 +60,27 @@ tail -f /var/log/bellforge/updater.log
 journalctl -u bellforge-updater --since "1 hour ago"
 ```
 
+## Bugfix rollout verification on a real Pi
+
+Before closing a production bugfix, verify the full staged-update lifecycle on the device itself:
+
+```bash
+npm run verify:pi-rollout -- --pi-host 192.168.2.180 --expected-version 0.1.54
+```
+
+This verifier:
+
+- reads live updater state from `/api/updater/status`
+- confirms the Pi detects the published version
+- confirms the update is fully downloaded and staged
+- reboots the Pi over SSH and waits for SSH plus HTTP recovery
+- confirms the staged release was actually installed
+- opens the real `/status` and `/settings` pages in a headless browser against the Pi
+- opens the live status preview modal from Settings and checks the mirrored status surface
+- captures JSON and screenshot artifacts under `tests/logs/pi-rollout/`
+
+Use `--allow-already-current` only for audit reruns after the first closeout validation. The first validation for a bugfix should capture both staging and apply evidence.
+
 ---
 
 ## Manually triggering an update

@@ -210,6 +210,25 @@ Or from Windows in one step:
 
 ---
 
+## Full bugfix rollout verification from dev machine
+
+Use the Playwright-backed rollout verifier before closing a bugfix. It connects to the real Pi, confirms the published version is visible to the device, confirms the release is staged, reboots the Pi, waits for it to return, then validates the post-reboot Status page, Settings page, and live preview modal through a real browser.
+
+```bash
+npm run verify:pi-rollout -- --pi-host 192.168.2.180 --expected-version 0.1.54
+```
+
+Optional flags:
+
+```bash
+npm run verify:pi-rollout -- --pi-host 192.168.2.180 --expected-version 0.1.54 --ssh-key ~/.ssh/exportedRaspberryPiKey
+npm run verify:pi-rollout -- --pi-host 192.168.2.180 --expected-version 0.1.54 --allow-already-current
+```
+
+Artifacts are written to `tests/logs/pi-rollout/`.
+
+---
+
 ## Adding new commands
 
 Follow the conventions in `docs/CODING_CONVENTIONS.md` → **CLI Conventions** section.

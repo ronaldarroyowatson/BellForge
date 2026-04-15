@@ -431,6 +431,22 @@
       box-shadow: 0 calc(18px * var(--bf-shadow-scale)) calc(36px * var(--bf-shadow-scale)) rgba(27, 39, 49, 0.10);
       padding: 18px;
     }
+    .wrap.fibo-adaptive-grid > [data-fibo-card].hero,
+    .wrap.fibo-adaptive-grid > [data-fibo-card].stats,
+    .wrap.fibo-adaptive-grid > [data-fibo-card].url-panel,
+    .wrap.fibo-adaptive-grid > [data-fibo-card].onboarding-qr-panel,
+    .wrap.fibo-adaptive-grid > [data-fibo-card].advanced {
+      margin-bottom: 0;
+      padding: 0;
+    }
+    .wrap.fibo-adaptive-grid > [data-fibo-card].hero,
+    .wrap.fibo-adaptive-grid > [data-fibo-card].stats,
+    .wrap.fibo-adaptive-grid > [data-fibo-card].onboarding-qr-panel {
+      display: block;
+      grid-template-columns: none;
+      gap: 0;
+      align-items: stretch;
+    }
     .wrap.fibo-adaptive-grid > [data-fibo-card].is-collapsed {
       min-height: var(--fibo-collapsed-height, var(--bf-space-6));
       height: var(--fibo-collapsed-height, var(--bf-space-6));

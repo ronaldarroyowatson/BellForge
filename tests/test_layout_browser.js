@@ -22,6 +22,7 @@ const STORAGE_KEYS = [
 ];
 const VIEWPORTS = [
   { width: 1920, height: 1080 },
+  { width: 1600, height: 1000 },
   { width: 1280, height: 720 },
   { width: 800, height: 480 },
   { width: 480, height: 320 },
