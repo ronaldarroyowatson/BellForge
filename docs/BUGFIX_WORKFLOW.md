@@ -55,6 +55,7 @@ Recommended local hook setup:
 4. Verify the real Pi rollout before closing the bugfix:
     - Run `npm run verify:pi-rollout -- --pi-host 192.168.2.180 --expected-version X.Y.Z`
     - The verifier must prove all of these before the bugfix is considered closed:
+      - the real Status page is audited before rollout and while staged, then must pass with no browser-visible errors or regressions after apply
        - the Pi detects the new published version (`latest_detected_version`)
        - the update is fully downloaded and staged (`staged_update_pending=true`, `staged_release_version=X.Y.Z`, download progress at 100%)
        - the Pi is rebooted and returns to service

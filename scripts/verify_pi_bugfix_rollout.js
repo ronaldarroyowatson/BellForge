@@ -295,16 +295,25 @@ async function captureGridSnapshot(target, label) {
 }
 
 function assertNoOverlap(snapshot) {
+  const overlaps = collectOverlaps(snapshot);
+  assertCondition(snapshot.cards.length > 0, `${snapshot.label}: no fibo cards found`);
+  assertCondition(overlaps.length === 0, `${snapshot.label}: ${overlaps[0]}`);
+}
+
+function collectOverlaps(snapshot) {
+  const overlaps = [];
   const cards = snapshot.cards;
-  assertCondition(cards.length > 0, `${snapshot.label}: no fibo cards found`);
   for (let index = 0; index < cards.length; index += 1) {
     for (let compare = index + 1; compare < cards.length; compare += 1) {
       const left = cards[index].rect;
       const right = cards[compare].rect;
-      const overlaps = !(left.bottom <= right.y + 1 || right.bottom <= left.y + 1 || left.right <= right.x + 1 || right.right <= left.x + 1);
-      assertCondition(!overlaps, `${snapshot.label}: ${cards[index].key} overlaps ${cards[compare].key}`);
+      const isOverlapping = !(left.bottom <= right.y + 1 || right.bottom <= left.y + 1 || left.right <= right.x + 1 || right.right <= left.x + 1);
+      if (isOverlapping) {
+        overlaps.push(`${cards[index].key} overlaps ${cards[compare].key}`);
+      }
     }
   }
+  return overlaps;
 }
 
 async function waitForText(page, selector, expectedText) {
@@ -318,7 +327,18 @@ async function waitForText(page, selector, expectedText) {
   );
 }
 
-async function verifyStatusPage(context, config, expectedVersion, artifactPrefix) {
+function browserExpectationsFromState(state) {
+  const currentVersion = state.updater.current_device_version || state.version.version || 'Unavailable';
+  const latestDetectedVersion = state.updater.latest_detected_version || currentVersion;
+  return {
+    statusVersion: currentVersion,
+    previewVersion: currentVersion,
+    settingsCurrentVersion: currentVersion,
+    settingsLatestVersion: latestDetectedVersion,
+  };
+}
+
+async function verifyStatusPage(context, config, expectedVersion, artifactPrefix, options = {}) {
   const page = await context.newPage();
   const consoleEntries = [];
   page.on('console', (message) => consoleEntries.push({ type: message.type(), text: message.text() }));
@@ -327,24 +347,30 @@ async function verifyStatusPage(context, config, expectedVersion, artifactPrefix
   await waitForText(page, '#versionValue', expectedVersion);
 
   const snapshot = await captureGridSnapshot(page, `${artifactPrefix}-status-grid`);
-  assertNoOverlap(snapshot);
+  const overlaps = collectOverlaps(snapshot);
+  if (options.enforceNoOverlap !== false) {
+    assertNoOverlap(snapshot);
+  }
   await page.screenshot({ path: path.join(ARTIFACT_DIR, `${artifactPrefix}-status.png`), fullPage: true });
   writeJsonArtifact(`${artifactPrefix}-status-console`, consoleEntries);
   await page.close();
-  return snapshot;
+  return { snapshot, overlaps };
 }
 
-async function verifySettingsPage(context, config, expectedBrowserVersion, expectedPreviewVersion, artifactPrefix) {
+async function verifySettingsPage(context, config, expectedCurrentVersion, expectedLatestVersion, expectedPreviewVersion, artifactPrefix, options = {}) {
   const page = await context.newPage();
   const consoleEntries = [];
   page.on('console', (message) => consoleEntries.push({ type: message.type(), text: message.text() }));
   await page.goto(`${config.baseUrl}/settings`, { waitUntil: 'domcontentloaded' });
   await waitForLayoutReady(page);
-  await waitForText(page, '#currentVersion', expectedBrowserVersion);
-  await waitForText(page, '#latestVersion', expectedBrowserVersion);
+  await waitForText(page, '#currentVersion', expectedCurrentVersion);
+  await waitForText(page, '#latestVersion', expectedLatestVersion);
 
   const snapshot = await captureGridSnapshot(page, `${artifactPrefix}-settings-grid`);
-  assertNoOverlap(snapshot);
+  const settingsOverlaps = collectOverlaps(snapshot);
+  if (options.enforceNoOverlap !== false) {
+    assertNoOverlap(snapshot);
+  }
 
   await page.click('#designStatusPreviewToggle');
   await page.waitForSelector('#designStatusPreviewModal:not([hidden])', { timeout: 10_000 });
@@ -354,20 +380,34 @@ async function verifySettingsPage(context, config, expectedBrowserVersion, expec
   await waitForLayoutReady(frame);
   await waitForText(frame, '#versionValue', expectedPreviewVersion);
   const previewSnapshot = await captureGridSnapshot(frame, `${artifactPrefix}-preview-grid`);
-  assertNoOverlap(previewSnapshot);
+  const previewOverlaps = collectOverlaps(previewSnapshot);
+  if (options.enforceNoOverlap !== false) {
+    assertNoOverlap(previewSnapshot);
+  }
   await page.screenshot({ path: path.join(ARTIFACT_DIR, `${artifactPrefix}-settings.png`), fullPage: true });
   await page.click('#designStatusModalClose');
   writeJsonArtifact(`${artifactPrefix}-settings-console`, consoleEntries);
   await page.close();
-  return { settings: snapshot, preview: previewSnapshot };
+  return {
+    settings: { snapshot, overlaps: settingsOverlaps },
+    preview: { snapshot: previewSnapshot, overlaps: previewOverlaps },
+  };
 }
 
-async function verifyBrowserSurface(config, phase, expectedBrowserVersion) {
+async function verifyBrowserSurface(config, phase, expectations, options = {}) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
   try {
-    const status = await verifyStatusPage(context, config, expectedBrowserVersion, `${phase}`);
-    const settings = await verifySettingsPage(context, config, expectedBrowserVersion, expectedBrowserVersion, `${phase}`);
+    const status = await verifyStatusPage(context, config, expectations.statusVersion, `${phase}`, options);
+    const settings = await verifySettingsPage(
+      context,
+      config,
+      expectations.settingsCurrentVersion,
+      expectations.settingsLatestVersion,
+      expectations.previewVersion,
+      `${phase}`,
+      options,
+    );
     return { status, settings };
   } finally {
     await context.close();
@@ -423,12 +463,14 @@ async function main() {
     });
 
     assertCondition(preState.version.version === preState.updater.current_device_version, 'Pi /api/version does not match updater current_device_version');
-    assertCondition(preState.updater.latest_detected_version === config.expectedVersion, `Pi did not detect expected version ${config.expectedVersion}`);
 
-    await verifyBrowserSurface(config, 'pre-rollout-browser', config.expectedVersion);
+    const preBrowser = await verifyBrowserSurface(config, 'pre-rollout-browser', browserExpectationsFromState(preState), { enforceNoOverlap: false });
     recordStep('pre-rollout-browser-ok', {
       currentVersion: preState.updater.current_device_version,
-      latestDetectedVersion: config.expectedVersion,
+      latestDetectedVersion: preState.updater.latest_detected_version,
+      statusOverlaps: preBrowser.status.overlaps,
+      settingsOverlaps: preBrowser.settings.settings.overlaps,
+      previewOverlaps: preBrowser.settings.preview.overlaps,
     });
 
     const alreadyCurrent = preState.updater.current_device_version === config.expectedVersion && !preState.updater.staged_update_pending;
@@ -453,7 +495,11 @@ async function main() {
       `staged update ${config.expectedVersion}`,
       async () => {
         const state = await collectApiState(config, 'staged-rollout-api-state');
-        if (state.updater.staged_update_pending && state.updater.staged_release_version === config.expectedVersion) {
+        if (
+          state.updater.latest_detected_version === config.expectedVersion
+          && state.updater.staged_update_pending
+          && state.updater.staged_release_version === config.expectedVersion
+        ) {
           return state;
         }
         return null;
@@ -462,16 +508,21 @@ async function main() {
     );
     recordStep('staged-update-confirmed', {
       state: stagedState.updater.state,
+      currentVersion: stagedState.updater.current_device_version,
+      latestDetectedVersion: stagedState.updater.latest_detected_version,
       stagedReleaseVersion: stagedState.updater.staged_release_version,
       downloadProgress: stagedState.updater.download_progress,
     });
 
     assertCondition(stagedState.updater.download_progress.percent >= 100, 'Pi has not fully downloaded the staged release');
 
-    await verifyBrowserSurface(config, 'staged-rollout-browser', config.expectedVersion);
+    const stagedBrowser = await verifyBrowserSurface(config, 'staged-rollout-browser', browserExpectationsFromState(stagedState), { enforceNoOverlap: false });
     recordStep('staged-browser-ok', {
       currentVersion: stagedState.updater.current_device_version,
       latestDetectedVersion: config.expectedVersion,
+      statusOverlaps: stagedBrowser.status.overlaps,
+      settingsOverlaps: stagedBrowser.settings.settings.overlaps,
+      previewOverlaps: stagedBrowser.settings.preview.overlaps,
     });
 
     if (config.skipReboot) {
@@ -525,10 +576,13 @@ async function main() {
     });
 
     await captureRemoteTriage(config, 'post-rollout-triage');
-    await verifyBrowserSurface(config, 'post-rollout-browser', config.expectedVersion);
+    const postBrowser = await verifyBrowserSurface(config, 'post-rollout-browser', browserExpectationsFromState(appliedState));
     recordStep('post-rollout-browser-ok', {
       currentVersion: config.expectedVersion,
       latestDetectedVersion: config.expectedVersion,
+      statusOverlaps: postBrowser.status.overlaps,
+      settingsOverlaps: postBrowser.settings.settings.overlaps,
+      previewOverlaps: postBrowser.settings.preview.overlaps,
     });
 
     summary.finishedAt = new Date().toISOString();

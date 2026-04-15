@@ -502,6 +502,39 @@ test('browser verification validates responsive reflow across viewport matrix fo
   }
 });
 
+test('browser verification keeps status onboarding card stable with long live-like onboarding URLs', async () => {
+  const viewport = { width: 1600, height: 1000 };
+  const context = await newContext(viewport);
+  const { page, consoleEntries } = await openPage(context, STATUS_PATH, 'status-live-like-onboarding');
+
+  await page.evaluate(() => {
+    const longToken = 'h7vIp-pairing-token-' + 'Ab9xYz'.repeat(48);
+    const longOnboardingUrl = `http://192.168.2.180:8000/client/onboarding.html?pairing_token=${longToken}`;
+    const directLink = document.getElementById('onboardingDirectUrl');
+    const status = document.getElementById('onboardingQrStatus');
+    const image = document.getElementById('onboardingQr');
+    if (!directLink || !status || !image) {
+      throw new Error('Onboarding QR elements are missing');
+    }
+    directLink.textContent = longOnboardingUrl;
+    directLink.href = longOnboardingUrl;
+    status.textContent = 'Scan to start. Pairing code: 63378984';
+    image.src = `/api/qr/svg?text=${encodeURIComponent(longOnboardingUrl)}`;
+    window.__bellforgeStatusLayout?.recompute?.();
+  });
+  await waitForLayoutReady(page);
+
+  const snapshot = await captureSnapshot(page, 'status-live-like-onboarding');
+  writeArtifact('status-live-like-onboarding', { snapshot, consoleEntries });
+  assertCardsRemainInGrid(snapshot);
+  assertNoOverlap(snapshot);
+  const onboardingCard = snapshot.cards.find((card) => card.key === 'onboarding-qr');
+  assert.ok(onboardingCard, 'Onboarding QR card is missing');
+  assert.ok(onboardingCard.rect.height < 1400, 'Onboarding QR card grew to an unreasonable height with a long live onboarding URL');
+
+  await context.close();
+});
+
 test('browser verification validates preview modal scale, mirrored layout, collapse, and drag behavior', async () => {
   const context = await newContext({ width: 1280, height: 720 });
   const { page: referencePage, consoleEntries: referenceConsole } = await openPage(context, DISPLAY_STATUS_PATH, 'status-display-reference');

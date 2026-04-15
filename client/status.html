@@ -476,6 +476,18 @@
       margin: 0;
       padding: 0;
     }
+    .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.onboarding-qr-panel {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+    }
+    .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.onboarding-qr-panel .onboarding-qr-shell {
+      max-width: 240px;
+      margin: 0 auto;
+    }
+    .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.onboarding-qr-panel .onboarding-direct-link {
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
     .wrap.fibo-adaptive-grid > [data-fibo-card].is-expanded {
       transform: translateY(-1px);
     }
