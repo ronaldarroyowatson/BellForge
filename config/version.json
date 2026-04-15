@@ -1,6 +1,6 @@
 {
-  "version": "0.1.55",
-  "released_at": "2026-04-15T18:30:43Z",
+  "version": "0.1.56",
+  "released_at": "2026-04-15T18:43:18Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
   "notes": "Stabilized settings/status layout behavior and blocked same-version updater drift rollbacks"
