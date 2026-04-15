@@ -413,7 +413,7 @@
     }
     .wrap.fibo-adaptive-grid > [data-fibo-card] {
       margin: 0;
-      grid-column: span var(--fibo-col-span, 1);
+      grid-column: var(--fibo-col-start, auto) / span var(--fibo-col-span, 1);
       grid-row: span var(--fibo-row-span, 18);
       order: var(--fibo-order, 0);
       position: relative;
@@ -432,8 +432,8 @@
       padding: 18px;
     }
     .wrap.fibo-adaptive-grid > [data-fibo-card].is-collapsed {
-      min-height: var(--bf-space-6);
-      height: var(--bf-space-6);
+      min-height: var(--fibo-collapsed-height, var(--bf-space-6));
+      height: var(--fibo-collapsed-height, var(--bf-space-6));
       overflow: hidden;
       background: var(--paper-shade-3);
       border-color: var(--stroke-default);
@@ -524,16 +524,6 @@
       width: calc(100% / var(--bf-status-page-scale));
       transform: scale(var(--bf-status-page-scale));
       transform-origin: top center;
-      display: grid;
-      grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
-      gap: 12px;
-      align-items: start;
-    }
-    body.display-view .hero,
-    body.display-view .url-panel,
-    body.display-view .stats,
-    body.display-view .onboarding-qr-panel {
-      margin-bottom: 12px;
     }
     body.display-view .wrap.fibo-adaptive-grid {
       grid-template-columns: repeat(var(--fibo-columns, 5), minmax(0, 1fr));
@@ -552,14 +542,7 @@
     body.display-view .advanced {
       padding: 16px 18px;
     }
-    body.display-view .hero {
-      grid-column: 1 / 2;
-      grid-row: 1;
-      margin-bottom: 0;
-    }
     body.display-view .onboarding-qr-panel {
-      grid-column: 2 / 3;
-      grid-row: 1;
       align-self: start;
       padding: 16px 18px;
       grid-template-columns: 1fr;
@@ -580,18 +563,6 @@
     body.display-view .onboarding-direct-link {
       font-size: 0.95rem;
       padding: 10px 12px;
-    }
-    body.display-view .url-panel {
-      grid-column: 1 / -1;
-      grid-row: 2;
-    }
-    body.display-view .stats {
-      grid-column: 1 / -1;
-      grid-row: 3;
-    }
-    body.display-view .advanced {
-      grid-column: 1 / -1;
-      grid-row: 4;
     }
     body.display-view .url-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -654,17 +625,6 @@
       .onboarding-qr-panel,
       .steps {
         grid-template-columns: 1fr;
-      }
-      body.display-view .wrap {
-        grid-template-columns: 1fr;
-      }
-      body.display-view .hero,
-      body.display-view .onboarding-qr-panel,
-      body.display-view .url-panel,
-      body.display-view .stats,
-      body.display-view .advanced {
-        grid-column: 1;
-        grid-row: auto;
       }
       body.display-view .url-card:nth-child(n+4) {
         display: block;
@@ -821,6 +781,7 @@
     </details>
   </main>
 
+  <script src="/client/js/fibonacci_layout.js"></script>
   <script>
     const REFRESH_MS = 10000;
     const STATUS_LAYOUT_STORAGE_KEY = "bellforge.status.fibo-cards.v1";
@@ -881,618 +842,18 @@
     }
 
     function createFibonacciAdaptiveLayout(options) {
-      const container = options.container;
-      const cardSelector = options.cardSelector;
-      const storageKey = options.storageKey;
-      const rowUnit = options.rowUnit || 8;
-      const collapsedHeight = options.collapsedHeight || 56;
-      const collapsedHeightToken = options.collapsedHeightToken || "--bf-space-6";
-
-      const logger = {
-        enabled: localStorage.getItem("bellforge.debug.fibo") === "true",
-        log(msg, data) {
-          if (this.enabled) {
-            console.log(`[Fibonacci Layout] ${msg}`, data || "");
-          }
+      return window.BellForgeFibonacciLayout.createAdaptiveLayout({
+        syncChannel: "bellforge-status-layout-state",
+        mode: isDisplayView ? "status-display" : "status",
+        defaultPriorities: {
+          hero: 10,
+          "browser-links": 8,
+          "onboarding-qr": 7,
+          stats: 6,
+          advanced: 4,
         },
-      };
-
-      if (!container) {
-        return {
-          recompute() {},
-          autoArrange() {},
-          applyRemoteState() {},
-          emitLayoutSnapshot() {},
-        };
-      }
-
-      container.classList.add("fibo-adaptive-grid");
-      container.style.setProperty("--fibo-row-unit", `${rowUnit}px`);
-
-      const cards = Array.from(container.querySelectorAll(cardSelector));
-      const state = JSON.parse(localStorage.getItem(storageKey) || "{}");
-      let frameToken = 0;
-      let isApplyingRemoteState = false;
-      let skipPersistOnce = false;
-      let pendingAutoArrange = false;
-      let dragSourceKey = "";
-      const layoutCache = { columns: 0, rows: [], weights: {}, spans: {}, heights: {} };
-      let suppressInternalMutations = false;
-      let internalMutationResetTimer = 0;
-
-      function flushCaches() {
-        layoutCache.columns = 0;
-        layoutCache.rows = [];
-        layoutCache.weights = {};
-        layoutCache.spans = {};
-        layoutCache.heights = {};
-      }
-
-      function numericCssValue(value, fallback) {
-        const parsed = Number.parseFloat(String(value || "").trim());
-        return Number.isFinite(parsed) ? parsed : fallback;
-      }
-
-      function resolveCollapsedHeight(card) {
-        const localValue = card ? getComputedStyle(card).getPropertyValue(collapsedHeightToken).trim() : "";
-        const rootValue = getComputedStyle(document.documentElement).getPropertyValue(collapsedHeightToken).trim();
-        return Math.max(rowUnit, Math.round(numericCssValue(localValue || rootValue, collapsedHeight)));
-      }
-
-      function currentContainerWidth() {
-        return Math.max(0, Math.round(container.clientWidth || container.getBoundingClientRect().width || window.innerWidth || 0));
-      }
-
-      function columnsFor(width) {
-        if (isDisplayView) {
-          if (width >= 860) return { tracks: 5, maxPerRow: 2 };
-          return { tracks: 1, maxPerRow: 1 };
-        }
-        if (width >= 1240) return { tracks: 10, maxPerRow: 3 };
-        if (width >= 660) return { tracks: 5, maxPerRow: 2 };
-        return { tracks: 1, maxPerRow: 1 };
-      }
-
-      function calculateContentWeight(card) {
-        if (card.classList.contains("is-collapsed")) {
-          return 1;
-        }
-
-        let weight = 1;
-        const contentEl = card.querySelector(".card-content") || card;
-        const svg = contentEl.querySelector("svg");
-        const canvas = contentEl.querySelector("canvas");
-        const details = card.matches("details[open]");
-        const multilineText = (contentEl.textContent.match(/\n/g) || []).length;
-
-        if (svg || canvas) {
-          weight = 5;
-        } else if (details || multilineText > 3) {
-          weight = 3;
-        } else if (contentEl.textContent.trim().length === 0) {
-          weight = 0;
-        }
-
-        logger.log("card footprint calculations", { card: keyFor(card), weight, mode: "weight" });
-        return weight;
-      }
-
-      function measuredCardHeight(card) {
-        if (card.classList.contains("is-collapsed")) {
-          return resolveCollapsedHeight(card);
-        }
-        const titlebarHeight = card.querySelector(".card-titlebar")?.offsetHeight || 34;
-        const contentHeight = card.querySelector(".card-content")?.scrollHeight || 0;
-        const computed = getComputedStyle(card);
-        const verticalPadding = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
-        const total = Math.ceil(titlebarHeight + contentHeight + verticalPadding);
-        logger.log("card footprint calculations", { card: keyFor(card), height: total, mode: "height" });
-        return total;
-      }
-
-      function partitionRows(count, maxPerRow) {
-        if (maxPerRow <= 1) return Array(count).fill(1);
-        const rows = [];
-        let remaining = count;
-        while (remaining > 0) {
-          if (maxPerRow === 3 && remaining === 4) {
-            rows.push(2, 2);
-            break;
-          }
-          const next = Math.min(maxPerRow, remaining);
-          rows.push(next);
-          remaining -= next;
-        }
-        return rows;
-      }
-
-      function widthRatios(rowSize, tracks) {
-        if (rowSize <= 1) return [tracks];
-        if (rowSize === 2) return [3, 2];
-        if (rowSize === 3) return [5, 3, 2];
-        return [5, 3, 2];
-      }
-
-      function normalizeRatios(ratios, tracks) {
-        const total = ratios.reduce((sum, value) => sum + value, 0) || 1;
-        const base = ratios.map((ratio) => Math.max(1, Math.floor((ratio / total) * tracks)));
-        let used = base.reduce((sum, value) => sum + value, 0);
-        let index = 0;
-        while (used < tracks) {
-          base[index % base.length] += 1;
-          used += 1;
-          index += 1;
-        }
-        while (used > tracks) {
-          const target = base.findIndex((value) => value > 1);
-          if (target === -1) break;
-          base[target] -= 1;
-          used -= 1;
-        }
-        return base;
-      }
-
-      function titleFor(card) {
-        const t = card.dataset.cardTitle;
-        if (t) return t;
-        const heading = card.querySelector("h1, h2, h3");
-        return heading ? heading.textContent.trim() : "Card";
-      }
-
-      function keyFor(card) {
-        if (card.dataset.cardKey) return card.dataset.cardKey;
-        const generated = titleFor(card).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `card-${Math.random().toString(16).slice(2, 8)}`;
-        card.dataset.cardKey = generated;
-        return generated;
-      }
-
-      function normalizeCardState(card, cardState = {}, keyOverride = "") {
-        const key = keyOverride || keyFor(card);
-        const migratedHidden = cardState.hidden === true;
-        if (migratedHidden) {
-          logger.log("hidden -> collapsed transitions", { card: key, previous: cardState });
-        }
-        return {
-          collapsed: Boolean(cardState.collapsed || migratedHidden),
-          hidden: false,
-          order: Number.isFinite(cardState.order) ? Number(cardState.order) : Number.MAX_SAFE_INTEGER,
-        };
-      }
-
-      function readCardState(card) {
-        const key = keyFor(card);
-        const normalized = normalizeCardState(card, state[key] || {});
-        state[key] = normalized;
-        return normalized;
-      }
-
-      function persistState(reason) {
-        if (isApplyingRemoteState || skipPersistOnce) {
-          skipPersistOnce = false;
-          return;
-        }
-        localStorage.setItem(storageKey, JSON.stringify(state));
-        logger.log("preview-to-status sync events", { reason, state });
-      }
-
-      function writeCardState(card, nextState, reason = "card-state") {
-        const key = keyFor(card);
-        state[key] = normalizeCardState(card, { ...readCardState(card), ...nextState });
-        persistState(reason);
-        logger.log("card state load", { card: key, state: state[key] });
-      }
-
-      function updateCardChrome(card) {
-        const cardState = readCardState(card);
-        const helper = card.querySelector(".card-helper-text");
-        if (helper) {
-          helper.hidden = !cardState.collapsed;
-          helper.textContent = "hidden";
-        }
-        const toggle = card.querySelector('[data-card-action="collapse-toggle"]');
-        if (toggle) {
-          toggle.textContent = cardState.collapsed ? "Expand" : "Collapse";
-          toggle.setAttribute("aria-expanded", cardState.collapsed ? "false" : "true");
-        }
-      }
-
-      function applyState(card) {
-        const cardState = readCardState(card);
-        card.classList.toggle("is-collapsed", !!cardState.collapsed);
-        card.classList.remove("is-hidden");
-        card.style.setProperty("--fibo-collapsed-height", `${resolveCollapsedHeight(card)}px`);
-        if (card.matches("details")) {
-          card.open = !cardState.collapsed;
-        }
-        updateCardChrome(card);
-      }
-
-      function designTokensSnapshot() {
-        const rootStyles = getComputedStyle(document.documentElement);
-        return {
-          theme: document.documentElement.getAttribute("data-design-theme") || "warm",
-          radius: rootStyles.getPropertyValue("--bf-card-radius").trim(),
-          spacing: rootStyles.getPropertyValue("--bf-ui-scale").trim(),
-          glow: rootStyles.getPropertyValue("--bf-shadow-scale").trim(),
-          stroke: rootStyles.getPropertyValue("--line").trim(),
-          motionDuration: rootStyles.getPropertyValue("--motion-duration").trim(),
-          motionEasing: rootStyles.getPropertyValue("--motion-easing").trim(),
-          statusFit: rootStyles.getPropertyValue("--bf-status-page-scale").trim(),
-        };
-      }
-
-      function emitLayoutSnapshot(reason = "sync") {
-        const registry = cards.map((card, index) => ({
-          key: keyFor(card),
-          title: titleFor(card),
-          order: readCardState(card).order ?? index,
-          collapsed: !!readCardState(card).collapsed,
-          hidden: false,
-          weight: layoutCache.weights[keyFor(card)] ?? null,
-          spans: layoutCache.spans[keyFor(card)] ?? null,
-        }));
-        logger.log("card registry load", registry);
-        const payload = {
-          reason,
-          registry,
-          state,
-          tokens: designTokensSnapshot(),
-          layoutCache,
-          timestamp: Date.now(),
-        };
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: "bellforge-status-layout-state", payload }, window.location.origin);
-        }
-      }
-
-      function toggleCollapsed(card, reason = "toggle-collapse") {
-        const current = readCardState(card);
-        writeCardState(card, { collapsed: !current.collapsed, hidden: false }, reason);
-        applyState(card);
-        logger.log("collapse/expand events", { reason, card: keyFor(card), collapsed: !current.collapsed });
-        logger.log("preview-to-status sync events", { reason, card: keyFor(card), collapsed: !current.collapsed });
-        scheduleRecompute();
-      }
-
-      function appendHelperText(titleGroup) {
-        const helper = document.createElement("span");
-        helper.className = "card-helper-text";
-        helper.hidden = true;
-        helper.textContent = "hidden";
-        titleGroup.appendChild(helper);
-        return helper;
-      }
-
-      function createToolButton() {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "card-tool";
-        button.dataset.cardAction = "collapse-toggle";
-        button.textContent = "Collapse";
-        return button;
-      }
-
-      function bindToolButton(button, card) {
-        button.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          toggleCollapsed(card, "collapse-toggle");
-        });
-      }
-
-      function beginInternalMutationWindow() {
-        suppressInternalMutations = true;
-        if (internalMutationResetTimer) {
-          clearTimeout(internalMutationResetTimer);
-        }
-      }
-
-      function endInternalMutationWindow() {
-        internalMutationResetTimer = window.setTimeout(() => {
-          suppressInternalMutations = false;
-          internalMutationResetTimer = 0;
-        }, 0);
-      }
-
-      function reorderCards(draggedKey, targetKey) {
-        if (!draggedKey || !targetKey || draggedKey === targetKey) {
-          return;
-        }
-        const ordered = cards.slice().sort((a, b) => {
-          const aState = readCardState(a);
-          const bState = readCardState(b);
-          const aOrder = Number.isFinite(aState.order) ? aState.order : cards.indexOf(a);
-          const bOrder = Number.isFinite(bState.order) ? bState.order : cards.indexOf(b);
-          return aOrder - bOrder;
-        });
-        const fromIndex = ordered.findIndex((card) => keyFor(card) === draggedKey);
-        const toIndex = ordered.findIndex((card) => keyFor(card) === targetKey);
-        if (fromIndex < 0 || toIndex < 0) {
-          return;
-        }
-        const [moved] = ordered.splice(fromIndex, 1);
-        ordered.splice(toIndex, 0, moved);
-        ordered.forEach((card, index) => {
-          const key = keyFor(card);
-          state[key] = { ...readCardState(card), order: index };
-        });
-        logger.log("drag-and-drop events", { draggedKey, targetKey, ordered: ordered.map((card) => keyFor(card)) });
-        persistState("drag-drop");
-        scheduleRecompute();
-      }
-
-      function recompute() {
-        frameToken = 0;
-        beginInternalMutationWindow();
-        try {
-          flushCaches();
-          logger.log("preview-to-status sync events", { reason: "recompute-start" });
-
-          for (const card of cards) applyState(card);
-
-          const layoutCards = cards.slice();
-          const config = columnsFor(currentContainerWidth() || window.innerWidth);
-          layoutCache.columns = config.tracks;
-          container.style.setProperty("--fibo-columns", String(config.tracks));
-
-          if (layoutCards.length === 0) {
-            emitLayoutSnapshot("empty-layout");
-            return;
-          }
-
-          let weightedCards = layoutCards.map((card, index) => {
-            const weight = calculateContentWeight(card);
-            const height = measuredCardHeight(card);
-            const cardState = readCardState(card);
-            const explicitOrder = Number.isFinite(cardState.order) ? cardState.order : index;
-            layoutCache.weights[keyFor(card)] = weight;
-            layoutCache.heights[keyFor(card)] = height;
-            return { card, index, weight, height, explicitOrder };
-          });
-
-          if (pendingAutoArrange) {
-            weightedCards = weightedCards.sort((left, right) => {
-              if (right.weight !== left.weight) return right.weight - left.weight;
-              if (right.height !== left.height) return right.height - left.height;
-              return left.index - right.index;
-            });
-            logger.log("auto-arrange events", { mode: "weight-first" });
-          } else {
-            weightedCards = weightedCards.sort((left, right) => {
-              if (left.explicitOrder !== right.explicitOrder) return left.explicitOrder - right.explicitOrder;
-              return left.index - right.index;
-            });
-          }
-
-          const rows = partitionRows(weightedCards.length, config.maxPerRow);
-          layoutCache.rows = rows.slice();
-          logger.log("Grid row partition computed", { rows, tracks: config.tracks });
-
-          let cursor = 0;
-          rows.forEach((rowSize, rowIndex) => {
-            const rowCards = weightedCards.slice(cursor, cursor + rowSize);
-            const ratios = normalizeRatios(widthRatios(rowSize, config.tracks), config.tracks);
-            rowCards.forEach((entry, itemIndex) => {
-              const rowSpan = Math.max(1, Math.ceil(entry.height / rowUnit));
-              entry.card.style.setProperty("--fibo-col-span", String(ratios[itemIndex] || 1));
-              entry.card.style.setProperty("--fibo-row-span", String(rowSpan));
-              entry.card.style.setProperty("--fibo-order", String(cursor + itemIndex));
-              if (isDisplayView) {
-                entry.card.style.gridRow = "auto";
-              }
-              const cardKey = keyFor(entry.card);
-              state[cardKey] = { ...readCardState(entry.card), order: cursor + itemIndex };
-              layoutCache.spans[cardKey] = {
-                col: ratios[itemIndex] || 1,
-                row: rowSpan,
-                order: cursor + itemIndex,
-              };
-              logger.log("Fibonacci slot assignments", {
-                card: cardKey,
-                rowIndex,
-                colSpan: ratios[itemIndex] || 1,
-                rowSpan,
-                order: cursor + itemIndex,
-              });
-            });
-            cursor += rowSize;
-          });
-
-          persistState(pendingAutoArrange ? "auto-arrange" : "reflow");
-          logger.log("grid reflow events", { tracks: config.tracks, visibleCount: layoutCards.length });
-          emitLayoutSnapshot(pendingAutoArrange ? "auto-arrange" : "reflow");
-          pendingAutoArrange = false;
-        } finally {
-          endInternalMutationWindow();
-        }
-      }
-
-      function scheduleRecompute() {
-        if (frameToken) return;
-        frameToken = requestAnimationFrame(recompute);
-      }
-
-      function handleViewportReflow(reason) {
-        logger.log("window resize reflow", {
-          reason,
-          containerWidth: currentContainerWidth(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        });
-        scheduleRecompute();
-      }
-
-      function attachDragHandlers(handle, card) {
-        handle.setAttribute("draggable", "true");
-        handle.addEventListener("dragstart", (event) => {
-          dragSourceKey = keyFor(card);
-          event.dataTransfer?.setData("text/plain", dragSourceKey);
-          event.dataTransfer?.setDragImage(card, 20, 20);
-          card.classList.add("is-dragging");
-          logger.log("drag-and-drop events", { action: "dragstart", card: dragSourceKey });
-        });
-        handle.addEventListener("dragend", () => {
-          card.classList.remove("is-dragging");
-          dragSourceKey = "";
-        });
-        handle.addEventListener("dragover", (event) => {
-          event.preventDefault();
-        });
-        handle.addEventListener("drop", (event) => {
-          event.preventDefault();
-          const draggedKey = event.dataTransfer?.getData("text/plain") || dragSourceKey;
-          const targetKey = keyFor(card);
-          reorderCards(draggedKey, targetKey);
-        });
-      }
-
-      function injectControls(card) {
-        if (card.querySelector(".card-titlebar")) return;
-
-        if (card.matches("details")) {
-          const summary = card.querySelector("summary");
-          if (!summary) return;
-          const tools = document.createElement("div");
-          tools.className = "card-tools";
-          const titleGroup = summary.querySelector(":scope > div") || summary;
-          titleGroup.classList.add("card-titlegroup");
-          if (!titleGroup.querySelector(".card-helper-text")) {
-            appendHelperText(titleGroup);
-          }
-
-          const collapseButton = createToolButton();
-          bindToolButton(collapseButton, card);
-
-          tools.appendChild(collapseButton);
-          summary.classList.add("card-titlebar");
-          summary.appendChild(tools);
-          const detailsContent = document.createElement("div");
-          detailsContent.className = "card-content";
-          while (summary.nextSibling) {
-            detailsContent.appendChild(summary.nextSibling);
-          }
-          card.appendChild(detailsContent);
-          attachDragHandlers(summary, card);
-          summary.addEventListener("click", () => {
-            setTimeout(() => {
-              writeCardState(card, { collapsed: !card.open, hidden: false }, "toggle-collapse");
-              applyState(card);
-              logger.log("collapse/expand events", { reason: "summary-toggle", card: keyFor(card), collapsed: !card.open });
-              logger.log("preview-to-status sync events", { reason: "summary-toggle", card: keyFor(card), collapsed: !card.open });
-              scheduleRecompute();
-            }, 0);
-          });
-        } else {
-          const directHeading = card.querySelector(":scope > h1, :scope > h2, :scope > h3");
-          const title = directHeading ? directHeading.textContent.trim() : titleFor(card);
-          const content = document.createElement("div");
-          content.className = "card-content";
-          if (card.classList.contains("hero")) content.classList.add("hero");
-          if (card.classList.contains("stats")) content.classList.add("stats");
-          if (card.classList.contains("url-panel")) content.classList.add("url-panel");
-          if (card.classList.contains("onboarding-qr-panel")) content.classList.add("onboarding-qr-panel");
-
-          while (card.firstChild) {
-            const node = card.firstChild;
-            if (node === directHeading) {
-              card.removeChild(node);
-              continue;
-            }
-            content.appendChild(node);
-          }
-
-          const titlebar = document.createElement("div");
-          titlebar.className = "card-titlebar";
-          const titleGroup = document.createElement("div");
-          titleGroup.className = "card-titlegroup";
-
-          const headingEl = document.createElement("h2");
-          headingEl.textContent = title;
-          headingEl.style.margin = "0";
-          titleGroup.appendChild(headingEl);
-          appendHelperText(titleGroup);
-
-          const tools = document.createElement("div");
-          tools.className = "card-tools";
-          const collapseButton = createToolButton();
-          bindToolButton(collapseButton, card);
-
-          tools.appendChild(collapseButton);
-          titlebar.appendChild(titleGroup);
-          titlebar.appendChild(tools);
-
-          card.appendChild(titlebar);
-          card.appendChild(content);
-          attachDragHandlers(titlebar, card);
-          titlebar.addEventListener("click", () => {
-            toggleCollapsed(card, "titlebar-toggle");
-          });
-        }
-      }
-
-      function applyRemoteState(remoteState, reason = "remote-sync") {
-        if (!remoteState || typeof remoteState !== "object") {
-          return;
-        }
-        isApplyingRemoteState = true;
-        for (const [cardKey, cardState] of Object.entries(remoteState)) {
-          const targetCard = cards.find((card) => keyFor(card) === cardKey);
-          state[cardKey] = normalizeCardState(targetCard || null, {
-            ...state[cardKey],
-            ...cardState,
-          }, cardKey);
-        }
-        isApplyingRemoteState = false;
-        skipPersistOnce = true;
-        logger.log("preview-to-status sync events", { reason, remoteState });
-        scheduleRecompute();
-      }
-
-      function autoArrange() {
-        pendingAutoArrange = true;
-        logger.log("auto-arrange events", { action: "command-received" });
-        scheduleRecompute();
-      }
-
-      for (const card of cards) {
-        const key = keyFor(card);
-        if (!state[key]) {
-          state[key] = {
-            collapsed: false,
-            hidden: false,
-            order: cards.indexOf(card),
-          };
-        }
-        injectControls(card);
-        applyState(card);
-      }
-
-      window.addEventListener("resize", () => handleViewportReflow("window-resize"));
-      window.addEventListener("orientationchange", () => handleViewportReflow("orientation-change"));
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener("resize", () => handleViewportReflow("visual-viewport-resize"));
-      }
-      if (typeof ResizeObserver === "function") {
-        const resizeObserver = new ResizeObserver(() => {
-          handleViewportReflow("container-resize");
-        });
-        resizeObserver.observe(container);
-      }
-      scheduleRecompute();
-
-      return {
-        recompute: scheduleRecompute,
-        autoArrange,
-        applyRemoteState,
-        emitLayoutSnapshot,
-        getLayoutCache() {
-          return { ...layoutCache };
-        },
-        flushLayoutCache() {
-          flushCaches();
-          scheduleRecompute();
-        },
-      };
+        ...options,
+      });
     }
 
     function applyDesignControls(designControls) {

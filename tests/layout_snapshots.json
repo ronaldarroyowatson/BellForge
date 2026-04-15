@@ -1,0 +1,168 @@
+{
+  "settings": [
+    {
+      "key": "display-pipeline",
+      "order": 0,
+      "rowIndex": 0,
+      "colStart": 1,
+      "colSpan": 5,
+      "rowSpan": 45,
+      "weight": 9,
+      "collapsed": false
+    },
+    {
+      "key": "autoupdater",
+      "order": 1,
+      "rowIndex": 0,
+      "colStart": 6,
+      "colSpan": 3,
+      "rowSpan": 43,
+      "weight": 8,
+      "collapsed": false
+    },
+    {
+      "key": "network",
+      "order": 2,
+      "rowIndex": 0,
+      "colStart": 9,
+      "colSpan": 2,
+      "rowSpan": 40,
+      "weight": 8,
+      "collapsed": false
+    },
+    {
+      "key": "design-controls",
+      "order": 3,
+      "rowIndex": 1,
+      "colStart": 1,
+      "colSpan": 5,
+      "rowSpan": 53,
+      "weight": 7,
+      "collapsed": false
+    },
+    {
+      "key": "authentication",
+      "order": 4,
+      "rowIndex": 1,
+      "colStart": 6,
+      "colSpan": 3,
+      "rowSpan": 25,
+      "weight": 5,
+      "collapsed": false
+    },
+    {
+      "key": "logs",
+      "order": 5,
+      "rowIndex": 1,
+      "colStart": 9,
+      "colSpan": 2,
+      "rowSpan": 35,
+      "weight": 4,
+      "collapsed": false
+    }
+  ],
+  "status": [
+    {
+      "key": "hero",
+      "order": 0,
+      "rowIndex": 0,
+      "colStart": 1,
+      "colSpan": 3,
+      "rowSpan": 65,
+      "weight": 10,
+      "collapsed": false
+    },
+    {
+      "key": "browser-links",
+      "order": 1,
+      "rowIndex": 0,
+      "colStart": 4,
+      "colSpan": 2,
+      "rowSpan": 40,
+      "weight": 8,
+      "collapsed": false
+    },
+    {
+      "key": "onboarding-qr",
+      "order": 2,
+      "rowIndex": 1,
+      "colStart": 1,
+      "colSpan": 3,
+      "rowSpan": 43,
+      "weight": 7,
+      "collapsed": false
+    },
+    {
+      "key": "stats",
+      "order": 3,
+      "rowIndex": 1,
+      "colStart": 4,
+      "colSpan": 2,
+      "rowSpan": 30,
+      "weight": 6,
+      "collapsed": false
+    },
+    {
+      "key": "advanced",
+      "order": 4,
+      "rowIndex": 2,
+      "colStart": 1,
+      "colSpan": 5,
+      "rowSpan": 38,
+      "weight": 4,
+      "collapsed": false
+    }
+  ],
+  "preview": [
+    {
+      "key": "hero",
+      "order": 0,
+      "rowIndex": 0,
+      "colStart": 1,
+      "colSpan": 3,
+      "rowSpan": 65,
+      "weight": 10,
+      "collapsed": false
+    },
+    {
+      "key": "browser-links",
+      "order": 1,
+      "rowIndex": 0,
+      "colStart": 4,
+      "colSpan": 2,
+      "rowSpan": 40,
+      "weight": 8,
+      "collapsed": false
+    },
+    {
+      "key": "onboarding-qr",
+      "order": 2,
+      "rowIndex": 1,
+      "colStart": 1,
+      "colSpan": 3,
+      "rowSpan": 43,
+      "weight": 7,
+      "collapsed": false
+    },
+    {
+      "key": "stats",
+      "order": 3,
+      "rowIndex": 1,
+      "colStart": 4,
+      "colSpan": 2,
+      "rowSpan": 30,
+      "weight": 6,
+      "collapsed": false
+    },
+    {
+      "key": "advanced",
+      "order": 4,
+      "rowIndex": 2,
+      "colStart": 1,
+      "colSpan": 5,
+      "rowSpan": 38,
+      "weight": 4,
+      "collapsed": false
+    }
+  ]
+}
