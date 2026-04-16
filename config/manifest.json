@@ -1,6 +1,6 @@
 {
-  "version": "0.1.58",
-  "generated_at": "2026-04-16T19:35:25Z",
+  "version": "0.1.59",
+  "generated_at": "2026-04-16T19:49:04Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -127,8 +127,8 @@
       "size": 74003
     },
     "client/status.html": {
-      "sha256": "a04bc38c160ab6f267a5f7d794bebf269a475641b992d90d7b905549e4b790e8",
-      "size": 45826
+      "sha256": "219270c8d4df3933988591db87a6ed511fcf36daddc40c5ff78e1beab695997e",
+      "size": 45960
     },
     "updater/agent.py": {
       "sha256": "ae12e291131f87284e770fcdea945c35520cc82c7db627a475ab1dc020f1dae2",
@@ -155,7 +155,7 @@
       "size": 736
     },
     "config/version.json": {
-      "sha256": "6a78792cdafe2530ce11c1920a550b3d6542c29f4ec5b0f22fb618283092ba96",
+      "sha256": "df80e936093cb288a6f7440bcd4c520dc1dbc3d0e2ced6db61db885b979fe962",
       "size": 234
     },
     "scripts/bellforge-backend.service": {
@@ -255,8 +255,8 @@
       "size": 1932
     },
     "scripts/verify_pi_bugfix_rollout.js": {
-      "sha256": "0aae593602227776b414623fa2e15f5f72bee1e6b56cce9b001d53c43363140d",
-      "size": 28990
+      "sha256": "e2f66f21839a84789d91b862fdb3201d2946cbb3ef542db701b4f65a42249e12",
+      "size": 29114
     }
   }
 }
