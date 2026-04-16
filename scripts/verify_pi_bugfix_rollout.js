@@ -7,6 +7,13 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 
 const { chromium } = require('playwright');
+const {
+  collectOverlaps,
+  collectSpacingMetrics,
+  findFibonacciRatioIssues,
+  findWeightOrderingIssues,
+  simplifyLayout,
+} = require('../tests/layout_dom_utils.js');
 
 const execFileAsync = promisify(execFile);
 
@@ -283,10 +290,19 @@ async function captureGridSnapshot(target, label) {
         },
       };
     }).sort((left, right) => left.order - right.order);
+    const container = document.querySelector('.fibo-adaptive-grid');
+    const containerRect = container ? container.getBoundingClientRect() : { width: 0, height: 0 };
+    const containerStyle = container ? getComputedStyle(container) : null;
     return {
       label: artifactLabel,
       url: window.location.href,
       viewport: { width: window.innerWidth, height: window.innerHeight },
+      container: {
+        width: round(containerRect.width),
+        height: round(containerRect.height),
+        gap: round(Number.parseFloat(containerStyle?.columnGap || containerStyle?.gap || '0') || 0),
+        columns: Number(containerStyle?.getPropertyValue('--fibo-columns') || container?.style.getPropertyValue('--fibo-columns') || 0),
+      },
       cards,
     };
   }, label);
@@ -297,23 +313,17 @@ async function captureGridSnapshot(target, label) {
 function assertNoOverlap(snapshot) {
   const overlaps = collectOverlaps(snapshot);
   assertCondition(snapshot.cards.length > 0, `${snapshot.label}: no fibo cards found`);
-  assertCondition(overlaps.length === 0, `${snapshot.label}: ${overlaps[0]}`);
+  assertCondition(overlaps.length === 0, `${snapshot.label}: ${overlaps[0]?.left} overlaps ${overlaps[0]?.right}`);
 }
 
-function collectOverlaps(snapshot) {
-  const overlaps = [];
-  const cards = snapshot.cards;
-  for (let index = 0; index < cards.length; index += 1) {
-    for (let compare = index + 1; compare < cards.length; compare += 1) {
-      const left = cards[index].rect;
-      const right = cards[compare].rect;
-      const isOverlapping = !(left.bottom <= right.y + 1 || right.bottom <= left.y + 1 || left.right <= right.x + 1 || right.right <= left.x + 1);
-      if (isOverlapping) {
-        overlaps.push(`${cards[index].key} overlaps ${cards[compare].key}`);
-      }
-    }
-  }
-  return overlaps;
+function assertBrowserLayoutHealth(snapshot, options = {}) {
+  const ratioIssues = findFibonacciRatioIssues(snapshot, options.ratioTolerance || 0.03);
+  const weightIssues = findWeightOrderingIssues(snapshot);
+  const spacing = collectSpacingMetrics(snapshot);
+  const minVisibleCards = options.minVisibleCards || Math.min(snapshot.cards.length, 3);
+  assertCondition(ratioIssues.length === 0, `${snapshot.label}: Fibonacci ratio failed for ${ratioIssues[0]?.left}:${ratioIssues[0]?.right}`);
+  assertCondition(weightIssues.length === 0, `${snapshot.label}: heavier ${weightIssues[0]?.heavier} received a smaller slot than ${weightIssues[0]?.lighter}`);
+  assertCondition(spacing.visibleCards >= minVisibleCards, `${snapshot.label}: only ${spacing.visibleCards} cards visible above fold`);
 }
 
 async function waitForText(page, selector, expectedText) {
@@ -364,6 +374,7 @@ async function verifyStatusPage(context, config, expectedVersion, artifactPrefix
   const overlaps = collectOverlaps(snapshot);
   if (options.enforceNoOverlap !== false) {
     assertNoOverlap(snapshot);
+    assertBrowserLayoutHealth(snapshot, { minVisibleCards: 3 });
   }
   await page.screenshot({ path: path.join(ARTIFACT_DIR, `${artifactPrefix}-status.png`), fullPage: true });
   writeJsonArtifact(`${artifactPrefix}-status-console`, consoleEntries);
@@ -387,7 +398,26 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
   const settingsOverlaps = collectOverlaps(snapshot);
   if (options.enforceNoOverlap !== false) {
     assertNoOverlap(snapshot);
+    assertBrowserLayoutHealth(snapshot, { minVisibleCards: 3 });
   }
+
+  const modalMetrics = await page.evaluate(() => {
+    const modal = document.getElementById('designStatusPreviewModal');
+    const dialog = modal?.querySelector('.status-preview-modal__dialog');
+    const rootStyle = getComputedStyle(document.documentElement);
+    const modalRect = modal?.getBoundingClientRect();
+    const dialogRect = dialog?.getBoundingClientRect();
+    return {
+      modalPosition: modal ? getComputedStyle(modal).position : null,
+      modalRect: modalRect ? { width: modalRect.width, height: modalRect.height } : null,
+      dialogRect: dialogRect ? { width: dialogRect.width, height: dialogRect.height } : null,
+      nativeWidth: Number(rootStyle.getPropertyValue('--status-preview-native-width') || 0),
+      nativeHeight: Number(rootStyle.getPropertyValue('--status-preview-native-height') || 0),
+      viewportWidth: Number.parseFloat(rootStyle.getPropertyValue('--status-preview-modal-width') || '0'),
+      viewportHeight: Number.parseFloat(rootStyle.getPropertyValue('--status-preview-modal-height') || '0'),
+      resolutionLabel: document.getElementById('designStatusResolution')?.textContent?.trim() || '',
+    };
+  });
 
   await page.click('#designStatusPreviewToggle');
   await page.waitForSelector('#designStatusPreviewModal:not([hidden])', { timeout: 10_000 });
@@ -401,7 +431,19 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
   const previewOverlaps = collectOverlaps(previewSnapshot);
   if (options.enforceNoOverlap !== false) {
     assertNoOverlap(previewSnapshot);
+    assertBrowserLayoutHealth(previewSnapshot, { minVisibleCards: 3 });
   }
+  const displayReferencePage = await context.newPage();
+  await displayReferencePage.goto(`${config.baseUrl}/status?view=display`, { waitUntil: 'domcontentloaded' });
+  await waitForLayoutReady(displayReferencePage);
+  const displayReferenceSnapshot = await captureGridSnapshot(displayReferencePage, `${artifactPrefix}-preview-reference-grid`);
+  await displayReferencePage.close();
+  assertCondition(modalMetrics.modalPosition === 'fixed', `${artifactPrefix}: preview modal is not fixed`);
+  assertCondition(modalMetrics.modalRect && Math.abs(modalMetrics.modalRect.width - page.viewportSize().width) <= 4, `${artifactPrefix}: preview modal is not full-width`);
+  assertCondition(modalMetrics.modalRect && Math.abs(modalMetrics.modalRect.height - page.viewportSize().height) <= 4, `${artifactPrefix}: preview modal is not full-height`);
+  assertCondition(modalMetrics.nativeWidth >= 800 && modalMetrics.nativeHeight >= 480, `${artifactPrefix}: preview modal picked a tiny target resolution`);
+  assertCondition(modalMetrics.resolutionLabel.length > 0, `${artifactPrefix}: preview modal did not expose its resolution label`);
+  assertCondition(JSON.stringify(simplifyLayout(previewSnapshot)) === JSON.stringify(simplifyLayout(displayReferenceSnapshot)), `${artifactPrefix}: preview layout diverged from real display status layout`);
   await page.screenshot({ path: path.join(ARTIFACT_DIR, `${artifactPrefix}-settings.png`), fullPage: true });
   await page.click('#designStatusModalClose');
   writeJsonArtifact(`${artifactPrefix}-settings-console`, consoleEntries);
@@ -417,6 +459,8 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
       snapshot: previewSnapshot,
       overlaps: previewOverlaps,
       displayedVersion: displayedPreviewVersion?.trim() || null,
+      modalMetrics,
+      referenceSnapshot: displayReferenceSnapshot,
     },
   };
 }

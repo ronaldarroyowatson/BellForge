@@ -19,6 +19,7 @@ DEFAULT_CLIENT_ENV = {
     "BELLFORGE_CARD_RADIUS_PX": "14",
     "BELLFORGE_SHADOW_INTENSITY": "1.00",
     "BELLFORGE_STATUS_PAGE_SCALE": "0.92",
+    "BELLFORGE_LAYOUT_MODE": "portrait",
 }
 
 
@@ -92,6 +93,11 @@ def _theme_value(raw_value: str | None) -> str:
     return value if value in allowed else DEFAULT_CLIENT_ENV["BELLFORGE_UI_THEME"]
 
 
+def _layout_mode_value(raw_value: str | None) -> str:
+    value = str(raw_value or DEFAULT_CLIENT_ENV["BELLFORGE_LAYOUT_MODE"]).strip().lower()
+    return value if value in {"portrait", "landscape"} else DEFAULT_CLIENT_ENV["BELLFORGE_LAYOUT_MODE"]
+
+
 def get_display_preferences(project_root: Path) -> dict[str, Any]:
     env_values = {**DEFAULT_CLIENT_ENV, **_read_client_env(project_root)}
     overscan_percent = _scale_to_percent(env_values.get("BELLFORGE_DISPLAY_SCALE"))
@@ -103,6 +109,7 @@ def get_display_preferences(project_root: Path) -> dict[str, Any]:
         "card_radius_px": _int_value(env_values.get("BELLFORGE_CARD_RADIUS_PX"), DEFAULT_CLIENT_ENV["BELLFORGE_CARD_RADIUS_PX"], 6, 28),
         "shadow_intensity": round(_float_value(env_values.get("BELLFORGE_SHADOW_INTENSITY"), DEFAULT_CLIENT_ENV["BELLFORGE_SHADOW_INTENSITY"], 0.0, 1.6), 2),
         "status_page_scale": round(_float_value(env_values.get("BELLFORGE_STATUS_PAGE_SCALE"), DEFAULT_CLIENT_ENV["BELLFORGE_STATUS_PAGE_SCALE"], 0.75, 1.0), 2),
+        "layout_mode": _layout_mode_value(env_values.get("BELLFORGE_LAYOUT_MODE")),
     }
     return {
         "timestamp": _utc_now(),
@@ -130,6 +137,7 @@ def update_display_preferences(
     card_radius_px: int | None = None,
     shadow_intensity: float | None = None,
     status_page_scale: float | None = None,
+    layout_mode: str | None = None,
 ) -> dict[str, Any]:
     current = {**DEFAULT_CLIENT_ENV, **_read_client_env(project_root)}
 
@@ -163,6 +171,9 @@ def update_display_preferences(
     if status_page_scale is not None:
         clamped_status_page_scale = max(0.75, min(1.0, float(status_page_scale)))
         current["BELLFORGE_STATUS_PAGE_SCALE"] = f"{clamped_status_page_scale:.2f}"
+
+    if layout_mode is not None:
+        current["BELLFORGE_LAYOUT_MODE"] = _layout_mode_value(layout_mode)
 
     _write_client_env(project_root, current)
     return {

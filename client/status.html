@@ -6,6 +6,11 @@
   <title>BellForge Device Status</title>
   <style>
     :root {
+      --bf-space-1: 4px;
+      --bf-space-2: 8px;
+      --bf-space-3: 12px;
+      --bf-space-4: 16px;
+      --bf-space-5: 20px;
       --bf-font-scale: 1;
       --bf-ui-scale: 1;
       --bf-card-radius: 24px;
@@ -72,6 +77,7 @@
     body {
       margin: 0;
       min-height: 100vh;
+      overflow-x: hidden;
       color: var(--text);
       font-size: calc(16px * var(--bf-font-scale));
       font-family: "Trebuchet MS", "Segoe UI", sans-serif;
@@ -85,13 +91,6 @@
       margin: 0 auto;
       padding: calc(24px * var(--bf-ui-scale));
     }
-    .hero {
-      display: grid;
-      grid-template-columns: 1.5fr 1fr;
-      gap: 18px;
-      align-items: stretch;
-      margin-bottom: 18px;
-    }
     .card {
       background: var(--paper);
       border: 1px solid rgba(215, 200, 181, 0.9);
@@ -99,8 +98,13 @@
       box-shadow: 0 calc(18px * var(--bf-shadow-scale)) calc(36px * var(--bf-shadow-scale)) rgba(27, 39, 49, 0.10);
       backdrop-filter: blur(8px);
     }
-    .hero-main {
-      padding: 28px;
+    .setup-hero {
+      padding: 0;
+    }
+    .setup-hero-body {
+      display: grid;
+      gap: var(--bf-space-4);
+      padding: calc(28px * var(--bf-ui-scale));
     }
     .eyebrow {
       display: inline-block;
@@ -157,16 +161,19 @@
       font-size: 0.98rem;
       line-height: 1.4;
     }
-    .hero-side {
-      padding: 22px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 16px;
+    .quick-facts {
+      padding: 0;
       background: linear-gradient(180deg, rgba(19, 79, 120, 0.94), rgba(12, 54, 83, 0.95));
       color: #f5fbff;
     }
-    .hero-side h2,
+    .quick-facts-body {
+      padding: calc(22px * var(--bf-ui-scale));
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: var(--bf-space-4);
+    }
+    .quick-facts h2,
     .url-panel h2,
     .stats h2,
     .advanced h2 {
@@ -175,7 +182,7 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
-    .hero-side p {
+    .quick-facts p {
       margin: 0;
       color: rgba(245, 251, 255, 0.84);
       line-height: 1.45;
@@ -392,7 +399,7 @@
       font-family: "Consolas", "Cascadia Mono", monospace;
     }
     .refresh {
-      margin-top: 10px;
+      margin-top: auto;
       color: rgba(245, 251, 255, 0.76);
       font-size: 0.9rem;
     }
@@ -408,7 +415,7 @@
       grid-template-columns: repeat(var(--fibo-columns, 10), minmax(0, 1fr));
       grid-auto-rows: var(--fibo-row-unit);
       grid-auto-flow: dense;
-      gap: 16px;
+      gap: var(--bf-space-2);
       align-items: start;
     }
     .wrap.fibo-adaptive-grid > [data-fibo-card] {
@@ -431,7 +438,6 @@
       box-shadow: 0 calc(18px * var(--bf-shadow-scale)) calc(36px * var(--bf-shadow-scale)) rgba(27, 39, 49, 0.10);
       padding: 18px;
     }
-    .wrap.fibo-adaptive-grid > [data-fibo-card].hero,
     .wrap.fibo-adaptive-grid > [data-fibo-card].stats,
     .wrap.fibo-adaptive-grid > [data-fibo-card].url-panel,
     .wrap.fibo-adaptive-grid > [data-fibo-card].onboarding-qr-panel,
@@ -439,7 +445,6 @@
       margin-bottom: 0;
       padding: 0;
     }
-    .wrap.fibo-adaptive-grid > [data-fibo-card].hero,
     .wrap.fibo-adaptive-grid > [data-fibo-card].stats,
     .wrap.fibo-adaptive-grid > [data-fibo-card].onboarding-qr-panel {
       display: block;
@@ -469,7 +474,6 @@
       transition: max-height var(--motion-expand-duration) var(--motion-expand-easing),
                   opacity var(--motion-expand-duration) var(--motion-expand-easing);
     }
-    .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.hero,
     .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.stats,
     .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.url-panel,
     .wrap.fibo-adaptive-grid > [data-fibo-card] .card-content.onboarding-qr-panel {
@@ -548,22 +552,27 @@
     }
     body.display-view .wrap {
       max-width: 1280px;
-      padding: 14px 18px;
+      padding: var(--bf-space-3) var(--bf-space-4);
       width: calc(100% / var(--bf-status-page-scale));
       transform: scale(var(--bf-status-page-scale));
       transform-origin: top center;
     }
+    body.display-view.mirror-view .wrap {
+      max-width: 100%;
+      width: 100%;
+      transform: none;
+    }
     body.display-view .wrap.fibo-adaptive-grid {
       grid-template-columns: repeat(var(--fibo-columns, 5), minmax(0, 1fr));
-      gap: 12px;
+      gap: var(--bf-space-2);
     }
     body.display-view .wrap.fibo-adaptive-grid > [data-fibo-card] {
       grid-row: var(--fibo-row-start, auto) / span var(--fibo-row-span, 18) !important;
       grid-column: var(--fibo-col-start, auto) / span var(--fibo-col-span, 1) !important;
       margin-bottom: 0;
     }
-    body.display-view .hero-main,
-    body.display-view .hero-side,
+    body.display-view .setup-hero-body,
+    body.display-view .quick-facts-body,
     body.display-view .url-panel,
     body.display-view .onboarding-qr-panel,
     body.display-view .stat-card,
@@ -646,7 +655,6 @@
       display: block;
     }
     @media (max-width: 980px) {
-      .hero,
       .url-grid,
       .stats,
       .advanced-grid,
@@ -665,8 +673,8 @@
       .wrap {
         padding: 14px;
       }
-      .hero-main,
-      .hero-side,
+      .setup-hero-body,
+      .quick-facts-body,
       .url-panel,
       .stat-card,
       .advanced {
@@ -680,8 +688,8 @@
 </head>
 <body>
   <main class="wrap">
-    <section class="hero" data-fibo-card data-card-key="hero" data-card-title="Setup Hero">
-      <article class="card hero-main">
+    <section class="card setup-hero" data-fibo-card data-card-key="setup-hero" data-card-title="Setup Hero">
+      <div class="setup-hero-body">
         <div class="eyebrow">BellForge Setup Screen</div>
         <h1>Connect to this display from your browser.</h1>
         <p class="lede">If you are setting this screen up for the first time, use a phone, laptop, or desktop browser and type one of the addresses shown below exactly as written.</p>
@@ -699,11 +707,12 @@
             <p>Use the settings page if you need to configure schedules, content, or networking.</p>
           </li>
         </ol>
-      </article>
+      </div>
+    </section>
 
-      <aside class="card hero-side">
+    <section class="card quick-facts" data-fibo-card data-card-key="quick-facts" data-card-title="Quick Facts">
+      <div class="quick-facts-body">
         <div>
-          <h2>Quick facts</h2>
           <p>This display refreshes itself every few seconds. Once content is assigned, this setup screen will disappear automatically.</p>
         </div>
         <div class="quick-grid">
@@ -725,7 +734,7 @@
           </div>
         </div>
         <div class="refresh" id="refreshLabel">Refreshing every 10 seconds</div>
-      </aside>
+      </div>
     </section>
 
     <section class="card url-panel" data-fibo-card data-card-key="browser-links" data-card-title="Browser Links">
@@ -817,6 +826,7 @@
     const DESIGN_CONTROLS_LIVE_KEY = "bellforge.design-controls.live.v1";
     const params = new URLSearchParams(window.location.search);
     const isDisplayView = params.get("view") === "display";
+    const isMirrorView = params.get("mirror") === "1";
     const advancedDetails = document.querySelector(".advanced");
     const advancedItems = Array.from(document.querySelectorAll(".advanced-item"));
     const advancedPager = document.getElementById("advancedPager");
@@ -864,9 +874,16 @@
       document.body.classList.add("display-view");
       advancedDetails.open = true;
     }
+    if (isMirrorView) {
+      document.body.classList.add("mirror-view");
+    }
 
-    function clamp(value, min, max) {
-      return Math.max(min, Math.min(max, value));
+    function clamp(value, min, max, fallback = min) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return fallback;
+      }
+      return Math.max(min, Math.min(max, numeric));
     }
 
     function createFibonacciAdaptiveLayout(options) {
@@ -874,12 +891,14 @@
         syncChannel: "bellforge-status-layout-state",
         mode: isDisplayView ? "status-display" : "status",
         defaultPriorities: {
-          hero: 10,
+          "setup-hero": 10,
+          "quick-facts": 9,
           "browser-links": 8,
           "onboarding-qr": 7,
           stats: 6,
           advanced: 4,
         },
+        getLayoutMode: () => document.documentElement.dataset.designLayoutMode || "portrait",
         ...options,
       });
     }
@@ -892,20 +911,27 @@
       const theme = ["warm", "ocean", "forest", "high-contrast"].includes(designControls.theme)
         ? designControls.theme
         : "warm";
-      const fontScale = Number(clamp(Number(designControls.font_scale || 1), 0.85, 1.35).toFixed(2));
-      const uiScale = Number(clamp(Number(designControls.ui_scale || 1), 0.8, 1.2).toFixed(2));
-      const cardRadius = Math.round(clamp(Number(designControls.card_radius_px || 24), 6, 28));
-      const shadowScale = Number(clamp(Number(designControls.shadow_intensity || 1), 0, 1.6).toFixed(2));
-      const statusPageScale = Number(clamp(Number(designControls.status_page_scale || 0.92), 0.75, 1).toFixed(2));
+      const fontScale = Number(clamp(designControls.font_scale ?? 1, 0.85, 1.35, 1).toFixed(2));
+      const uiScale = Number(clamp(designControls.ui_scale ?? 1, 0.8, 1.2, 1).toFixed(2));
+      const cardRadius = Math.round(clamp(designControls.card_radius_px ?? 24, 6, 28, 24));
+      const shadowScale = Number(clamp(designControls.shadow_intensity ?? 1, 0, 1.6, 1).toFixed(2));
+      const statusPageScale = Number(clamp(designControls.status_page_scale ?? 0.92, 0.75, 1, 0.92).toFixed(2));
+      const layoutMode = window.BellForgeFibonacciLayout.normalizeLayoutMode(designControls.layout_mode);
 
       document.documentElement.setAttribute("data-design-theme", theme);
+      document.documentElement.dataset.designLayoutMode = layoutMode;
+      document.documentElement.style.setProperty("--bf-space-1", `${Math.round(4 * uiScale)}px`);
+      document.documentElement.style.setProperty("--bf-space-2", `${Math.round(8 * uiScale)}px`);
+      document.documentElement.style.setProperty("--bf-space-3", `${Math.round(12 * uiScale)}px`);
+      document.documentElement.style.setProperty("--bf-space-4", `${Math.round(16 * uiScale)}px`);
+      document.documentElement.style.setProperty("--bf-space-5", `${Math.round(20 * uiScale)}px`);
       document.documentElement.style.setProperty("--bf-font-scale", String(fontScale));
       document.documentElement.style.setProperty("--bf-ui-scale", String(uiScale));
       document.documentElement.style.setProperty("--bf-card-radius", `${cardRadius}px`);
       document.documentElement.style.setProperty("--bf-shadow-scale", String(shadowScale));
       document.documentElement.style.setProperty("--bf-status-page-scale", String(statusPageScale));
       document.documentElement.style.setProperty("--bf-space-6", `${Math.round(56 * uiScale)}px`);
-      console.log("[Fibonacci Layout] token application", { theme, fontScale, uiScale, cardRadius, shadowScale, statusPageScale });
+      console.log("[Fibonacci Layout] token application", { theme, fontScale, uiScale, cardRadius, shadowScale, statusPageScale, layoutMode });
     }
 
     function pill(text, level) {
@@ -1065,7 +1091,16 @@
         if (!response.ok) return;
         const data = await response.json();
         diagnosticsRotationMs = Math.max(4000, Number(data.diagnostics_rotation_seconds || 8) * 1000);
-        applyDesignControls(data.design_controls);
+        const liveDesignControls = (() => {
+          try {
+            const raw = localStorage.getItem(DESIGN_CONTROLS_LIVE_KEY);
+            const parsed = raw ? JSON.parse(raw) : null;
+            return parsed && parsed.payload ? parsed.payload : null;
+          } catch {
+            return null;
+          }
+        })();
+        applyDesignControls(liveDesignControls || data.design_controls);
         scheduleDiagnosticsCarousel();
         statusAdaptiveLayout.recompute();
       } catch (error) {
@@ -1160,7 +1195,7 @@
     const statusAdaptiveLayout = createFibonacciAdaptiveLayout({
       container: document.querySelector(".wrap"),
       cardSelector: "[data-fibo-card]",
-      storageKey: STATUS_LAYOUT_STORAGE_KEY,
+      storageKey: isMirrorView ? null : STATUS_LAYOUT_STORAGE_KEY,
       rowUnit: 8,
       collapsedHeight: 56,
     });
@@ -1169,6 +1204,7 @@
       autoArrange: () => statusAdaptiveLayout.autoArrange(),
       recompute: () => statusAdaptiveLayout.recompute(),
       resetState: () => statusAdaptiveLayout.resetState("status-debug-reset"),
+      setCardCollapsed: (cardKey, collapsed, reason = "status-debug-collapse") => statusAdaptiveLayout.setCardCollapsed(cardKey, collapsed, reason),
       applyRemoteState: (remoteState, reason = "status-debug-apply") => statusAdaptiveLayout.applyRemoteState(remoteState, reason),
       emitLayoutSnapshot: (reason = "status-debug-snapshot") => statusAdaptiveLayout.emitLayoutSnapshot(reason),
       getLayoutCache: () => statusAdaptiveLayout.getLayoutCache(),

@@ -52,7 +52,8 @@ const settingsCards = [
 ];
 
 const statusCards = [
-  { key: 'hero', priority: 10, weight: 10, height: 520 },
+  { key: 'setup-hero', priority: 10, weight: 10, height: 420 },
+  { key: 'quick-facts', priority: 9, weight: 9, height: 300 },
   { key: 'browser-links', priority: 8, weight: 8, height: 320 },
   { key: 'onboarding-qr', priority: 7, weight: 7, height: 340 },
   { key: 'stats', priority: 6, weight: 6, height: 240 },
@@ -119,7 +120,8 @@ test('layout packs tightly with no unused track gaps inside a row', () => {
 
 test('expanding a card pushes cards below it out of the way and collapsing pulls them upward', () => {
   const collapsed = computeSnapshot([
-    { key: 'hero', priority: 10, weight: 10, height: 56, collapsed: true },
+    { key: 'setup-hero', priority: 10, weight: 10, height: 56, collapsed: true },
+    { key: 'quick-facts', priority: 9, weight: 9, height: 300 },
     { key: 'browser-links', priority: 8, weight: 8, height: 320 },
     { key: 'onboarding-qr', priority: 7, weight: 7, height: 340 },
     { key: 'stats', priority: 6, weight: 6, height: 240 },
@@ -128,9 +130,12 @@ test('expanding a card pushes cards below it out of the way and collapsing pulls
 
   const expanded = computeSnapshot(statusCards, { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
 
-  const collapsedAdvanced = collapsed.find((item) => item.key === 'advanced');
-  const expandedAdvanced = expanded.find((item) => item.key === 'advanced');
-  assert.ok(expandedAdvanced.rowStart > collapsedAdvanced.rowStart);
+  const collapsedBrowserLinks = collapsed.find((item) => item.key === 'browser-links');
+  const expandedBrowserLinks = expanded.find((item) => item.key === 'browser-links');
+  const collapsedStats = collapsed.find((item) => item.key === 'stats');
+  const expandedStats = expanded.find((item) => item.key === 'stats');
+  assert.ok(expandedBrowserLinks.rowStart > collapsedBrowserLinks.rowStart);
+  assert.ok(expandedStats.rowStart > collapsedStats.rowStart);
 });
 
 test('no card overlaps another after autolayout packing', () => {
@@ -147,6 +152,8 @@ test('responsive track resolver reflows across breakpoints', () => {
   assert.deepEqual(resolver(500), { tracks: 1, maxPerRow: 1 });
   assert.deepEqual(resolver(900), { tracks: 5, maxPerRow: 2 });
   assert.deepEqual(resolver(1300), { tracks: 10, maxPerRow: 3 });
+  assert.deepEqual(resolver(900, { layoutMode: 'landscape' }), { tracks: 8, maxPerRow: 3 });
+  assert.deepEqual(resolver(1300, { layoutMode: 'landscape' }), { tracks: 12, maxPerRow: 4 });
 });
 
 test('settings and status pages use the shared engine instead of duplicated inline layout logic', () => {
@@ -192,13 +199,16 @@ test('preview modal is full-screen, uses the real status page, and syncs through
 test('status card registry is complete and default priorities match the default readable layout', () => {
   const statusKeys = extractCardKeys(statusHtml);
   assert.deepEqual(statusKeys, [
-    'hero',
+    'setup-hero',
+    'quick-facts',
     'browser-links',
     'onboarding-qr',
     'stats',
     'advanced',
   ]);
-  assert.match(statusHtml, /defaultPriorities:\s*\{[\s\S]*hero: 10,[\s\S]*"browser-links": 8,[\s\S]*"onboarding-qr": 7,[\s\S]*stats: 6,[\s\S]*advanced: 4,/);
+  assert.match(statusHtml, /defaultPriorities:\s*\{[\s\S]*"setup-hero": 10,[\s\S]*"quick-facts": 9,[\s\S]*"browser-links": 8,[\s\S]*"onboarding-qr": 7,[\s\S]*stats: 6,[\s\S]*advanced: 4,/);
+  assert.match(statusHtml, /document\.documentElement\.dataset\.designLayoutMode = layoutMode/);
+  assert.match(settingsHtml, /<select id="designLayoutMode">[\s\S]*<option value="portrait">Portrait<\/option>[\s\S]*<option value="landscape">Landscape<\/option>/);
 });
 
 test('token changes and layout events trigger reflow hooks', () => {

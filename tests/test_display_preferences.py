@@ -27,6 +27,7 @@ class DisplayPreferencesTests(unittest.TestCase):
         self.assertEqual(payload["design_controls"]["card_radius_px"], 14)
         self.assertEqual(payload["design_controls"]["shadow_intensity"], 1.0)
         self.assertEqual(payload["design_controls"]["status_page_scale"], 0.92)
+        self.assertEqual(payload["design_controls"]["layout_mode"], "portrait")
 
     def test_update_display_preferences_persists_values(self) -> None:
         payload = update_display_preferences(
@@ -39,6 +40,7 @@ class DisplayPreferencesTests(unittest.TestCase):
             card_radius_px=20,
             shadow_intensity=1.25,
             status_page_scale=0.86,
+            layout_mode="landscape",
         )
         self.assertTrue(payload["updated"])
         self.assertEqual(payload["overscan_percent"], 92)
@@ -49,6 +51,7 @@ class DisplayPreferencesTests(unittest.TestCase):
         self.assertEqual(payload["design_controls"]["card_radius_px"], 20)
         self.assertEqual(payload["design_controls"]["shadow_intensity"], 1.25)
         self.assertEqual(payload["design_controls"]["status_page_scale"], 0.86)
+        self.assertEqual(payload["design_controls"]["layout_mode"], "landscape")
 
         saved = (self.project_root / "config" / "client.env").read_text(encoding="utf-8")
         self.assertIn("BELLFORGE_DISPLAY_SCALE=0.92", saved)
@@ -59,6 +62,7 @@ class DisplayPreferencesTests(unittest.TestCase):
         self.assertIn("BELLFORGE_CARD_RADIUS_PX=20", saved)
         self.assertIn("BELLFORGE_SHADOW_INTENSITY=1.25", saved)
         self.assertIn("BELLFORGE_STATUS_PAGE_SCALE=0.86", saved)
+        self.assertIn("BELLFORGE_LAYOUT_MODE=landscape", saved)
 
 
 if __name__ == "__main__":

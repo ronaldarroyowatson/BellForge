@@ -40,15 +40,35 @@
     };
   }
 
+  function normalizeLayoutMode(value) {
+    return String(value || "portrait").trim().toLowerCase() === "landscape" ? "landscape" : "portrait";
+  }
+
   function createDefaultTrackResolver(mode) {
-    return function resolveTracks(width) {
+    return function resolveTracks(width, context = {}) {
+      const layoutMode = normalizeLayoutMode(context.layoutMode);
       if (mode === "status-display") {
+        if (layoutMode === "landscape") {
+          if (width >= 860) return { tracks: 8, maxPerRow: 3 };
+          if (width >= 520) return { tracks: 5, maxPerRow: 2 };
+          return { tracks: 1, maxPerRow: 1 };
+        }
         if (width >= 860) return { tracks: 5, maxPerRow: 2 };
         return { tracks: 1, maxPerRow: 1 };
       }
       if (mode === "settings") {
+        if (layoutMode === "landscape") {
+          if (width >= 1180) return { tracks: 12, maxPerRow: 4 };
+          if (width >= 620) return { tracks: 8, maxPerRow: 3 };
+          return { tracks: 1, maxPerRow: 1 };
+        }
         if (width >= 1180) return { tracks: 10, maxPerRow: 3 };
         if (width >= 620) return { tracks: 5, maxPerRow: 2 };
+        return { tracks: 1, maxPerRow: 1 };
+      }
+      if (layoutMode === "landscape") {
+        if (width >= 1240) return { tracks: 15, maxPerRow: 4 };
+        if (width >= 660) return { tracks: 8, maxPerRow: 3 };
         return { tracks: 1, maxPerRow: 1 };
       }
       if (width >= 1240) return { tracks: 10, maxPerRow: 3 };
@@ -243,10 +263,17 @@
     }
   }
 
+  function computeRowSpan(height, rowUnit, rowGap) {
+    const normalizedHeight = Math.max(rowUnit, Number(height) || rowUnit);
+    const normalizedGap = Math.max(0, Number(rowGap) || 0);
+    return Math.max(1, Math.ceil((normalizedHeight + normalizedGap) / (rowUnit + normalizedGap)));
+  }
+
   function computeLayoutPlan(entries, options = {}) {
     const tracks = Math.max(1, Number(options.tracks) || 1);
     const maxPerRow = Math.max(1, Number(options.maxPerRow) || 1);
     const rowUnit = Math.max(1, Number(options.rowUnit) || 8);
+    const rowGap = Math.max(0, Number(options.rowGap) || 0);
     const preferImportance = options.preferImportance === true;
     const weightedEntries = entries.map((entry, index) => ({
       index,
@@ -278,7 +305,7 @@
       let colStart = 1;
       rowEntries.forEach((entry, itemIndex) => {
         const colSpan = ratios[itemIndex] || 1;
-        const rowSpan = Math.max(1, Math.ceil(entry.height / rowUnit));
+        const rowSpan = computeRowSpan(entry.height, rowUnit, rowGap);
         let rowStart = 1;
         while (!canPlaceItem(occupied, rowStart, colStart, rowSpan, colSpan)) {
           rowStart += 1;
@@ -352,6 +379,8 @@
     const collapsedHeightToken = options.collapsedHeightToken || "--bf-space-6";
     const mode = options.mode || "status";
     const defaultPriorities = options.defaultPriorities || {};
+    const getDefaultCardState = typeof options.getDefaultCardState === "function" ? options.getDefaultCardState : null;
+    const getLayoutMode = typeof options.getLayoutMode === "function" ? options.getLayoutMode : null;
     const trackResolver = options.trackResolver || createDefaultTrackResolver(mode);
     const syncChannel = options.syncChannel || null;
     const logger = options.logger || defaultLogger({
@@ -362,6 +391,7 @@
       return {
         recompute() {},
         autoArrange() {},
+        setCardCollapsed() {},
         applyRemoteState() {},
         emitLayoutSnapshot() {},
         getLayoutCache() { return { columns: 0, rows: [], weights: {}, spans: {}, heights: {} }; },
@@ -403,20 +433,62 @@
       return Math.max(0, Math.round(container.clientWidth || container.getBoundingClientRect().width || globalScope.innerWidth || 0));
     }
 
+    function currentContainerRowGap() {
+      if (typeof getComputedStyle !== "function") {
+        return 0;
+      }
+      const styles = getComputedStyle(container);
+      return Math.max(0, Math.round(numericCssValue(styles.rowGap || styles.gap, 0)));
+    }
+
+    function resolveLayoutMode() {
+      if (getLayoutMode) {
+        return normalizeLayoutMode(getLayoutMode({ mode, container, cards }));
+      }
+      if (container?.dataset?.layoutMode) {
+        return normalizeLayoutMode(container.dataset.layoutMode);
+      }
+      if (typeof document !== "undefined" && document.documentElement) {
+        return normalizeLayoutMode(document.documentElement.dataset.designLayoutMode);
+      }
+      return "portrait";
+    }
+
+    function defaultStateForCard(card) {
+      const key = ensureCardKey(card);
+      const defaultState = getDefaultCardState ? getDefaultCardState(card, key, { mode, container }) : {};
+      return normalizeCardState(defaultState || {});
+    }
+
     function readCardState(card) {
       const key = ensureCardKey(card);
-      const normalized = normalizeCardState(state[key] || {});
-      state[key] = normalized;
+      if (!state[key]) {
+        state[key] = defaultStateForCard(card);
+      } else {
+        state[key] = normalizeCardState(state[key]);
+      }
+      const normalized = state[key];
       return normalized;
     }
 
     function persistState(reason) {
-      if (!storageKey || typeof localStorage === "undefined" || isApplyingRemoteState || skipPersistOnce) {
+      const normalizedReason = typeof reason === "string" ? reason : "card-state";
+      const isInternalRecompute = normalizedReason === "reflow"
+        || normalizedReason === "default-layout"
+        || normalizedReason === "auto-arrange";
+      if (skipPersistOnce && isInternalRecompute) {
         skipPersistOnce = false;
         return;
       }
+      if (!storageKey || typeof localStorage === "undefined" || isApplyingRemoteState) {
+        skipPersistOnce = false;
+        return;
+      }
+      if (skipPersistOnce) {
+        skipPersistOnce = false;
+      }
       localStorage.setItem(storageKey, JSON.stringify(state));
-      logger.log("preview-to-status sync events", { reason, state });
+      logger.log("preview-to-status sync events", { reason: normalizedReason, state });
     }
 
     function writeCardState(card, nextState, reason) {
@@ -434,8 +506,9 @@
       const cardState = readCardState(card);
       const helper = card.querySelector(".card-helper-text");
       if (helper) {
-        helper.hidden = !cardState.collapsed;
-        helper.textContent = card.dataset.cardHelperText || "hidden";
+        const helperText = card.dataset.cardHelperText || "";
+        helper.hidden = !cardState.collapsed || !helperText;
+        helper.textContent = helperText;
       }
       const toggle = card.querySelector('[data-card-action="collapse-toggle"]');
       if (toggle) {
@@ -446,9 +519,19 @@
 
     function applyState(card) {
       const cardState = readCardState(card);
+      const collapsedPx = resolveCollapsedHeight(card);
       card.classList.toggle("is-collapsed", Boolean(cardState.collapsed));
       card.classList.remove("is-hidden");
-      card.style.setProperty("--fibo-collapsed-height", `${resolveCollapsedHeight(card)}px`);
+      card.style.setProperty("--fibo-collapsed-height", `${collapsedPx}px`);
+      if (cardState.collapsed) {
+        card.style.height = `${collapsedPx}px`;
+        card.style.minHeight = `${collapsedPx}px`;
+        card.style.maxHeight = `${collapsedPx}px`;
+      } else {
+        card.style.removeProperty("height");
+        card.style.removeProperty("min-height");
+        card.style.removeProperty("max-height");
+      }
       if (card.matches("details")) {
         card.open = !cardState.collapsed;
       }
@@ -459,7 +542,7 @@
       const helper = document.createElement("span");
       helper.className = "card-helper-text";
       helper.hidden = true;
-      helper.textContent = target.closest("[data-fibo-card]")?.dataset.cardHelperText || "hidden";
+      helper.textContent = target.closest("[data-fibo-card]")?.dataset.cardHelperText || "";
       target.appendChild(helper);
       return helper;
     }
@@ -477,15 +560,26 @@
       const current = readCardState(card);
       writeCardState(card, { collapsed: !current.collapsed, hidden: false }, reason || "toggle-collapse");
       applyState(card);
+      pendingAutoArrange = true;
       logger.log("collapse/expand events", { reason: reason || "toggle-collapse", card: ensureCardKey(card), collapsed: !current.collapsed });
       scheduleRecompute();
     }
 
     function bindToolButton(button, card) {
+      button.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
       button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         toggleCollapsed(card, "collapse-toggle");
+        if (card.matches("details")) {
+          globalScope.setTimeout(() => {
+            applyState(card);
+            scheduleRecompute();
+          }, 0);
+        }
       });
     }
 
@@ -569,10 +663,15 @@
         }
         card.appendChild(detailsContent);
         attachDragHandlers(summary, card);
-        summary.addEventListener("click", () => {
+        summary.addEventListener("click", (event) => {
+          if (event.target instanceof Element && event.target.closest(".card-tools")) {
+            event.preventDefault();
+            return;
+          }
           globalScope.setTimeout(() => {
             writeCardState(card, { collapsed: !card.open, hidden: false }, "toggle-collapse");
             applyState(card);
+            pendingAutoArrange = true;
             logger.log("collapse/expand events", { reason: "summary-toggle", card: ensureCardKey(card), collapsed: !card.open });
             scheduleRecompute();
           }, 0);
@@ -635,7 +734,9 @@
       const contentHeight = card.querySelector(".card-content")?.scrollHeight || 0;
       const computed = typeof getComputedStyle === "function" ? getComputedStyle(card) : { paddingTop: 0, paddingBottom: 0 };
       const verticalPadding = numericCssValue(computed.paddingTop, 0) + numericCssValue(computed.paddingBottom, 0);
-      return Math.ceil(titlebarHeight + contentHeight + verticalPadding);
+      const composedHeight = Math.ceil(titlebarHeight + contentHeight + verticalPadding);
+      const scrollHeight = Math.ceil(card.scrollHeight || 0);
+      return Math.max(composedHeight, scrollHeight);
     }
 
     function buildCardDescriptor(card, index) {
@@ -649,7 +750,9 @@
         index,
         collapsed: Boolean(cardState.collapsed),
         explicitOrder: cardState.order,
-        explicitWeight: Number(card.dataset.layoutWeight || ""),
+        explicitWeight: card.dataset.layoutWeight != null && card.dataset.layoutWeight !== ""
+          ? Number(card.dataset.layoutWeight)
+          : null,
         priority,
         hasGraphic: Boolean(contentEl.querySelector("svg, canvas, img")),
         isDetailsOpen: card.matches("details[open]"),
@@ -698,59 +801,73 @@
       flushCaches();
       cards.forEach((card) => applyState(card));
 
-      const trackConfig = trackResolver(currentContainerWidth(), { mode, container, cards });
-      const descriptors = cards.map((card, index) => buildCardDescriptor(card, index));
+      const layoutMode = resolveLayoutMode();
+      const trackConfig = trackResolver(currentContainerWidth(), { mode, container, cards, layoutMode });
+      const rowGap = currentContainerRowGap();
       const preferImportance = pendingAutoArrange || shouldGenerateDefaultLayout();
-      if (preferImportance && !pendingAutoArrange) {
-        logger.log("default layout generation", { ordered: descriptors.slice().sort(sortByImportance).map((descriptor) => descriptor.key) });
+      function buildPlan() {
+        const descriptors = cards.map((card, index) => buildCardDescriptor(card, index));
+        if (preferImportance && !pendingAutoArrange) {
+          logger.log("default layout generation", { ordered: descriptors.slice().sort(sortByImportance).map((descriptor) => descriptor.key) });
+        }
+        return computeLayoutPlan(descriptors, {
+          tracks: trackConfig.tracks,
+          maxPerRow: trackConfig.maxPerRow,
+          rowUnit,
+          rowGap,
+          preferImportance,
+        });
       }
 
-      const plan = computeLayoutPlan(descriptors, {
-        tracks: trackConfig.tracks,
-        maxPerRow: trackConfig.maxPerRow,
-        rowUnit,
-        preferImportance,
-      });
+      function applyPlan(plan, options = {}) {
+        layoutCache.columns = trackConfig.tracks;
+        layoutCache.layoutMode = layoutMode;
+        layoutCache.rows = plan.rows.slice();
+        container.style.setProperty("--fibo-columns", String(trackConfig.tracks));
 
-      layoutCache.columns = trackConfig.tracks;
-      layoutCache.rows = plan.rows.slice();
-      container.style.setProperty("--fibo-columns", String(trackConfig.tracks));
-
-      plan.items.forEach((item) => {
-        const card = item.card;
-        card.style.setProperty("--fibo-order", String(item.order));
-        card.style.setProperty("--fibo-col-span", String(item.colSpan));
-        card.style.setProperty("--fibo-row-span", String(item.rowSpan));
-        card.style.setProperty("--fibo-col-start", String(item.colStart));
-        card.style.setProperty("--fibo-row-start", String(item.rowStart));
-        card.dataset.fiboOrder = String(item.order);
-        card.dataset.fiboRowIndex = String(item.rowIndex);
-        card.dataset.fiboRowStart = String(item.rowStart);
-        card.dataset.fiboColStart = String(item.colStart);
-        card.dataset.fiboColSpan = String(item.colSpan);
-        card.dataset.fiboRowSpan = String(item.rowSpan);
-        card.dataset.fiboWeight = String(item.weight);
-        const key = ensureCardKey(card);
-        layoutCache.spans[key] = {
-          col: item.colSpan,
-          row: item.rowSpan,
-          order: item.order,
-          start: item.colStart,
-          rowStart: item.rowStart,
-        };
-        state[key] = { ...readCardState(card), order: item.order };
-        logger.log("Fibonacci slot assignments", {
-          card: key,
-          rowIndex: item.rowIndex,
-          rowStart: item.rowStart,
-          colStart: item.colStart,
-          colSpan: item.colSpan,
-          rowSpan: item.rowSpan,
-          order: item.order,
+        plan.items.forEach((item) => {
+          const card = item.card;
+          card.style.setProperty("--fibo-order", String(item.order));
+          card.style.setProperty("--fibo-col-span", String(item.colSpan));
+          card.style.setProperty("--fibo-row-span", String(item.rowSpan));
+          card.style.setProperty("--fibo-col-start", String(item.colStart));
+          card.style.setProperty("--fibo-row-start", String(item.rowStart));
+          card.dataset.fiboOrder = String(item.order);
+          card.dataset.fiboRowIndex = String(item.rowIndex);
+          card.dataset.fiboRowStart = String(item.rowStart);
+          card.dataset.fiboColStart = String(item.colStart);
+          card.dataset.fiboColSpan = String(item.colSpan);
+          card.dataset.fiboRowSpan = String(item.rowSpan);
+          card.dataset.fiboWeight = String(item.weight);
+          const key = ensureCardKey(card);
+          layoutCache.spans[key] = {
+            col: item.colSpan,
+            row: item.rowSpan,
+            order: item.order,
+            start: item.colStart,
+            rowStart: item.rowStart,
+          };
+          state[key] = { ...readCardState(card), order: item.order };
+          if (options.logAssignments !== false) {
+            logger.log("Fibonacci slot assignments", {
+              card: key,
+              rowIndex: item.rowIndex,
+              rowStart: item.rowStart,
+              colStart: item.colStart,
+              colSpan: item.colSpan,
+              rowSpan: item.rowSpan,
+              order: item.order,
+            });
+          }
         });
-      });
+      }
 
-      logger.log("card reflow events", snapshotFromPlan(plan));
+      const initialPlan = buildPlan();
+      applyPlan(initialPlan, { logAssignments: false });
+      const refinedPlan = buildPlan();
+      applyPlan(refinedPlan);
+
+      logger.log("card reflow events", snapshotFromPlan(refinedPlan));
       persistState(pendingAutoArrange ? "auto-arrange" : preferImportance ? "default-layout" : "reflow");
       emitLayoutSnapshot(pendingAutoArrange ? "auto-arrange" : preferImportance ? "default-layout" : "reflow");
       pendingAutoArrange = false;
@@ -781,12 +898,25 @@
 
     function resetState(reason) {
       cards.forEach((card) => {
-        state[ensureCardKey(card)] = normalizeCardState({});
+        state[ensureCardKey(card)] = defaultStateForCard(card);
       });
       pendingAutoArrange = true;
       logger.log("default layout generation", { reason: reason || "reset-state", action: "state-reset" });
       persistState(reason || "reset-state");
       scheduleRecompute();
+    }
+
+    function setCardCollapsed(cardKey, collapsed, reason) {
+      const card = cards.find((entry) => ensureCardKey(entry) === cardKey);
+      if (!card) {
+        return false;
+      }
+      writeCardState(card, { collapsed: Boolean(collapsed), hidden: false }, reason || "set-card-collapsed");
+      applyState(card);
+      pendingAutoArrange = true;
+      logger.log("collapse/expand events", { reason: reason || "set-card-collapsed", card: cardKey, collapsed: Boolean(collapsed) });
+      scheduleRecompute();
+      return true;
     }
 
     function applyRemoteState(remoteState, reason) {
@@ -806,7 +936,7 @@
     cards.forEach((card) => {
       const key = ensureCardKey(card);
       if (!state[key]) {
-        state[key] = normalizeCardState({});
+        state[key] = defaultStateForCard(card);
       }
       injectControls(card);
       applyState(card);
@@ -830,11 +960,13 @@
       recompute: scheduleRecompute,
       autoArrange,
       resetState,
+      setCardCollapsed,
       applyRemoteState,
       emitLayoutSnapshot,
       getLayoutCache() {
         return {
           columns: layoutCache.columns,
+          layoutMode: layoutCache.layoutMode || resolveLayoutMode(),
           rows: layoutCache.rows.slice(),
           weights: { ...layoutCache.weights },
           spans: { ...layoutCache.spans },
@@ -843,9 +975,10 @@
       },
       getSnapshot() {
         return snapshotFromPlan(computeLayoutPlan(cards.map((card, index) => buildCardDescriptor(card, index)), {
-          tracks: layoutCache.columns || trackResolver(currentContainerWidth(), { mode, container, cards }).tracks,
-          maxPerRow: trackResolver(currentContainerWidth(), { mode, container, cards }).maxPerRow,
+          tracks: layoutCache.columns || trackResolver(currentContainerWidth(), { mode, container, cards, layoutMode: resolveLayoutMode() }).tracks,
+          maxPerRow: trackResolver(currentContainerWidth(), { mode, container, cards, layoutMode: resolveLayoutMode() }).maxPerRow,
           rowUnit,
+          rowGap: currentContainerRowGap(),
           preferImportance: false,
         }));
       },
@@ -862,10 +995,12 @@
     normalizeRatios,
     computeDescriptorWeight,
     computeLayoutPlan,
+    computeRowSpan,
     snapshotFromPlan,
     createAdaptiveLayout,
     createDefaultTrackResolver,
     extractResolutionCandidatesFromText,
+    normalizeLayoutMode,
     pickBestResolution,
   };
 });

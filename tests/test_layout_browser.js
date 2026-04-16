@@ -6,6 +6,14 @@ const http = require('node:http');
 const { spawn } = require('node:child_process');
 
 const { chromium } = require('playwright');
+const {
+  collectOverlaps,
+  collectSpacingMetrics,
+  countVisibleCards,
+  findFibonacciRatioIssues,
+  findWeightOrderingIssues,
+  simplifyLayout,
+} = require('./layout_dom_utils.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const BASE_URL = 'http://127.0.0.1:8000';
@@ -295,6 +303,10 @@ async function captureSnapshot(target, kind) {
         gap: round(Number.parseFloat(containerStyle?.columnGap || containerStyle?.gap || '0') || 0),
         columns: Number(containerStyle?.getPropertyValue('--fibo-columns') || container?.style.getPropertyValue('--fibo-columns') || 0),
       },
+      document: {
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+      },
       layoutCache: debugLayout?.getLayoutCache?.() || null,
       state: debugLayout?.getState?.() || null,
       cards,
@@ -302,25 +314,9 @@ async function captureSnapshot(target, kind) {
   }, { kind });
 }
 
-function rowGroups(snapshot) {
-  const groups = new Map();
-  snapshot.cards.forEach((card) => {
-    if (!groups.has(card.rowIndex)) groups.set(card.rowIndex, []);
-    groups.get(card.rowIndex).push(card);
-  });
-  return Array.from(groups.values()).map((items) => items.sort((left, right) => left.colStart - right.colStart));
-}
-
 function assertNoOverlap(snapshot) {
-  const cards = snapshot.cards;
-  for (let index = 0; index < cards.length; index += 1) {
-    for (let compare = index + 1; compare < cards.length; compare += 1) {
-      const left = cards[index].rect;
-      const right = cards[compare].rect;
-      const overlaps = !(left.bottom <= right.y + 1 || right.bottom <= left.y + 1 || left.right <= right.x + 1 || right.right <= left.x + 1);
-      assert.equal(overlaps, false, `${snapshot.kind}: ${cards[index].key} overlaps ${cards[compare].key}`);
-    }
-  }
+  const overlaps = collectOverlaps(snapshot);
+  assert.equal(overlaps.length, 0, `${snapshot.kind}: ${overlaps[0]?.left} overlaps ${overlaps[0]?.right}`);
 }
 
 function assertCardsRemainInGrid(snapshot) {
@@ -329,6 +325,7 @@ function assertCardsRemainInGrid(snapshot) {
     assert.notEqual(card.computed.position, 'absolute', `${snapshot.kind}: ${card.key} left grid flow`);
     assert.notEqual(card.computed.position, 'fixed', `${snapshot.kind}: ${card.key} left grid flow`);
     assert.ok(card.rect.width > 0 && card.rect.height > 0, `${snapshot.kind}: ${card.key} is not visible`);
+    assert.notEqual(card.computed.display, 'none', `${snapshot.kind}: ${card.key} is hidden`);
   });
 }
 
@@ -341,46 +338,76 @@ function assertCollapseControls(snapshot, keys) {
 }
 
 function assertFibonacciRatios(snapshot, tolerance = 0.03) {
-  const gap = snapshot.container.gap || 0;
-  rowGroups(snapshot).forEach((items) => {
-    if (items.length <= 1) {
-      return;
-    }
-    const normalizedWidths = items.map((item) => item.rect.width - ((item.colSpan - 1) * gap));
-    const expectedSpans = items.map((item) => item.colSpan);
-    for (let index = 1; index < items.length; index += 1) {
-      const actualRatio = normalizedWidths[index - 1] / normalizedWidths[index];
-      const expectedRatio = expectedSpans[index - 1] / expectedSpans[index];
-      const delta = Math.abs(actualRatio - expectedRatio) / expectedRatio;
-      assert.ok(delta <= tolerance, `${snapshot.kind}: ratio failed for ${items[index - 1].key}:${items[index].key} (${actualRatio.toFixed(3)} vs ${expectedRatio.toFixed(3)})`);
-    }
-  });
+  const issues = findFibonacciRatioIssues(snapshot, tolerance);
+  assert.equal(issues.length, 0, `${snapshot.kind}: ratio failed for ${issues[0]?.left}:${issues[0]?.right} (${issues[0]?.actualRatio} vs ${issues[0]?.expectedRatio})`);
 }
 
 function assertWeightOrdering(snapshot) {
-  const cards = snapshot.cards;
-  for (let index = 0; index < cards.length; index += 1) {
-    for (let compare = index + 1; compare < cards.length; compare += 1) {
-      if (cards[index].weight > cards[compare].weight) {
-        assert.ok(cards[index].colSpan >= cards[compare].colSpan, `${snapshot.kind}: heavier ${cards[index].key} should not get smaller slot than ${cards[compare].key}`);
-      }
-    }
-  }
+  const issues = findWeightOrderingIssues(snapshot);
+  assert.equal(issues.length, 0, `${snapshot.kind}: heavier ${issues[0]?.heavier} should not get smaller slot than ${issues[0]?.lighter}`);
 }
 
 function assertExpectedColumns(snapshot, expectedColumns) {
   assert.equal(snapshot.container.columns, expectedColumns, `${snapshot.kind}: expected ${expectedColumns} tracks, got ${snapshot.container.columns}`);
 }
 
-function simplifyLayout(snapshot) {
-  return snapshot.cards.map((card) => ({
-    key: card.key,
-    collapsed: card.collapsed,
-    rowIndex: card.rowIndex,
-    colStart: card.colStart,
-    colSpan: card.colSpan,
-    order: card.order,
-  }));
+function assertSpacing(snapshot, options = {}) {
+  const metrics = collectSpacingMetrics(snapshot);
+  const minVisibleCards = options.minVisibleCards ?? Math.min(snapshot.cards.length, 3);
+  if (options.maxUnusedAreaRatio != null) {
+    assert.ok(metrics.unusedAreaRatio <= options.maxUnusedAreaRatio, `${snapshot.kind}: wasted whitespace ratio ${metrics.unusedAreaRatio}`);
+  }
+  assert.ok(metrics.visibleCards >= minVisibleCards, `${snapshot.kind}: only ${metrics.visibleCards} cards are visible above the fold`);
+}
+
+function assertWhitespaceImproves(beforeSnapshot, afterSnapshot, label, allowance = 0.02) {
+  const beforeMetrics = collectSpacingMetrics(beforeSnapshot);
+  const afterMetrics = collectSpacingMetrics(afterSnapshot);
+  assert.ok(afterMetrics.unusedAreaRatio <= beforeMetrics.unusedAreaRatio + allowance, `${label}: whitespace worsened from ${beforeMetrics.unusedAreaRatio} to ${afterMetrics.unusedAreaRatio}`);
+}
+
+function assertCollapsedCardsVisible(snapshot, keys) {
+  for (const key of keys) {
+    const card = snapshot.cards.find((item) => item.key === key);
+    assert.ok(card, `${snapshot.kind}: missing card ${key}`);
+    assert.equal(card.collapsed, true, `${snapshot.kind}: ${key} is not collapsed`);
+    assert.equal(card.collapseLabel, 'Expand', `${snapshot.kind}: ${key} did not expose an expand control after collapse`);
+    assert.ok(card.rect.width > 0 && card.rect.height > 0, `${snapshot.kind}: ${key} disappeared after collapse`);
+  }
+}
+
+function assertMovement(beforeSnapshot, afterSnapshot, options = {}) {
+  const delta = options.delta ?? 4;
+  const cardKeys = options.keys || beforeSnapshot.cards.map((card) => card.key);
+  const beforeMap = new Map(beforeSnapshot.cards.map((card) => [card.key, card]));
+  const afterMap = new Map(afterSnapshot.cards.map((card) => [card.key, card]));
+  let horizontal = false;
+  let vertical = false;
+
+  for (const key of cardKeys) {
+    const before = beforeMap.get(key);
+    const after = afterMap.get(key);
+    if (!before || !after) {
+      continue;
+    }
+    if (Math.abs(before.rect.x - after.rect.x) > delta) {
+      horizontal = true;
+    }
+    if (Math.abs(before.rect.y - after.rect.y) > delta) {
+      vertical = true;
+    }
+  }
+
+  if (options.requireHorizontal !== false) {
+    assert.equal(horizontal, true, `${afterSnapshot.kind}: expected horizontal movement after reflow`);
+  }
+  if (options.requireVertical !== false) {
+    assert.equal(vertical, true, `${afterSnapshot.kind}: expected vertical movement after reflow`);
+  }
+}
+
+function assertConsoleContains(entries, snippet, label) {
+  assert.ok(entries.some((entry) => entry.text.includes(snippet)), `${label}: missing console log containing "${snippet}"`);
 }
 
 async function dragCard(target, sourceKey, targetKey) {
@@ -396,11 +423,49 @@ async function dragCard(target, sourceKey, targetKey) {
     destination.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
     source.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }));
   }, { sourceKey, targetKey });
+  await target.evaluate(() => {
+    window.__bellforgeStatusLayout?.recompute?.();
+    window.__bellforgeSettingsLayout?.recompute?.();
+  });
   await waitForLayoutReady(target);
+  await target.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 async function collapseCard(target, key) {
-  await target.locator(`[data-card-key="${key}"] [data-card-action="collapse-toggle"]`).click();
+  const expectedCollapsed = await target.evaluate((targetKey) => {
+    const card = document.querySelector(`[data-card-key="${targetKey}"]`);
+    return !card?.classList.contains('is-collapsed');
+  }, key);
+  await target.evaluate((targetKey) => {
+    const button = document.querySelector(`[data-card-key="${targetKey}"] [data-card-action="collapse-toggle"]`);
+    if (!button) {
+      throw new Error(`Missing collapse button for ${targetKey}`);
+    }
+    button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }, key);
+  await target.waitForFunction(({ targetKey, expected }) => {
+    const card = document.querySelector(`[data-card-key="${targetKey}"]`);
+    return Boolean(card) && card.classList.contains('is-collapsed') === expected;
+  }, { targetKey: key, expected: expectedCollapsed });
+  await waitForLayoutReady(target);
+}
+
+async function setCardCollapsed(target, key, collapsed) {
+  await target.evaluate(({ targetKey, nextCollapsed }) => {
+    const statusLayout = window.__bellforgeStatusLayout;
+    const settingsLayout = window.__bellforgeSettingsLayout;
+    const applied = statusLayout?.setCardCollapsed?.(targetKey, nextCollapsed, 'browser-dom-verification')
+      || settingsLayout?.setCardCollapsed?.(targetKey, nextCollapsed, 'browser-dom-verification');
+    if (!applied) {
+      throw new Error(`Unable to set collapsed state for ${targetKey}`);
+    }
+  }, { targetKey: key, nextCollapsed: collapsed });
+  await target.waitForFunction(({ targetKey, expected }) => {
+    const card = document.querySelector(`[data-card-key="${targetKey}"]`);
+    return Boolean(card) && card.classList.contains('is-collapsed') === expected;
+  }, { targetKey: key, expected: collapsed });
   await waitForLayoutReady(target);
 }
 
@@ -435,11 +500,11 @@ test('browser verification validates real status DOM collapse, expand, drag, rat
     const beforeCollapse = await captureSnapshot(page, `status-before-collapse-${attempt}`);
     writeArtifact(`status-before-collapse-${attempt}`, { snapshot: beforeCollapse, consoleEntries });
     assertCardsRemainInGrid(beforeCollapse);
-    assertCollapseControls(beforeCollapse, ['browser-links', 'stats', 'advanced']);
+    assertCollapseControls(beforeCollapse, ['setup-hero', 'quick-facts', 'browser-links', 'onboarding-qr', 'stats', 'advanced']);
     assertNoOverlap(beforeCollapse);
     assertFibonacciRatios(beforeCollapse);
-    assertWeightOrdering(beforeCollapse);
-    assert.deepEqual(beforeCollapse.cards.map((card) => card.key), ['hero', 'browser-links', 'onboarding-qr', 'stats', 'advanced']);
+    assertSpacing(beforeCollapse, { minVisibleCards: 2 });
+    assert.deepEqual(beforeCollapse.cards.map((card) => card.key), ['setup-hero', 'quick-facts', 'browser-links', 'onboarding-qr', 'stats', 'advanced']);
 
     await collapseCard(page, 'stats');
     const afterCollapse = await captureSnapshot(page, `status-after-collapse-${attempt}`);
@@ -451,7 +516,11 @@ test('browser verification validates real status DOM collapse, expand, drag, rat
     assert.ok(collapsedStats.rect.y >= beforeCollapse.cards.find((card) => card.key === 'browser-links').rect.y, 'Collapsed card floated to the top');
     assert.ok(collapsedStats.rect.height < beforeStats.rect.height, 'Collapsed card height did not reduce');
     assertCardsRemainInGrid(afterCollapse);
+    assertCollapsedCardsVisible(afterCollapse, ['stats']);
     assertNoOverlap(afterCollapse);
+    assertSpacing(afterCollapse, { minVisibleCards: countVisibleCards(beforeCollapse) });
+    assert.ok(countVisibleCards(afterCollapse) >= countVisibleCards(beforeCollapse), 'Collapsing a card did not maximize visible cards');
+    assertWhitespaceImproves(beforeCollapse, afterCollapse, 'status collapse density');
 
     await collapseCard(page, 'stats');
     const afterExpand = await captureSnapshot(page, `status-after-expand-${attempt}`);
@@ -462,14 +531,125 @@ test('browser verification validates real status DOM collapse, expand, drag, rat
     assert.equal(expandedStats.collapsed, false, 'Card did not expand again');
     assert.ok(advancedAfterExpand.rect.y >= advancedAfterCollapse.rect.y, 'Expanding a card did not push later cards back down');
     assertNoOverlap(afterExpand);
+    assertSpacing(afterExpand, { minVisibleCards: 2 });
 
     await dragCard(page, 'advanced', 'browser-links');
     const afterDrag = await captureSnapshot(page, `status-after-drag-${attempt}`);
     writeArtifact(`status-after-drag-${attempt}`, { snapshot: afterDrag, consoleEntries });
-    assert.equal(afterDrag.cards[1].key, 'advanced', 'Drag-and-drop did not reorder cards');
+    const advancedIndex = afterDrag.cards.findIndex((card) => card.key === 'advanced');
+    const browserLinksIndex = afterDrag.cards.findIndex((card) => card.key === 'browser-links');
+    assert.ok(advancedIndex >= 0 && browserLinksIndex >= 0 && advancedIndex + 1 === browserLinksIndex, 'Drag-and-drop did not place Advanced Diagnostics immediately before Browser Links');
     assertNoOverlap(afterDrag);
     assertFibonacciRatios(afterDrag);
+
+    await page.setViewportSize({ width: 800, height: 480 });
+    await waitForLayoutReady(page);
+    const afterResizeSmall = await captureSnapshot(page, `status-after-resize-small-${attempt}`);
+    writeArtifact(`status-after-resize-small-${attempt}`, { snapshot: afterResizeSmall, consoleEntries });
+    assertExpectedColumns(afterResizeSmall, 5);
+    assert.notDeepEqual(simplifyLayout(afterResizeSmall), simplifyLayout(afterDrag), 'Status layout did not reflow after resize');
+    assertNoOverlap(afterResizeSmall);
+
+    await collapseCard(page, 'stats');
+    const beforeTokenChange = await captureSnapshot(page, `status-before-token-change-${attempt}`);
+    writeArtifact(`status-before-token-change-${attempt}`, { snapshot: beforeTokenChange, consoleEntries });
+
+    const spacingBeforeToken = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bf-space-6').trim());
+    await page.evaluate(() => {
+      window.postMessage({
+        type: 'bellforge-design-controls',
+        payload: {
+          theme: 'warm',
+          font_scale: 1,
+          ui_scale: 1.2,
+          card_radius_px: 24,
+          shadow_intensity: 1,
+          status_page_scale: 0.75,
+        },
+      }, window.location.origin);
+    });
+    await waitForLayoutReady(page);
+    const afterTokenChange = await captureSnapshot(page, `status-after-token-change-${attempt}`);
+    writeArtifact(`status-after-token-change-${attempt}`, { snapshot: afterTokenChange, consoleEntries });
+    const spacingAfterToken = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bf-space-6').trim());
+    const collapsedStatsBeforeToken = beforeTokenChange.cards.find((card) => card.key === 'stats');
+    const collapsedStatsAfterToken = afterTokenChange.cards.find((card) => card.key === 'stats');
+    assert.notEqual(spacingAfterToken, spacingBeforeToken, 'Token changes did not update live spacing tokens');
+    assert.ok(collapsedStatsAfterToken.rect.height > collapsedStatsBeforeToken.rect.height, 'Status layout did not reflow after token changes');
+    assertNoOverlap(afterTokenChange);
+    assertFibonacciRatios(afterTokenChange);
+    assertSpacing(afterTokenChange, { minVisibleCards: 2 });
   });
+
+  assertConsoleContains(consoleEntries, 'default layout generation', 'status console');
+  assertConsoleContains(consoleEntries, 'Fibonacci slot assignments', 'status console');
+  assertConsoleContains(consoleEntries, 'collapse/expand events', 'status console');
+  assertConsoleContains(consoleEntries, 'drag-and-drop events', 'status console');
+  assertConsoleContains(consoleEntries, 'token application', 'status console');
+  assertConsoleContains(consoleEntries, 'card reflow events', 'status console');
+
+  await context.close();
+});
+
+test('browser verification validates settings collapse density, multi-expand reflow, and auto-arrange repair', async () => {
+  const context = await newContext({ width: 1280, height: 720 });
+  const { page, consoleEntries } = await openPage(context, SETTINGS_PATH, 'settings-layout-behavior');
+  const cardKeys = ['display-pipeline', 'network', 'autoupdater', 'design-controls', 'authentication', 'logs'];
+
+  await withRepair(page, 'settings', 'settings-dom-verification', async (attempt) => {
+    const before = await captureSnapshot(page, `settings-before-${attempt}`);
+    writeArtifact(`settings-before-${attempt}`, { snapshot: before, consoleEntries });
+    assertCardsRemainInGrid(before);
+    assertNoOverlap(before);
+    assertFibonacciRatios(before);
+    assertWeightOrdering(before);
+    assertSpacing(before, { minVisibleCards: 2 });
+
+    for (const key of cardKeys) {
+      await setCardCollapsed(page, key, true);
+    }
+    const allCollapsed = await captureSnapshot(page, `settings-all-collapsed-${attempt}`);
+    writeArtifact(`settings-all-collapsed-${attempt}`, { snapshot: allCollapsed, consoleEntries });
+    assertCollapsedCardsVisible(allCollapsed, cardKeys);
+    assertNoOverlap(allCollapsed);
+    assertFibonacciRatios(allCollapsed);
+    assertSpacing(allCollapsed, { maxUnusedAreaRatio: 0.5, minVisibleCards: cardKeys.length });
+    assert.equal(countVisibleCards(allCollapsed), cardKeys.length, 'Collapsed settings cards did not pack tightly on screen');
+    assert.ok(countVisibleCards(allCollapsed) >= countVisibleCards(before), 'Collapsed settings layout reduced visible cards');
+    assertWhitespaceImproves(before, allCollapsed, 'settings collapse density');
+
+    await setCardCollapsed(page, 'network', false);
+    await setCardCollapsed(page, 'design-controls', false);
+    const multiExpanded = await captureSnapshot(page, `settings-multi-expanded-${attempt}`);
+    writeArtifact(`settings-multi-expanded-${attempt}`, { snapshot: multiExpanded, consoleEntries });
+    assert.equal(multiExpanded.cards.find((card) => card.key === 'network')?.collapsed, false, 'Network card did not expand');
+    assert.equal(multiExpanded.cards.find((card) => card.key === 'design-controls')?.collapsed, false, 'Design controls card did not expand');
+    assertNoOverlap(multiExpanded);
+    assertSpacing(multiExpanded, { minVisibleCards: 2 });
+    assertMovement(allCollapsed, multiExpanded, { requireHorizontal: false, requireVertical: true });
+
+    await dragCard(page, 'logs', 'network');
+    const afterDrag = await captureSnapshot(page, `settings-after-drag-${attempt}`);
+    writeArtifact(`settings-after-drag-${attempt}`, { snapshot: afterDrag, consoleEntries });
+    assert.ok(afterDrag.cards.findIndex((card) => card.key === 'logs') < afterDrag.cards.findIndex((card) => card.key === 'network'), 'Settings drag-and-drop did not reorder cards');
+    assertNoOverlap(afterDrag);
+
+    await page.evaluate(() => {
+      window.__bellforgeSettingsLayout?.autoArrange?.();
+    });
+    await waitForLayoutReady(page);
+    const afterAutoArrange = await captureSnapshot(page, `settings-after-auto-arrange-${attempt}`);
+    writeArtifact(`settings-after-auto-arrange-${attempt}`, { snapshot: afterAutoArrange, consoleEntries });
+    assert.notDeepEqual(simplifyLayout(afterAutoArrange), simplifyLayout(afterDrag), 'Settings auto arrange did not visibly rearrange cards');
+    assertNoOverlap(afterAutoArrange);
+    assertFibonacciRatios(afterAutoArrange);
+    assertMovement(afterDrag, afterAutoArrange, { requireHorizontal: true, requireVertical: true });
+  });
+
+  assertConsoleContains(consoleEntries, 'collapse/expand events', 'settings console');
+  assertConsoleContains(consoleEntries, 'drag-and-drop events', 'settings console');
+  assertConsoleContains(consoleEntries, 'auto-arrange events', 'settings console');
+  assertConsoleContains(consoleEntries, 'card reflow events', 'settings console');
 
   await context.close();
 });
@@ -538,11 +718,13 @@ test('browser verification keeps status onboarding card stable with long live-li
 test('browser verification validates preview modal scale, mirrored layout, collapse, and drag behavior', async () => {
   const context = await newContext({ width: 1280, height: 720 });
   const { page: referencePage, consoleEntries: referenceConsole } = await openPage(context, DISPLAY_STATUS_PATH, 'status-display-reference');
-  const referenceSnapshot = await captureSnapshot(referencePage, 'status-display-reference');
-  writeArtifact('status-display-reference', { snapshot: referenceSnapshot, consoleEntries: referenceConsole });
+  const initialReferenceSnapshot = await captureSnapshot(referencePage, 'status-display-reference');
+  writeArtifact('status-display-reference', { snapshot: initialReferenceSnapshot, consoleEntries: referenceConsole });
 
   const { page: settingsPage, consoleEntries: settingsConsole } = await openPage(context, SETTINGS_PATH, 'settings-preview');
   await withRepair(settingsPage, 'settings', 'settings-preview-modal', async (attempt) => {
+    const referenceSnapshot = await captureSnapshot(referencePage, `status-display-reference-${attempt}`);
+    writeArtifact(`status-display-reference-${attempt}`, { snapshot: referenceSnapshot, consoleEntries: referenceConsole });
     const previewFrame = await openPreviewModal(settingsPage);
     const previewConsole = attachConsole(previewFrame.page(), `preview-frame-${attempt}`);
     const modalMetrics = await settingsPage.evaluate(() => {
@@ -574,6 +756,8 @@ test('browser verification validates preview modal scale, mirrored layout, colla
 
     assert.equal(modalMetrics.previewOpen, true, 'Preview modal did not open');
     assert.equal(modalMetrics.modalPosition, 'fixed', 'Preview modal is not fixed full-screen');
+  assert.ok(Math.abs(modalMetrics.modalRect.width - 1280) <= 4, 'Preview modal overlay does not span the full viewport width');
+  assert.ok(Math.abs(modalMetrics.modalRect.height - 720) <= 4, 'Preview modal overlay does not span the full viewport height');
     assert.ok(modalMetrics.nativeWidth >= 800 && modalMetrics.nativeHeight >= 480, 'Preview modal chose an unexpectedly tiny display resolution');
     const nativeRatio = modalMetrics.nativeWidth / modalMetrics.nativeHeight;
     const viewportRatio = modalMetrics.viewportWidth / modalMetrics.viewportHeight;
@@ -584,21 +768,71 @@ test('browser verification validates preview modal scale, mirrored layout, colla
     assertCardsRemainInGrid(previewSnapshot);
     assertNoOverlap(previewSnapshot);
     assertFibonacciRatios(previewSnapshot);
+    assertSpacing(previewSnapshot, { minVisibleCards: 2 });
 
-    await collapseCard(previewFrame, 'advanced');
+    await setCardCollapsed(previewFrame, 'advanced', true);
     const collapsedPreview = await captureSnapshot(previewFrame, `status-preview-collapsed-${attempt}`);
     writeArtifact(`status-preview-collapsed-${attempt}`, { snapshot: collapsedPreview, settingsConsoleEntries: settingsConsole, previewConsoleEntries: previewConsole });
     const previewAdvanced = collapsedPreview.cards.find((card) => card.key === 'advanced');
     assert.equal(previewAdvanced.collapsed, true, 'Preview collapse did not apply');
     assert.ok(previewAdvanced.rect.height <= previewAdvanced.titlebarHeight + 24, 'Preview collapsed card did not shrink to title-only height');
     assertNoOverlap(collapsedPreview);
+    await waitForLayoutReady(referencePage);
+    const referenceAfterCollapse = await captureSnapshot(referencePage, `status-reference-after-preview-collapse-${attempt}`);
+    writeArtifact(`status-reference-after-preview-collapse-${attempt}`, { snapshot: referenceAfterCollapse, consoleEntries: referenceConsole });
+    assert.equal(referenceAfterCollapse.cards.find((card) => card.key === 'advanced')?.collapsed, true, 'Preview collapse did not update the real status page');
 
     await dragCard(previewFrame, 'advanced', 'browser-links');
     const draggedPreview = await captureSnapshot(previewFrame, `status-preview-dragged-${attempt}`);
     writeArtifact(`status-preview-dragged-${attempt}`, { snapshot: draggedPreview, settingsConsoleEntries: settingsConsole, previewConsoleEntries: previewConsole });
-    assert.equal(draggedPreview.cards[1].key, 'advanced', 'Preview drag-and-drop did not reorder cards');
+    const previewAdvancedIndex = draggedPreview.cards.findIndex((card) => card.key === 'advanced');
+    const previewBrowserLinksIndex = draggedPreview.cards.findIndex((card) => card.key === 'browser-links');
+    assert.ok(previewAdvancedIndex >= 0 && previewBrowserLinksIndex >= 0 && previewAdvancedIndex + 1 === previewBrowserLinksIndex, 'Preview drag-and-drop did not place Advanced Diagnostics immediately before Browser Links');
     assertNoOverlap(draggedPreview);
+    await waitForLayoutReady(referencePage);
+    const referenceAfterDrag = await captureSnapshot(referencePage, `status-reference-after-preview-drag-${attempt}`);
+    writeArtifact(`status-reference-after-preview-drag-${attempt}`, { snapshot: referenceAfterDrag, consoleEntries: referenceConsole });
+    assert.deepEqual(simplifyLayout(referenceAfterDrag), simplifyLayout(draggedPreview), 'Preview drag-and-drop did not update the real status page layout');
+
+    await settingsPage.evaluate(() => {
+      window.__bellforgeStatusPreview?.autoArrange?.();
+    });
+    await waitForLayoutReady(previewFrame);
+    await waitForLayoutReady(referencePage);
+    const previewAfterAuto = await captureSnapshot(previewFrame, `status-preview-auto-arranged-${attempt}`);
+    const referenceAfterAuto = await captureSnapshot(referencePage, `status-reference-auto-arranged-${attempt}`);
+    writeArtifact(`status-preview-auto-arranged-${attempt}`, {
+      previewSnapshot: previewAfterAuto,
+      referenceSnapshot: referenceAfterAuto,
+      settingsConsoleEntries: settingsConsole,
+      previewConsoleEntries: previewConsole,
+      referenceConsoleEntries: referenceConsole,
+    });
+    assert.notDeepEqual(simplifyLayout(previewAfterAuto), simplifyLayout(draggedPreview), 'Preview auto arrange did not visibly rearrange cards');
+    assert.deepEqual(simplifyLayout(previewAfterAuto), simplifyLayout(referenceAfterAuto), 'Preview auto arrange did not update the real status page');
+    assertFibonacciRatios(previewAfterAuto);
+
+    await dragCard(referencePage, 'stats', 'advanced');
+    const referenceAfterLiveDrag = await captureSnapshot(referencePage, `status-reference-live-drag-${attempt}`);
+    writeArtifact(`status-reference-live-drag-${attempt}`, { snapshot: referenceAfterLiveDrag, consoleEntries: referenceConsole });
+    await settingsPage.evaluate(() => {
+      window.__bellforgeStatusPreview?.sync?.();
+    });
+    await waitForLayoutReady(previewFrame);
+    const previewAfterSync = await captureSnapshot(previewFrame, `status-preview-after-sync-${attempt}`);
+    writeArtifact(`status-preview-after-sync-${attempt}`, {
+      previewSnapshot: previewAfterSync,
+      referenceSnapshot: referenceAfterLiveDrag,
+      settingsConsoleEntries: settingsConsole,
+      previewConsoleEntries: previewConsole,
+      referenceConsoleEntries: referenceConsole,
+    });
+    assert.deepEqual(simplifyLayout(previewAfterSync), simplifyLayout(referenceAfterLiveDrag), 'Preview sync did not refresh the preview to the real status layout');
   });
+
+  assertConsoleContains(settingsConsole, 'preview expansion/collapse', 'settings preview console');
+  assertConsoleContains(settingsConsole, 'preview-to-status sync events', 'settings preview console');
+  assertConsoleContains(settingsConsole, 'window resize reflow', 'settings preview console');
 
   await context.close();
 });

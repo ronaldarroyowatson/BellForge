@@ -181,7 +181,7 @@
       grid-template-columns: repeat(var(--fibo-columns, 1), minmax(0, 1fr));
       grid-auto-rows: var(--fibo-row-unit);
       grid-auto-flow: dense;
-      gap: 14px;
+      gap: var(--dcs-space-2);
       align-items: start;
     }
     .grid.fibo-adaptive-grid {
@@ -196,7 +196,7 @@
       border-radius: var(--radius-card);
       box-shadow: 0 calc(10px * var(--dcs-shadow-intensity)) calc(20px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.08);
       padding: calc(14px * var(--dcs-ui-scale));
-      min-height: var(--card-min-height, 200px);
+      min-height: 0;
       position: relative;
       grid-column: var(--fibo-col-start, auto) / span var(--fibo-col-span, 1);
       grid-row: var(--fibo-row-start, auto) / span var(--fibo-row-span, 18);
@@ -209,10 +209,12 @@
                   grid-row var(--motion-reflow-duration) var(--motion-reflow-easing);
     }
     .card.is-collapsed {
-      --card-min-height: var(--dcs-space-6);
       align-self: start;
+      gap: 0;
+      padding: 0;
       min-height: var(--fibo-collapsed-height, var(--dcs-space-6));
       height: var(--fibo-collapsed-height, var(--dcs-space-6));
+      max-height: 120px;
       overflow: hidden;
       background: var(--surface-shade-3);
       border-color: var(--stroke-default);
@@ -223,9 +225,13 @@
     }
     .card.is-collapsed .card-content {
       max-height: 0;
+      min-height: 0;
+      display: none;
       overflow: hidden;
       opacity: 0;
       margin-top: 0;
+      padding-top: 0;
+      padding-bottom: 0;
       transition: max-height var(--motion-collapse-duration) var(--motion-collapse-easing),
                   opacity var(--motion-collapse-duration) var(--motion-collapse-easing);
     }
@@ -249,6 +255,11 @@
       padding: 2px 0;
       gap: var(--dcs-space-2);
       user-select: none;
+    }
+    .card.is-collapsed .card-titlebar {
+      min-height: var(--fibo-collapsed-height, var(--dcs-space-6));
+      padding: 0 var(--dcs-space-3);
+      align-items: center;
     }
     .card-titlebar:hover {
       opacity: 0.85;
@@ -343,7 +354,7 @@
     .form-grid .full {
       grid-column: 1 / -1;
     }
-    .logs {
+    .logs:not(.is-collapsed) {
       min-height: 260px;
     }
     .dcs-preview {
@@ -723,6 +734,12 @@
               <strong id="designStatusPageScaleValue" class="mono">0.92x</strong>
             </div>
           </label>
+          <label class="full">Layout Mode
+            <select id="designLayoutMode">
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </label>
           <button type="submit">Save Design Controls</button>
           <button id="designReset" class="secondary" type="button">Reset Defaults</button>
         </form>
@@ -830,6 +847,7 @@
       card_radius_px: 14,
       shadow_intensity: 1.0,
       status_page_scale: 0.92,
+      layout_mode: "portrait",
     };
     const lastRefreshed = document.getElementById("lastRefreshed");
 
@@ -882,6 +900,7 @@
       designShadowIntensityValue: document.getElementById("designShadowIntensityValue"),
       designStatusPageScale: document.getElementById("designStatusPageScale"),
       designStatusPageScaleValue: document.getElementById("designStatusPageScaleValue"),
+      designLayoutMode: document.getElementById("designLayoutMode"),
       designPreviewSummary: document.getElementById("designPreviewSummary"),
       designPreviewCard: document.getElementById("designPreviewCard"),
       designPreviewToggle: document.getElementById("designPreviewToggle"),
@@ -929,8 +948,12 @@
       nativeHeight: 1080,
     };
 
-    function clamp(value, min, max) {
-      return Math.max(min, Math.min(max, value));
+    function clamp(value, min, max, fallback = min) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return fallback;
+      }
+      return Math.max(min, Math.min(max, numeric));
     }
 
     function createFibonacciAdaptiveLayout(options) {
@@ -952,11 +975,12 @@
     function normalizeDesignControls(raw = {}) {
       return {
         theme: ["warm", "ocean", "forest", "high-contrast"].includes(raw.theme) ? raw.theme : DESIGN_DEFAULTS.theme,
-        font_scale: Number(clamp(Number(raw.font_scale ?? DESIGN_DEFAULTS.font_scale), 0.85, 1.35).toFixed(2)),
-        ui_scale: Number(clamp(Number(raw.ui_scale ?? DESIGN_DEFAULTS.ui_scale), 0.8, 1.2).toFixed(2)),
-        card_radius_px: Math.round(clamp(Number(raw.card_radius_px ?? DESIGN_DEFAULTS.card_radius_px), 6, 28)),
-        shadow_intensity: Number(clamp(Number(raw.shadow_intensity ?? DESIGN_DEFAULTS.shadow_intensity), 0.0, 1.6).toFixed(2)),
-        status_page_scale: Number(clamp(Number(raw.status_page_scale ?? DESIGN_DEFAULTS.status_page_scale), 0.75, 1.0).toFixed(2)),
+        font_scale: Number(clamp(raw.font_scale ?? DESIGN_DEFAULTS.font_scale, 0.85, 1.35, DESIGN_DEFAULTS.font_scale).toFixed(2)),
+        ui_scale: Number(clamp(raw.ui_scale ?? DESIGN_DEFAULTS.ui_scale, 0.8, 1.2, DESIGN_DEFAULTS.ui_scale).toFixed(2)),
+        card_radius_px: Math.round(clamp(raw.card_radius_px ?? DESIGN_DEFAULTS.card_radius_px, 6, 28, DESIGN_DEFAULTS.card_radius_px)),
+        shadow_intensity: Number(clamp(raw.shadow_intensity ?? DESIGN_DEFAULTS.shadow_intensity, 0.0, 1.6, DESIGN_DEFAULTS.shadow_intensity).toFixed(2)),
+        status_page_scale: Number(clamp(raw.status_page_scale ?? DESIGN_DEFAULTS.status_page_scale, 0.75, 1.0, DESIGN_DEFAULTS.status_page_scale).toFixed(2)),
+        layout_mode: window.BellForgeFibonacciLayout.normalizeLayoutMode(raw.layout_mode ?? DESIGN_DEFAULTS.layout_mode),
       };
     }
 
@@ -1010,6 +1034,13 @@
         elements.designStatusResolution.textContent = `Target display ${nativeWidth}x${nativeHeight} | Modal viewport ${modalWidth}x${modalHeight}`;
       }
 
+      console.log("[Fibonacci Layout] preview modal size calculations", {
+        nativeWidth,
+        nativeHeight,
+        modalWidth,
+        modalHeight,
+        scale,
+      });
       console.log("[Fibonacci Layout] window resize reflow", {
         source: "settings-preview-modal",
         nativeWidth,
@@ -1037,18 +1068,49 @@
       elements.designCardRadiusValue.textContent = `${state.card_radius_px}px`;
       elements.designShadowIntensityValue.textContent = `${state.shadow_intensity.toFixed(2)}x`;
       elements.designStatusPageScaleValue.textContent = `${state.status_page_scale.toFixed(2)}x`;
-      elements.designPreviewSummary.textContent = `Theme ${state.theme} | Font ${state.font_scale.toFixed(2)}x | UI ${state.ui_scale.toFixed(2)}x | Status ${state.status_page_scale.toFixed(2)}x`;
+      elements.designPreviewSummary.textContent = `Theme ${state.theme} | Font ${state.font_scale.toFixed(2)}x | UI ${state.ui_scale.toFixed(2)}x | Status ${state.status_page_scale.toFixed(2)}x | Layout ${state.layout_mode}`;
     }
 
-    function broadcastStatusLayoutCommand(commandType, payload = {}) {
+    function parseStoredStatusLayoutState(rawValue = localStorage.getItem(STATUS_LAYOUT_STORAGE_KEY)) {
+      try {
+        const parsed = typeof rawValue === "string" ? JSON.parse(rawValue) : rawValue;
+        return parsed && typeof parsed === "object" ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function applyStatusLayoutStateToMirror(state, source = "storage") {
+      if (!state || typeof state !== "object" || !elements.designStatusMirror?.contentWindow) {
+        return false;
+      }
+      const command = {
+        type: "apply-state",
+        payload: state,
+        source: `settings-preview:${source}`,
+        timestamp: Date.now(),
+      };
+      elements.designStatusMirror.contentWindow.postMessage({ type: "bellforge-status-layout-command", command }, window.location.origin);
+      console.log("[Fibonacci Layout] preview-to-status sync events", command);
+      return true;
+    }
+
+    function syncStatusMirrorFromStorage(source = "storage") {
+      const state = parseStoredStatusLayoutState();
+      return applyStatusLayoutStateToMirror(state, source);
+    }
+
+    function broadcastStatusLayoutCommand(commandType, payload = {}, options = {}) {
       const command = {
         type: commandType,
         payload,
         source: "settings-preview",
         timestamp: Date.now(),
       };
-      localStorage.setItem(STATUS_LAYOUT_COMMAND_KEY, JSON.stringify(command));
-      if (elements.designStatusMirror?.contentWindow) {
+      if (options.persistToStorage !== false) {
+        localStorage.setItem(STATUS_LAYOUT_COMMAND_KEY, JSON.stringify(command));
+      }
+      if (options.includeMirror !== false && elements.designStatusMirror?.contentWindow) {
         elements.designStatusMirror.contentWindow.postMessage({ type: "bellforge-status-layout-command", command }, window.location.origin);
       }
       console.log("[Fibonacci Layout] preview-to-status sync events", command);
@@ -1068,6 +1130,7 @@
 
       elements.designStatusMirror.onload = () => {
         setStatusMirrorNote("Mirror loaded. Drag cards in the preview to reorder real status layout.");
+        syncStatusMirrorFromStorage("mirror-load");
         broadcastStatusLayoutCommand("sync-request", {});
       };
 
@@ -1081,6 +1144,12 @@
           console.log("[Fibonacci Layout] card registry load", snapshot.registry || []);
           console.log("[Fibonacci Layout] card state load", snapshot.state || {});
           console.log("[Fibonacci Layout] preview-to-status sync events", { reason: snapshot.reason || "snapshot", size });
+          if ((snapshot.reason === "reflow" || snapshot.reason === "auto-arrange") && snapshot.state) {
+            const storedState = parseStoredStatusLayoutState() || {};
+            if (JSON.stringify(storedState) !== JSON.stringify(snapshot.state)) {
+              broadcastStatusLayoutCommand("apply-state", snapshot.state, { includeMirror: false, persistToStorage: true });
+            }
+          }
         });
         statusMirrorMessageBound = true;
       }
@@ -1135,6 +1204,7 @@
       const normalized = normalizeDesignControls(state);
       const root = document.documentElement;
       root.setAttribute("data-design-theme", normalized.theme);
+      root.dataset.designLayoutMode = normalized.layout_mode;
       root.style.setProperty("--dcs-font-scale", String(normalized.font_scale));
       root.style.setProperty("--dcs-ui-scale", String(normalized.ui_scale));
       root.style.setProperty("--dcs-card-radius", `${normalized.card_radius_px}px`);
@@ -1161,6 +1231,7 @@
         card_radius_px: Number(elements.designCardRadius.value),
         shadow_intensity: Number(elements.designShadowIntensity.value) / 100,
         status_page_scale: Number(elements.designStatusPageScale.value) / 100,
+        layout_mode: elements.designLayoutMode.value,
       });
     }
 
@@ -1172,6 +1243,7 @@
       elements.designCardRadius.value = String(normalized.card_radius_px);
       elements.designShadowIntensity.value = String(Math.round(normalized.shadow_intensity * 100));
       elements.designStatusPageScale.value = String(Math.round(normalized.status_page_scale * 100));
+      elements.designLayoutMode.value = normalized.layout_mode;
       applyDesignControls(normalized);
     }
 
@@ -1477,12 +1549,15 @@
       storageKey: SETTINGS_LAYOUT_STORAGE_KEY,
       rowUnit: 8,
       collapsedHeight: 56,
+      getDefaultCardState: () => ({ collapsed: true }),
+      getLayoutMode: () => document.documentElement.dataset.designLayoutMode || "portrait",
     });
 
     window.__bellforgeSettingsLayout = {
       autoArrange: () => settingsAdaptiveLayout.autoArrange(),
       recompute: () => settingsAdaptiveLayout.recompute(),
       resetState: () => settingsAdaptiveLayout.resetState("settings-debug-reset"),
+      setCardCollapsed: (cardKey, collapsed, reason = "settings-debug-collapse") => settingsAdaptiveLayout.setCardCollapsed(cardKey, collapsed, reason),
       getLayoutCache: () => settingsAdaptiveLayout.getLayoutCache(),
       getSnapshot: () => settingsAdaptiveLayout.getSnapshot(),
       getState: () => settingsAdaptiveLayout.getState(),
@@ -1556,6 +1631,7 @@
     elements.designCardRadius.addEventListener("input", syncDesignControlLabels);
     elements.designShadowIntensity.addEventListener("input", syncDesignControlLabels);
     elements.designStatusPageScale.addEventListener("input", syncDesignControlLabels);
+    elements.designLayoutMode.addEventListener("change", syncDesignControlLabels);
     elements.designReset.addEventListener("click", resetDesignControls);
     elements.designPreviewToggle.addEventListener("click", () => {
       elements.designPreviewCard.classList.toggle("is-collapsed");
@@ -1609,6 +1685,7 @@
         const count = Object.keys(state).length;
         setStatusMirrorNote(`Status layout synced across views (${count} cards) at ${new Date().toLocaleTimeString()}.`);
         console.log("[Fibonacci Layout] preview-to-status sync event", { count, source: "storage" });
+        applyStatusLayoutStateToMirror(state, "storage");
       } catch {
         setStatusMirrorNote("Status layout sync event received.");
       }

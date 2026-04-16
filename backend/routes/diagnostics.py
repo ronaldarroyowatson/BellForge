@@ -50,6 +50,7 @@ class DisplayPreferencesPayload(BaseModel):
     card_radius_px: int | None = Field(default=None, ge=6, le=28)
     shadow_intensity: float | None = Field(default=None, ge=0.0, le=1.6)
     status_page_scale: float | None = Field(default=None, ge=0.75, le=1.0)
+    layout_mode: Literal["portrait", "landscape"] | None = None
 
 
 def _error_detail(message: str) -> dict[str, str]:
@@ -155,6 +156,7 @@ async def update_display_preferences_route(payload: DisplayPreferencesPayload) -
             card_radius_px=payload.card_radius_px,
             shadow_intensity=payload.shadow_intensity,
             status_page_scale=payload.status_page_scale,
+            layout_mode=payload.layout_mode,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Display preference update failed: {exc}")) from exc
