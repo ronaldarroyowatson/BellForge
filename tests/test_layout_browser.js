@@ -689,15 +689,33 @@ test('browser verification keeps status onboarding card stable with long live-li
 
   await page.evaluate(() => {
     const longToken = 'h7vIp-pairing-token-' + 'Ab9xYz'.repeat(48);
+    const baseUrl = 'http://192.168.2.180:8000';
     const longOnboardingUrl = `http://192.168.2.180:8000/client/onboarding.html?pairing_token=${longToken}`;
     const directLink = document.getElementById('onboardingDirectUrl');
     const status = document.getElementById('onboardingQrStatus');
     const image = document.getElementById('onboardingQr');
+    const browserLinks = [
+      ['accessUrl', `${baseUrl}`],
+      ['settingsUrl', `${baseUrl}/settings`],
+      ['authUrl', `${baseUrl}/client/auth.html`],
+      ['onboardingUrl', longOnboardingUrl],
+      ['automodeUrl', `${baseUrl}/client/automode.html`],
+    ];
     if (!directLink || !status || !image) {
       throw new Error('Onboarding QR elements are missing');
     }
+    browserLinks.forEach(([id, value]) => {
+      const link = document.getElementById(id);
+      if (!link) {
+        throw new Error(`Missing browser link ${id}`);
+      }
+      link.textContent = value;
+      link.href = value;
+      link.title = value;
+    });
     directLink.textContent = longOnboardingUrl;
     directLink.href = longOnboardingUrl;
+    directLink.title = longOnboardingUrl;
     status.textContent = 'Scan to start. Pairing code: 63378984';
     image.src = `/api/qr/svg?text=${encodeURIComponent(longOnboardingUrl)}`;
     window.__bellforgeStatusLayout?.recompute?.();
@@ -708,8 +726,11 @@ test('browser verification keeps status onboarding card stable with long live-li
   writeArtifact('status-live-like-onboarding', { snapshot, consoleEntries });
   assertCardsRemainInGrid(snapshot);
   assertNoOverlap(snapshot);
+  const browserLinksCard = snapshot.cards.find((card) => card.key === 'browser-links');
   const onboardingCard = snapshot.cards.find((card) => card.key === 'onboarding-qr');
+  assert.ok(browserLinksCard, 'Browser Links card is missing');
   assert.ok(onboardingCard, 'Onboarding QR card is missing');
+  assert.ok(browserLinksCard.rect.height < 1200, 'Browser Links card grew to an unreasonable height with long live URLs');
   assert.ok(onboardingCard.rect.height < 1400, 'Onboarding QR card grew to an unreasonable height with a long live onboarding URL');
 
   await context.close();
