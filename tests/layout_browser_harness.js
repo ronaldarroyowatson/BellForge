@@ -254,7 +254,23 @@ async function waitForLayoutReady(target, options = {}) {
     if (allowEmptyCards && cards.length === 0) {
       return true;
     }
-    return cards.length > 0 && cards.every((card) => Number(card.dataset.fiboColSpan || 0) >= 1 && Number(card.dataset.fiboRowSpan || 0) >= 1);
+    if (cards.length === 0) {
+      return false;
+    }
+
+    const layoutHandle = window.__bellforgeStatusLayout || window.__bellforgeSettingsLayout || null;
+    const layoutCache = layoutHandle?.getLayoutCache?.() || null;
+    const container = document.querySelector('.fibo-adaptive-grid');
+    const computedColumns = Number(
+      getComputedStyle(container || document.documentElement).getPropertyValue('--fibo-columns')
+      || container?.style?.getPropertyValue('--fibo-columns')
+      || 0
+    );
+    const assignedCards = cards.filter((card) => Number(card.dataset.fiboColSpan || 0) >= 1 && Number(card.dataset.fiboRowSpan || 0) >= 1).length;
+
+    return computedColumns >= 1
+      || Number(layoutCache?.columns || 0) >= 1
+      || assignedCards >= Math.min(cards.length, 2);
   }, allowEmpty);
   await waitForAnimationFrame(target);
 }

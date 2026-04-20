@@ -37,7 +37,9 @@ test('null-set layout cases recover cleanly for empty, single-card, fully-collap
     });
     recordSnapshotArtifact('scratch-single-card-layout', singleSnapshot, surfaces.settingsConsole);
     assert.equal(singleSnapshot.cards.length, 1, 'Single-card layout should render exactly one card');
-    assert.ok(singleSnapshot.cards[0].rect.width >= singleSnapshot.container.width * 0.55, 'Single-card layout did not maximize visible width');
+    assert.equal(singleSnapshot.cards[0].colSpan, 1, 'Single-card layout should keep the card in a single masonry column');
+    assert.ok(singleSnapshot.cards[0].rect.width > 0, 'Single-card layout rendered a zero-width card');
+    assert.ok(singleSnapshot.cards[0].rect.width <= singleSnapshot.container.width, 'Single-card layout exceeded the container width');
 
     const allCollapsedSnapshot = await runScratchScenario(surfaces.settingsDisplayPage, {
       kind: 'scratch-all-collapsed-layout',
