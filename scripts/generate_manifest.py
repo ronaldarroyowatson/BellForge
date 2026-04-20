@@ -44,7 +44,7 @@ SKIP_RELATIVE = {
     "config/auth_registry.json",  # Generated runtime auth state; not a published release artifact.
 }
 
-TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh"}
+TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh", ".ps1"}
 
 
 def should_normalize_text(path: Path, data: bytes) -> bool:

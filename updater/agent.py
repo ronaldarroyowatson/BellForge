@@ -30,7 +30,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import httpx
 
 SETTINGS_PATH = Path(os.environ.get("BELLFORGE_SETTINGS", "/opt/bellforge/config/settings.json"))
-TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh"}
+TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh", ".ps1"}
 
 
 @dataclass(slots=True)

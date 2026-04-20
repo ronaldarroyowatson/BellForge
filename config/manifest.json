@@ -1,6 +1,6 @@
 {
-  "version": "0.1.62",
-  "generated_at": "2026-04-20T14:42:37Z",
+  "version": "0.1.63",
+  "generated_at": "2026-04-20T14:49:37Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -139,8 +139,8 @@
       "size": 58524
     },
     "updater/agent.py": {
-      "sha256": "755a9d6093640e989db7575119f5eeb2f6de564720312cd367b611cd95aa3798",
-      "size": 36877
+      "sha256": "8ee71ec0cbb9f51452b5c89b13c0ef4f9bb0c4e427e5865d4b7de2a5616d1750",
+      "size": 36885
     },
     "updater/requirements.txt": {
       "sha256": "13c03db805d9f3a3a6db6aa4b8ae9d959bc94fc64322a8f56c136acebf59a901",
@@ -163,7 +163,7 @@
       "size": 906
     },
     "config/version.json": {
-      "sha256": "69026211d6c2117f6542e83d788c8ac23cdf470d633309d4ebe918919e05e431",
+      "sha256": "0413765b91e45e0dd55b1c384349ff63221726b9e35b0a2cb5a0d15535101482",
       "size": 234
     },
     "scripts/bellforge": {
@@ -203,8 +203,8 @@
       "size": 3317
     },
     "scripts/convert_ppk_to_openssh.ps1": {
-      "sha256": "75b7daba7ca48d6171cb6d36624074ed1b53f341a819525eb7c7967ff0efeb5e",
-      "size": 3392
+      "sha256": "f0972e2d207415fa33155c12217cd1043e66f4581d40c49ff54c24ae80900de2",
+      "size": 3289
     },
     "scripts/deploy_display_fixes.sh": {
       "sha256": "a7fac3e2e90c41b2b9fd832f210071a8a587d0d54aa29474926a99d5be1822d8",
@@ -219,8 +219,8 @@
       "size": 3356
     },
     "scripts/generate_manifest.py": {
-      "sha256": "dbd8223f8c545cc81d7c37c527850aa8c09954b26eeeaa58a11a3152709f7c97",
-      "size": 3952
+      "sha256": "f318dee181d79606d1a34596465ea6e74a2bb411188c7ba651375c04668efb34",
+      "size": 3960
     },
     "scripts/gpu_diagnostics.py": {
       "sha256": "29c33ba2d65d358e92eaf74c99aa770cd5612041126cd7e0316522412504eefc",
@@ -231,8 +231,8 @@
       "size": 3359
     },
     "scripts/pi_remote_triage.ps1": {
-      "sha256": "bc395dda308326f6b8ea8a254045d0c197746da1374a217428c409a3ab16bb50",
-      "size": 3245
+      "sha256": "8eb46b431d7b6e583f02db2b39656c6425ece23baa540070c7e2225d7a9bc244",
+      "size": 3162
     },
     "scripts/post_boot_capture.sh": {
       "sha256": "114381978df6a376d15d6e74771426378a243d7140dd2e319dcde29c3cdff695",

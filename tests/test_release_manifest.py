@@ -50,6 +50,17 @@ class ReleaseManifestTests(unittest.TestCase):
             self.assertEqual(generate_manifest.sha256_file(script_path), expected_hash)
             self.assertEqual(updater_sha256_file(script_path), expected_hash)
 
+    def test_powershell_script_hashes_are_lf_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script_path = Path(temp_dir) / "repair.ps1"
+            script_bytes = b"Write-Host 'ok'\r\nWrite-Host 'done'\r\n"
+            script_path.write_bytes(script_bytes)
+
+            expected_hash = hashlib.sha256(script_bytes.replace(b"\r\n", b"\n")).hexdigest()
+
+            self.assertEqual(generate_manifest.sha256_file(script_path), expected_hash)
+            self.assertEqual(updater_sha256_file(script_path), expected_hash)
+
 
 if __name__ == "__main__":
     unittest.main()
