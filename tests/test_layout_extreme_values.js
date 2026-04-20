@@ -21,14 +21,14 @@ test('extreme viewport, content, and token values still keep the layout readable
   try {
     const tinyStatus = await captureSnapshot(surfaces.statusPage, 'status-tiny-viewport');
     const tinySettings = await captureSnapshot(surfaces.settingsPage, 'settings-tiny-viewport');
-    const tinyPreview = await captureSnapshot(surfaces.previewFrame, 'preview-tiny-viewport');
+    const tinySettingsDisplay = await captureSnapshot(surfaces.settingsDisplayPage, 'settings-display-tiny-viewport');
     recordSnapshotArtifact('tiny-viewport-layouts', tinyStatus, surfaces.statusConsole, {
       settingsSnapshot: tinySettings,
-      previewSnapshot: tinyPreview,
+      settingsDisplaySnapshot: tinySettingsDisplay,
     });
     assertNoOverlap(tinyStatus);
     assertNoOverlap(tinySettings);
-    assertNoOverlap(tinyPreview);
+    assertNoOverlap(tinySettingsDisplay);
     assertExpectedColumns(tinyStatus, 1);
     assertExpectedColumns(tinySettings, 1);
 
@@ -38,7 +38,7 @@ test('extreme viewport, content, and token values still keep the layout readable
     await waitForLayoutReady(surfaces.statusPage);
     await waitForLayoutReady(surfaces.settingsPage);
     await waitForLayoutReady(surfaces.displayPage);
-    await waitForLayoutReady(surfaces.previewFrame);
+    await waitForLayoutReady(surfaces.settingsDisplayPage);
 
     const largeStatus = await captureSnapshot(surfaces.statusPage, 'status-large-viewport');
     const largeSettings = await captureSnapshot(surfaces.settingsPage, 'settings-large-viewport');

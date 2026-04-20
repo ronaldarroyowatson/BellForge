@@ -41,10 +41,6 @@
       --dcs-space-5: 20px;
       --dcs-space-6: 56px;
       --fibo-row-unit: 8px;
-      --status-preview-native-width: 1920;
-      --status-preview-native-height: 1080;
-      --status-preview-modal-width: 1280px;
-      --status-preview-modal-height: 720px;
     }
     :root[data-design-theme="ocean"] {
       --bg-a: #e8f3fa;
@@ -219,9 +215,6 @@
       background: var(--surface-shade-3);
       border-color: var(--stroke-default);
       box-shadow: 0 calc(6px * var(--dcs-shadow-intensity)) calc(12px * var(--dcs-shadow-intensity)) var(--surface-shade-2-shadow);
-    }
-    body.status-preview-modal-open {
-      overflow: hidden;
     }
     .card.is-collapsed .card-content {
       max-height: 0;
@@ -430,119 +423,15 @@
       color: var(--muted);
       background: #ffffff;
     }
-    .status-preview-controls {
+    .status-access-actions {
       display: flex;
       gap: var(--dcs-space-2);
       flex-wrap: wrap;
     }
-    .status-preview-card {
-      min-height: var(--dcs-space-6);
-      transition: transform var(--motion-expand-duration) var(--motion-expand-easing),
-                  box-shadow var(--motion-expand-duration) var(--motion-expand-easing),
-                  grid-column var(--motion-reflow-duration) var(--motion-reflow-easing);
-    }
-    .status-preview-card.is-collapsed {
-      min-height: var(--dcs-space-6);
-    }
-    .status-preview-card.is-preview-expanded {
-      z-index: 24;
-      transform: translateY(-2px);
-      box-shadow: 0 calc(16px * var(--dcs-shadow-intensity)) calc(36px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.16);
-    }
-    .status-preview-frame {
-      width: 100%;
-      height: 100%;
-      border: 0;
-      background: #ffffff;
-    }
-    .status-preview-note {
+    .status-access-note {
       font-size: 0.8rem;
       color: var(--muted);
       margin: 0;
-    }
-    .status-preview-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 1200;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: clamp(12px, 2vw, 28px);
-      background: rgba(15, 21, 26, 0.34);
-      backdrop-filter: blur(10px);
-    }
-    .status-preview-modal[hidden] {
-      display: none;
-    }
-    .status-preview-modal__dialog {
-      width: min(calc(var(--status-preview-modal-width) + (2 * var(--dcs-space-5))), calc(100vw - (2 * var(--dcs-space-4))));
-      max-height: calc(100vh - (2 * var(--dcs-space-4)));
-      background: color-mix(in srgb, var(--surface) 96%, #ffffff);
-      border: 1px solid var(--line);
-      border-radius: calc(var(--dcs-card-radius) * 1.05);
-      box-shadow: 0 calc(22px * var(--dcs-shadow-intensity)) calc(54px * var(--dcs-shadow-intensity)) rgba(10, 24, 37, 0.24);
-      display: grid;
-      gap: var(--dcs-space-3);
-      padding: var(--dcs-space-4);
-      overflow: hidden;
-    }
-    .status-preview-modal__header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--dcs-space-3);
-      flex-wrap: wrap;
-    }
-    .status-preview-modal__title {
-      display: grid;
-      gap: 4px;
-      min-width: 0;
-    }
-    .status-preview-modal__title h3 {
-      margin: 0;
-      color: var(--accent);
-      font-size: 1.02rem;
-    }
-    .status-preview-modal__meta {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.84rem;
-    }
-    .status-preview-modal__controls {
-      display: flex;
-      gap: var(--dcs-space-2);
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-    .status-preview-modal__viewport {
-      min-height: 0;
-      overflow: auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 2px;
-    }
-    .status-preview-shell {
-      position: relative;
-      width: var(--status-preview-modal-width);
-      height: var(--status-preview-modal-height);
-      border: 1px solid var(--line);
-      border-radius: calc(var(--dcs-card-radius) * 0.85);
-      overflow: hidden;
-      background: color-mix(in srgb, var(--surface) 92%, #f8fbff);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
-      flex: 0 0 auto;
-    }
-    .status-preview-modal__footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--dcs-space-2);
-      flex-wrap: wrap;
-    }
-    .status-preview-resolution {
-      color: var(--muted);
-      font-size: 0.8rem;
     }
     .dcs-preview-toggle {
       width: auto;
@@ -579,12 +468,6 @@
       }
       .form-grid {
         grid-template-columns: 1fr;
-      }
-      .status-preview-modal {
-        padding: var(--dcs-space-2);
-      }
-      .status-preview-modal__dialog {
-        padding: var(--dcs-space-3);
       }
     }
   </style>
@@ -767,18 +650,17 @@
                 </div>
               </div>
             </article>
-            <article id="designStatusPreviewCard" class="dcs-preview-card status-preview-card is-collapsed">
+            <article id="designStatusAccessCard" class="dcs-preview-card">
               <div class="dcs-preview-card__header">
-                <h3 class="dcs-preview-card__title">Status Page Preview</h3>
-                <div class="status-preview-controls">
-                  <button id="designStatusPreviewToggle" class="secondary dcs-preview-toggle" type="button" aria-expanded="false">Expand Preview</button>
-                  <button id="designStatusAutoArrange" class="secondary dcs-preview-toggle" type="button">Auto Arrange</button>
-                  <button id="designStatusReloadMirror" class="secondary dcs-preview-toggle" type="button">Reload Mirror</button>
+                <h3 class="dcs-preview-card__title">Real Status Page Access</h3>
+                <div class="status-access-actions">
+                  <button id="openStatusPage" class="secondary dcs-preview-toggle" type="button">Open Status Page</button>
+                  <button id="openDisplayStatusPage" class="secondary dcs-preview-toggle" type="button">Open Display Output</button>
                 </div>
               </div>
               <div class="dcs-preview-card__body">
-                <p class="dcs-preview-card__meta">Live mirror of the real Status Page. Expand to open a full-screen modal that uses the same layout engine, tokens, drag behavior, and collapse states as the Pi display.</p>
-                <p id="designStatusMirrorNote" class="status-preview-note">Preview collapsed. Expand to open the live status mirror modal.</p>
+                <p class="dcs-preview-card__meta">Settings no longer render a status-page preview. Use these buttons to inspect the actual status page and the actual display output directly.</p>
+                <p id="designStatusAccessNote" class="status-access-note">Display diagnostics will report the real target resolution here after refresh.</p>
               </div>
             </article>
           </div>
@@ -794,6 +676,7 @@
               <option value="backend">backend</option>
               <option value="updater">updater</option>
               <option value="client">client</option>
+              <option value="debug">debug</option>
               <option value="install-repair">install/repair</option>
             </select>
           </label>
@@ -808,31 +691,7 @@
     </section>
   </main>
 
-  <div id="designStatusPreviewModal" class="status-preview-modal" hidden aria-hidden="true">
-    <div class="status-preview-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="designStatusPreviewModalTitle">
-      <div class="status-preview-modal__header">
-        <div class="status-preview-modal__title">
-          <h3 id="designStatusPreviewModalTitle">Status Page Preview</h3>
-          <p class="status-preview-modal__meta">1:1 live mirror of the real BellForge status page using live card state, layout, and tokens.</p>
-        </div>
-        <div class="status-preview-modal__controls">
-          <button id="designStatusModalArrange" class="secondary dcs-preview-toggle" type="button">Auto Arrange</button>
-          <button id="designStatusModalReload" class="secondary dcs-preview-toggle" type="button">Reload Mirror</button>
-          <button id="designStatusModalClose" class="secondary dcs-preview-toggle" type="button">Collapse Preview</button>
-        </div>
-      </div>
-      <div class="status-preview-modal__viewport">
-        <div class="status-preview-shell">
-          <iframe id="designStatusMirror" class="status-preview-frame" title="BellForge Status Page Live Mirror" loading="lazy"></iframe>
-        </div>
-      </div>
-      <div class="status-preview-modal__footer">
-        <p id="designStatusModalNote" class="status-preview-note">Preview collapsed. Expand to open the live status mirror modal.</p>
-        <span id="designStatusResolution" class="status-preview-resolution">Target display 1920x1080</span>
-      </div>
-    </div>
-  </div>
-
+  <script src="/client/js/bellforge_debug.js"></script>
   <script src="/client/js/fibonacci_layout.js"></script>
   <script>
     const REFRESH_MS = 5000;
@@ -850,6 +709,11 @@
       layout_mode: "portrait",
     };
     const lastRefreshed = document.getElementById("lastRefreshed");
+    const debugClient = window.BellForgeDebug?.createClient({
+      source: "settings",
+      verbose: localStorage.getItem("bellforge.debug.verbose") === "true",
+    });
+    window.__bellforgeDebug = debugClient;
 
     const elements = {
       ssid: document.getElementById("ssid"),
@@ -906,18 +770,10 @@
       designPreviewToggle: document.getElementById("designPreviewToggle"),
       designPreviewTitle: document.getElementById("designPreviewTitle"),
       designPreviewBody: document.getElementById("designPreviewBody"),
-      designStatusPreviewCard: document.getElementById("designStatusPreviewCard"),
-      designStatusPreviewToggle: document.getElementById("designStatusPreviewToggle"),
-      designStatusPreviewModal: document.getElementById("designStatusPreviewModal"),
-      designStatusMirror: document.getElementById("designStatusMirror"),
-      designStatusMirrorNote: document.getElementById("designStatusMirrorNote"),
-      designStatusModalNote: document.getElementById("designStatusModalNote"),
-      designStatusModalClose: document.getElementById("designStatusModalClose"),
-      designStatusModalArrange: document.getElementById("designStatusModalArrange"),
-      designStatusModalReload: document.getElementById("designStatusModalReload"),
-      designStatusResolution: document.getElementById("designStatusResolution"),
-      designStatusAutoArrange: document.getElementById("designStatusAutoArrange"),
-      designStatusReloadMirror: document.getElementById("designStatusReloadMirror"),
+      designStatusAccessCard: document.getElementById("designStatusAccessCard"),
+      designStatusAccessNote: document.getElementById("designStatusAccessNote"),
+      openStatusPage: document.getElementById("openStatusPage"),
+      openDisplayStatusPage: document.getElementById("openDisplayStatusPage"),
       designControlResult: document.getElementById("designControlResult"),
       designReset: document.getElementById("designReset"),
       displayHealResult: document.getElementById("displayHealResult"),
@@ -939,14 +795,24 @@
 
     let lastLogPayload = null;
     let refreshPromise = null;
-    let statusMirrorMessageBound = false;
-    let statusMirrorLoaded = false;
     let updaterAutoRecoveryAttempted = false;
     let settingsAdaptiveLayout = { recompute() {}, autoArrange() {} };
-    const statusMirrorViewport = {
-      nativeWidth: 1920,
-      nativeHeight: 1080,
-    };
+    debugClient?.installGlobalObservers({ observeContainer: "#settingsCardGrid" });
+
+    function debugEvent(channel, message, payload, level = "info") {
+      if (!debugClient) {
+        return;
+      }
+      if (level === "warn") {
+        debugClient.warn(channel, message, payload);
+        return;
+      }
+      if (level === "error") {
+        debugClient.error(channel, message, payload);
+        return;
+      }
+      debugClient.log(channel, message, payload);
+    }
 
     function clamp(value, min, max, fallback = min) {
       const numeric = Number(value);
@@ -984,13 +850,21 @@
       };
     }
 
-    function setStatusMirrorNote(message) {
-      if (elements.designStatusMirrorNote) {
-        elements.designStatusMirrorNote.textContent = message;
+    function setStatusAccessNote(message) {
+      if (elements.designStatusAccessNote) {
+        elements.designStatusAccessNote.textContent = message;
       }
-      if (elements.designStatusModalNote) {
-        elements.designStatusModalNote.textContent = message;
-      }
+    }
+
+    function broadcastStatusLayoutCommand(commandType, payload = {}) {
+      const command = {
+        type: commandType,
+        payload,
+        source: "settings-real-status",
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(STATUS_LAYOUT_COMMAND_KEY, JSON.stringify(command));
+      debugEvent("card registry sync", "Broadcasted real status layout command", command);
     }
 
     function parseResolutionFromText(value) {
@@ -1011,52 +885,11 @@
       return window.BellForgeFibonacciLayout.pickBestResolution(candidates, { width: 1920, height: 1080 });
     }
 
-    function updateStatusMirrorViewport() {
-      const modal = elements.designStatusPreviewModal;
-      if (!modal || modal.hidden) {
-        return;
-      }
-
-      const nativeWidth = Math.max(320, Number(statusMirrorViewport.nativeWidth) || 1920);
-      const nativeHeight = Math.max(240, Number(statusMirrorViewport.nativeHeight) || 1080);
-      const availableWidth = Math.max(320, window.innerWidth - 32);
-      const availableHeight = Math.max(240, window.innerHeight - 96);
-      const scale = Math.min(availableWidth / nativeWidth, availableHeight / nativeHeight, 1);
-      const modalWidth = Math.max(320, Math.round(nativeWidth * scale));
-      const modalHeight = Math.max(240, Math.round(nativeHeight * scale));
-
-      document.documentElement.style.setProperty("--status-preview-modal-width", `${modalWidth}px`);
-      document.documentElement.style.setProperty("--status-preview-modal-height", `${modalHeight}px`);
-      document.documentElement.style.setProperty("--status-preview-native-width", String(nativeWidth));
-      document.documentElement.style.setProperty("--status-preview-native-height", String(nativeHeight));
-
-      if (elements.designStatusResolution) {
-        elements.designStatusResolution.textContent = `Target display ${nativeWidth}x${nativeHeight} | Modal viewport ${modalWidth}x${modalHeight}`;
-      }
-
-      console.log("[Fibonacci Layout] preview modal size calculations", {
-        nativeWidth,
-        nativeHeight,
-        modalWidth,
-        modalHeight,
-        scale,
-      });
-      console.log("[Fibonacci Layout] window resize reflow", {
-        source: "settings-preview-modal",
-        nativeWidth,
-        nativeHeight,
-        modalWidth,
-        modalHeight,
-      });
-    }
-
     function applyStatusMirrorResolution(data, source = "display-pipeline") {
       const resolution = resolveDisplayResolution(data);
-      statusMirrorViewport.nativeWidth = resolution.width;
-      statusMirrorViewport.nativeHeight = resolution.height;
-      updateStatusMirrorViewport();
-      console.log("[Fibonacci Layout] preview-to-status sync events", {
-        reason: "mirror-resolution-update",
+      setStatusAccessNote(`Real display target ${resolution.width}x${resolution.height}. Open the real status output directly for verification.`);
+      debugEvent("layout engine decisions", "Updated real display resolution note", {
+        reason: "display-resolution-update",
         source,
         resolution,
       });
@@ -1071,118 +904,6 @@
       elements.designPreviewSummary.textContent = `Theme ${state.theme} | Font ${state.font_scale.toFixed(2)}x | UI ${state.ui_scale.toFixed(2)}x | Status ${state.status_page_scale.toFixed(2)}x | Layout ${state.layout_mode}`;
     }
 
-    function parseStoredStatusLayoutState(rawValue = localStorage.getItem(STATUS_LAYOUT_STORAGE_KEY)) {
-      try {
-        const parsed = typeof rawValue === "string" ? JSON.parse(rawValue) : rawValue;
-        return parsed && typeof parsed === "object" ? parsed : null;
-      } catch {
-        return null;
-      }
-    }
-
-    function applyStatusLayoutStateToMirror(state, source = "storage") {
-      if (!state || typeof state !== "object" || !elements.designStatusMirror?.contentWindow) {
-        return false;
-      }
-      const command = {
-        type: "apply-state",
-        payload: state,
-        source: `settings-preview:${source}`,
-        timestamp: Date.now(),
-      };
-      elements.designStatusMirror.contentWindow.postMessage({ type: "bellforge-status-layout-command", command }, window.location.origin);
-      console.log("[Fibonacci Layout] preview-to-status sync events", command);
-      return true;
-    }
-
-    function syncStatusMirrorFromStorage(source = "storage") {
-      const state = parseStoredStatusLayoutState();
-      return applyStatusLayoutStateToMirror(state, source);
-    }
-
-    function broadcastStatusLayoutCommand(commandType, payload = {}, options = {}) {
-      const command = {
-        type: commandType,
-        payload,
-        source: "settings-preview",
-        timestamp: Date.now(),
-      };
-      if (options.persistToStorage !== false) {
-        localStorage.setItem(STATUS_LAYOUT_COMMAND_KEY, JSON.stringify(command));
-      }
-      if (options.includeMirror !== false && elements.designStatusMirror?.contentWindow) {
-        elements.designStatusMirror.contentWindow.postMessage({ type: "bellforge-status-layout-command", command }, window.location.origin);
-      }
-      console.log("[Fibonacci Layout] preview-to-status sync events", command);
-    }
-
-    function initStatusMirror() {
-      if (!elements.designStatusMirror) {
-        return;
-      }
-      statusMirrorLoaded = true;
-      const mirrorUrl = new URL("/status", window.location.origin);
-      mirrorUrl.searchParams.set("view", "display");
-      mirrorUrl.searchParams.set("mirror", "1");
-      elements.designStatusMirror.src = mirrorUrl.toString();
-      setStatusMirrorNote("Loading real status mirror...");
-      updateStatusMirrorViewport();
-
-      elements.designStatusMirror.onload = () => {
-        setStatusMirrorNote("Mirror loaded. Drag cards in the preview to reorder real status layout.");
-        syncStatusMirrorFromStorage("mirror-load");
-        broadcastStatusLayoutCommand("sync-request", {});
-      };
-
-      if (!statusMirrorMessageBound) {
-        window.addEventListener("message", (event) => {
-          if (event.origin !== window.location.origin) return;
-          if (!event.data || event.data.type !== "bellforge-status-layout-state") return;
-          const snapshot = event.data.payload || {};
-          const size = Array.isArray(snapshot.registry) ? snapshot.registry.length : 0;
-          setStatusMirrorNote(`Mirror synced with ${size} cards. Last update ${new Date().toLocaleTimeString()}.`);
-          console.log("[Fibonacci Layout] card registry load", snapshot.registry || []);
-          console.log("[Fibonacci Layout] card state load", snapshot.state || {});
-          console.log("[Fibonacci Layout] preview-to-status sync events", { reason: snapshot.reason || "snapshot", size });
-          if ((snapshot.reason === "reflow" || snapshot.reason === "auto-arrange") && snapshot.state) {
-            const storedState = parseStoredStatusLayoutState() || {};
-            if (JSON.stringify(storedState) !== JSON.stringify(snapshot.state)) {
-              broadcastStatusLayoutCommand("apply-state", snapshot.state, { includeMirror: false, persistToStorage: true });
-            }
-          }
-        });
-        statusMirrorMessageBound = true;
-      }
-    }
-
-    function setStatusPreviewExpanded(expanded) {
-      const previewCard = elements.designStatusPreviewCard;
-      if (!previewCard) {
-        return;
-      }
-      previewCard.classList.add("is-collapsed");
-      previewCard.classList.toggle("is-preview-expanded", expanded);
-      if (elements.designStatusPreviewModal) {
-        elements.designStatusPreviewModal.hidden = !expanded;
-        elements.designStatusPreviewModal.setAttribute("aria-hidden", expanded ? "false" : "true");
-      }
-      document.body.classList.toggle("status-preview-modal-open", expanded);
-      elements.designStatusPreviewToggle.textContent = expanded ? "Collapse Preview" : "Expand Preview";
-      elements.designStatusPreviewToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-      if (expanded) {
-        if (!statusMirrorLoaded) {
-          initStatusMirror();
-        } else {
-          broadcastStatusLayoutCommand("sync-request", {});
-          setStatusMirrorNote("Live mirror active. Drag cards or collapse them here to update all status views.");
-        }
-        updateStatusMirrorViewport();
-      } else {
-        setStatusMirrorNote("Preview collapsed. Expand to open the live status mirror modal.");
-      }
-      console.log("[Fibonacci Layout] preview expansion/collapse", { expanded });
-    }
-
     function renderDesignPreview(state) {
       if (!elements.designPreviewCard) return;
       elements.designPreviewTitle.textContent = `${state.theme} preview`;
@@ -1192,12 +913,6 @@
         timestamp: Date.now(),
         payload: state,
       }));
-      if (elements.designStatusMirror?.contentWindow) {
-        elements.designStatusMirror.contentWindow.postMessage({
-          type: "bellforge-design-controls",
-          payload: state,
-        }, window.location.origin);
-      }
     }
 
     function applyDesignControls(state) {
@@ -1215,10 +930,9 @@
       root.style.setProperty("--dcs-space-4", `${Math.round(16 * normalized.ui_scale)}px`);
       root.style.setProperty("--dcs-space-5", `${Math.round(20 * normalized.ui_scale)}px`);
       root.style.setProperty("--dcs-space-6", `${Math.round(56 * normalized.ui_scale)}px`);
-      console.log("[Fibonacci Layout] token application", normalized);
+      debugEvent("orientation changes", "Applied settings design controls", normalized);
       updateDesignControlLabels(normalized);
       renderDesignPreview(normalized);
-      updateStatusMirrorViewport();
       settingsAdaptiveLayout.recompute();
       return normalized;
     }
@@ -1303,6 +1017,7 @@
       elements.signal.textContent = data.signal_strength != null ? `${data.signal_strength}%` : "Unavailable";
       elements.networkIp.textContent = data.ip_address || "Unavailable";
       elements.connectionType.textContent = data.connection_type || "unknown";
+      debugEvent("network status", "Refreshed network diagnostics", data);
     }
 
     async function refreshAuth() {
@@ -1311,6 +1026,10 @@
       elements.credentials.textContent = `${credentials.username || ""} / ${credentials.password || ""}`;
       setStatus(elements.authStatus, data.authentication_succeeded);
       elements.lastAuth.textContent = data.last_auth_attempt || "Unavailable";
+      debugEvent("backend health", "Refreshed authentication diagnostics", {
+        authenticationSucceeded: data.authentication_succeeded,
+        lastAuthAttempt: data.last_auth_attempt,
+      });
     }
 
     async function refreshUpdater() {
@@ -1359,6 +1078,14 @@
       if (data.staged_recovery && data.staged_recovery.attempted) {
         elements.updaterCheckResult.textContent = data.staged_recovery.message || "Attempted staged update recovery.";
       }
+
+      debugEvent("updater health", "Refreshed updater diagnostics", {
+        state: data.state,
+        currentVersion: data.current_device_version,
+        latestVersion: data.latest_detected_version,
+        updateAvailable: data.update_available,
+        stagedReleaseVersion: data.staged_release_version,
+      });
 
       if (data.staged_update_pending && data.state_active !== true && !updaterAutoRecoveryAttempted) {
         updaterAutoRecoveryAttempted = true;
@@ -1424,6 +1151,11 @@
         ? issues.map((x) => `[${x.level}] ${x.code}`).join(" | ")
         : "None";
       applyStatusMirrorResolution(data, "display-pipeline-refresh");
+      debugEvent("backend health", "Refreshed display pipeline diagnostics", {
+        health: data.health,
+        version: data.version,
+        issues,
+      });
     }
 
     async function refreshDisplayPreferences() {
@@ -1564,13 +1296,15 @@
       storageKey: SETTINGS_LAYOUT_STORAGE_KEY,
     };
 
+    debugClient?.snapshot("layout engine decisions", "Settings layout bootstrap", "#settingsCardGrid", {
+      mode: "settings",
+    });
     window.__bellforgeStatusPreview = {
-      open: () => setStatusPreviewExpanded(true),
-      close: () => setStatusPreviewExpanded(false),
-      sync: () => broadcastStatusLayoutCommand("sync-request", {}),
+      open: () => false,
+      close: () => true,
+      isOpen: () => false,
       autoArrange: () => broadcastStatusLayoutCommand("auto-arrange", {}),
-      getResolution: () => ({ ...statusMirrorViewport }),
-      isOpen: () => Boolean(elements.designStatusPreviewModal && !elements.designStatusPreviewModal.hidden),
+      sync: () => broadcastStatusLayoutCommand("sync-request", {}),
     };
 
     elements.networkForm.addEventListener("submit", async (event) => {
@@ -1636,66 +1370,20 @@
     elements.designPreviewToggle.addEventListener("click", () => {
       elements.designPreviewCard.classList.toggle("is-collapsed");
       elements.designPreviewToggle.textContent = elements.designPreviewCard.classList.contains("is-collapsed") ? "Expand" : "Collapse";
-      console.log("[Fibonacci Layout] preview card toggled", { collapsed: elements.designPreviewCard.classList.contains("is-collapsed") });
+      debugEvent("expand/collapse events", "Toggled design preview card", { collapsed: elements.designPreviewCard.classList.contains("is-collapsed") });
     });
-    elements.designStatusPreviewToggle.addEventListener("click", () => {
-      setStatusPreviewExpanded(!elements.designStatusPreviewCard.classList.contains("is-preview-expanded"));
+    elements.openStatusPage.addEventListener("click", () => {
+      window.open("/status", "_blank", "noopener,noreferrer");
     });
-    elements.designStatusAutoArrange.addEventListener("click", () => {
-      setStatusPreviewExpanded(true);
-      setStatusMirrorNote("Running Auto Arrange with real Fibonacci engine...");
-      broadcastStatusLayoutCommand("auto-arrange", {});
-    });
-    elements.designStatusReloadMirror.addEventListener("click", () => {
-      setStatusPreviewExpanded(true);
-      initStatusMirror();
-      broadcastStatusLayoutCommand("sync-request", {});
-    });
-    elements.designStatusModalClose.addEventListener("click", () => {
-      setStatusPreviewExpanded(false);
-    });
-    elements.designStatusModalArrange.addEventListener("click", () => {
-      setStatusMirrorNote("Running Auto Arrange with real Fibonacci engine...");
-      broadcastStatusLayoutCommand("auto-arrange", {});
-    });
-    elements.designStatusModalReload.addEventListener("click", () => {
-      initStatusMirror();
-      broadcastStatusLayoutCommand("sync-request", {});
-    });
-    elements.designStatusPreviewModal.addEventListener("click", (event) => {
-      if (event.target === elements.designStatusPreviewModal) {
-        setStatusPreviewExpanded(false);
-      }
-    });
-    window.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && elements.designStatusPreviewCard.classList.contains("is-preview-expanded")) {
-        setStatusPreviewExpanded(false);
-      }
-    });
-    window.addEventListener("resize", updateStatusMirrorViewport);
-    window.addEventListener("orientationchange", updateStatusMirrorViewport);
-
-    window.addEventListener("storage", (event) => {
-      if (event.key !== STATUS_LAYOUT_STORAGE_KEY || !event.newValue) {
-        return;
-      }
-      try {
-        const snapshot = JSON.parse(event.newValue);
-        const state = snapshot && typeof snapshot === "object" ? snapshot : {};
-        const count = Object.keys(state).length;
-        setStatusMirrorNote(`Status layout synced across views (${count} cards) at ${new Date().toLocaleTimeString()}.`);
-        console.log("[Fibonacci Layout] preview-to-status sync event", { count, source: "storage" });
-        applyStatusLayoutStateToMirror(state, "storage");
-      } catch {
-        setStatusMirrorNote("Status layout sync event received.");
-      }
+    elements.openDisplayStatusPage.addEventListener("click", () => {
+      window.open("/status?view=display", "_blank", "noopener,noreferrer");
     });
 
     elements.manualRefresh.addEventListener("click", () => refreshAll({ manual: true }));
 
     syncDisplayPreferenceLabels();
     pushDesignControlsToForm(DESIGN_DEFAULTS);
-    setStatusPreviewExpanded(false);
+    setStatusAccessNote("Open the real status page or the real display output directly. Settings no longer hosts a preview mirror.");
     refreshAll();
     setInterval(refreshAll, REFRESH_MS);
   </script>

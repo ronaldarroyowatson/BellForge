@@ -1,5 +1,7 @@
 # BellForge CLI Reference
 
+Use the Playwright-backed rollout verifier before closing a bugfix. It connects to the real Pi, confirms the published version is visible to the device, confirms the release is staged, reboots the Pi, waits for it to return, then validates the post-reboot Status page, Settings page, and real display output through a real browser.
+
 `scripts/bellforge_cli.py` is the unified diagnostics and operations tool.
 It runs directly on the Pi or on any host that can reach the BellForge backend.
 

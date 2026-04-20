@@ -76,10 +76,24 @@ This verifier:
 - reboots the Pi over SSH and waits for SSH plus HTTP recovery
 - confirms the staged release was actually installed
 - opens the real `/status` and `/settings` pages in a headless browser against the Pi
-- opens the live status preview modal from Settings and checks the mirrored status surface
+- opens the real `/status?view=display` surface and checks it alongside `/status` and `/settings`
 - captures JSON and screenshot artifacts under `tests/logs/pi-rollout/`
 
 Use `--allow-already-current` only for audit reruns after the first closeout validation. The first validation for a bugfix should capture both staging and apply evidence.
+
+On `main`, this is now also enforced automatically by `.github/workflows/release.yml` after each push finishes publishing the new version. The workflow runs the Pi verifier against the released version and uploads the rollout plus debug artifacts.
+
+### Structured debug inspection
+
+BellForge now writes structured rolling debug logs to the configured debug log file and exposes them through the backend:
+
+```bash
+python scripts/bellforge_cli.py debug-inspect --base-url http://127.0.0.1:8000
+python scripts/bellforge_cli.py debug-logs --channel "layout engine decisions" --lines 100
+python scripts/bellforge_cli.py --debug debug-inspect
+```
+
+The inspector summarizes recent findings across layout engine decisions, card registry sync, drag/drop, expand/collapse, auto-arrange, orientation changes, Pi update workflow, network/backend/updater health, DOM mutations, and rendering failures.
 
 ---
 
@@ -177,7 +191,7 @@ open http://localhost:8000/docs
 
 ## Browser Layout Verification (Permanent Gate)
 
-Run this whenever you touch layout, card ordering, collapse/expand behavior, drag-and-drop, preview modal behavior, or design tokens:
+Run this whenever you touch layout, card ordering, collapse/expand behavior, drag-and-drop, real display verification behavior, or design tokens:
 
 ```bash
 npm run test:layout
@@ -185,9 +199,9 @@ npm run test:layout
 
 What it does:
 - Starts or reuses the real backend at `http://127.0.0.1:8000`
-- Loads the real Status page, Settings page, and preview modal in headless Chromium
-- Verifies default layout, Fibonacci ratios, collapse/expand reflow, drag-and-drop reorder, viewport reflow at `1920x1080`, `1280x720`, `800x480`, and `480x320`, and preview/layout mirroring
-- Captures DOM geometry, computed styles, slot assignments, preview size calculations, and console debug logs under `tests/logs/layout-browser/`
+- Loads the real Status page, Settings page, and display output in headless Chromium
+- Verifies default layout, masonry span behavior, collapse/expand reflow, drag-and-drop reorder, viewport reflow at `1920x1080`, `1280x720`, `800x480`, and `480x320`, and real-surface consistency
+- Captures DOM geometry, computed styles, layout state, and console debug logs under `tests/logs/layout-browser/`
 - Clears persisted layout state, repairs with automatic auto-arrange/reset, and retries once before failing the run
 
 Rules:

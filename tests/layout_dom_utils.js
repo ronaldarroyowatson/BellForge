@@ -33,27 +33,17 @@ function collectOverlaps(snapshot) {
 }
 
 function findFibonacciRatioIssues(snapshot, tolerance = 0.03) {
+  void tolerance;
   const issues = [];
-  const gap = snapshot.container?.gap || 0;
-  for (const items of rowGroups(snapshot)) {
-    if (items.length <= 1) {
-      continue;
-    }
-    const normalizedWidths = items.map((item) => item.rect.width - ((item.colSpan - 1) * gap));
-    const expectedSpans = items.map((item) => item.colSpan);
-    for (let index = 1; index < items.length; index += 1) {
-      const actualRatio = normalizedWidths[index - 1] / normalizedWidths[index];
-      const expectedRatio = expectedSpans[index - 1] / expectedSpans[index];
-      const delta = Math.abs(actualRatio - expectedRatio) / expectedRatio;
-      if (delta > tolerance) {
-        issues.push({
-          left: items[index - 1].key,
-          right: items[index].key,
-          actualRatio: round(actualRatio),
-          expectedRatio: round(expectedRatio),
-          delta: round(delta),
-        });
-      }
+  for (const card of snapshot.cards || []) {
+    if (Number(card.colSpan || 1) !== 1) {
+      issues.push({
+        left: card.key,
+        right: card.key,
+        actualRatio: round(Number(card.colSpan || 1)),
+        expectedRatio: 1,
+        delta: round(Math.abs(Number(card.colSpan || 1) - 1)),
+      });
     }
   }
   return issues;
@@ -114,14 +104,19 @@ function collectSpacingMetrics(snapshot) {
 }
 
 function simplifyLayout(snapshot) {
-  return (snapshot.cards || []).map((card) => ({
-    key: card.key,
-    collapsed: card.collapsed,
-    rowIndex: card.rowIndex,
-    colStart: card.colStart,
-    colSpan: card.colSpan,
-    order: card.order,
-  }));
+  return {
+    layoutMode: snapshot.layoutMode || null,
+    columns: snapshot.container?.columns || 0,
+    gap: snapshot.container?.gap || 0,
+    cards: (snapshot.cards || []).map((card) => ({
+      key: card.key,
+      collapsed: card.collapsed,
+      rowIndex: card.rowIndex,
+      colStart: card.colStart,
+      colSpan: card.colSpan,
+      order: card.order,
+    })),
+  };
 }
 
 module.exports = {

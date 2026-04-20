@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import traceback
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -164,6 +165,38 @@ def cmd_updater_check_now(args: argparse.Namespace) -> int:
         return 0 if payload.get("ok") else 1
     except Exception as exc:
         print(f"updater check-now failed: {exc}", file=sys.stderr)
+        return 2
+
+
+def cmd_debug_logs(args: argparse.Namespace) -> int:
+    base = args.base_url.rstrip("/")
+    query = f"lines={args.lines}"
+    if args.channel:
+        query += f"&channel={args.channel}"
+    if args.source:
+        query += f"&source={args.source}"
+    if args.level:
+        query += f"&level={args.level}"
+    if args.contains:
+        query += f"&contains={args.contains}"
+
+    try:
+        payload = fetch_json(f"{base}/api/debug/logs?{query}")
+        print_json(payload)
+        return 0
+    except Exception as exc:
+        print(f"debug logs failed: {exc}", file=sys.stderr)
+        return 2
+
+
+def cmd_debug_inspect(args: argparse.Namespace) -> int:
+    base = args.base_url.rstrip("/")
+    try:
+        payload = fetch_json(f"{base}/api/debug/inspect?lines={args.lines}")
+        print_json(payload)
+        return 0 if not payload.get("findings") else 1
+    except Exception as exc:
+        print(f"debug inspect failed: {exc}", file=sys.stderr)
         return 2
 
 
@@ -323,6 +356,7 @@ def cmd_agent(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Unified BellForge diagnostics CLI")
     parser.set_defaults(func=None)
+    parser.add_argument("--debug", action="store_true", help="Enable verbose CLI diagnostics and stack traces")
 
     sub = parser.add_subparsers(dest="command")
 
@@ -338,12 +372,26 @@ def build_parser() -> argparse.ArgumentParser:
     service.set_defaults(func=cmd_service)
 
     logs = sub.add_parser("logs", help="Read backend log endpoint")
-    logs.add_argument("service", choices=["backend", "updater", "client", "install-repair"])
+    logs.add_argument("service", choices=["backend", "updater", "client", "install-repair", "debug"])
     logs.add_argument("--base-url", default="http://127.0.0.1:8000")
     logs.add_argument("--lines", type=int, default=200)
     logs.add_argument("--contains")
     logs.add_argument("--json", action="store_true")
     logs.set_defaults(func=cmd_logs)
+
+    dbg_logs = sub.add_parser("debug-logs", help="Read structured BellForge debug logs")
+    dbg_logs.add_argument("--base-url", default="http://127.0.0.1:8000")
+    dbg_logs.add_argument("--lines", type=int, default=200)
+    dbg_logs.add_argument("--channel")
+    dbg_logs.add_argument("--source")
+    dbg_logs.add_argument("--level")
+    dbg_logs.add_argument("--contains")
+    dbg_logs.set_defaults(func=cmd_debug_logs)
+
+    dbg_inspect = sub.add_parser("debug-inspect", help="Inspect recent structured debug findings")
+    dbg_inspect.add_argument("--base-url", default="http://127.0.0.1:8000")
+    dbg_inspect.add_argument("--lines", type=int, default=400)
+    dbg_inspect.set_defaults(func=cmd_debug_inspect)
 
     ups = sub.add_parser("updater-status", help="Show updater lifecycle status")
     ups.add_argument("--base-url", default="http://127.0.0.1:8000")
@@ -400,11 +448,21 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
+    if getattr(args, "debug", False):
+        os.environ["BELLFORGE_DEBUG"] = "1"
+
     if not getattr(args, "func", None):
         parser.print_help()
         return 1
 
-    return int(args.func(args))
+    try:
+        return int(args.func(args))
+    except Exception as exc:
+        if getattr(args, "debug", False):
+            traceback.print_exc()
+        else:
+            print(f"bellforge_cli failed: {exc}", file=sys.stderr)
+        return 3
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ import qrcode
 import qrcode.image.svg
 
 from backend.services.auth import get_auth_status
+from backend.services.debug_service import inspect_debug_events, read_debug_events, write_debug_event
 from backend.services.display_preferences import get_display_preferences, update_display_preferences
 from backend.services.device_info import collect_device_status
 from backend.services.display_pipeline import collect_display_pipeline, run_self_heal
@@ -51,6 +52,15 @@ class DisplayPreferencesPayload(BaseModel):
     shadow_intensity: float | None = Field(default=None, ge=0.0, le=1.6)
     status_page_scale: float | None = Field(default=None, ge=0.75, le=1.0)
     layout_mode: Literal["portrait", "landscape"] | None = None
+
+
+class DebugEventPayload(BaseModel):
+    source: str = Field(default="client", max_length=80)
+    channel: str = Field(default="general", max_length=120)
+    message: str = Field(default="event", max_length=240)
+    level: Literal["debug", "info", "warn", "warning", "error", "critical"] = "info"
+    event_type: str = Field(default="event", max_length=80)
+    payload: dict[str, Any] | list[Any] | str | int | float | bool | None = None
 
 
 def _error_detail(message: str) -> dict[str, str]:
@@ -99,7 +109,7 @@ async def auth_status() -> dict[str, Any]:
 
 @router.get("/logs/{service}", summary="Get service logs")
 async def service_logs(
-    service: Literal["backend", "updater", "client", "install-repair"],
+    service: Literal["backend", "updater", "client", "install-repair", "debug"],
     lines: int = Query(default=200, ge=1, le=2000),
     contains: str | None = Query(default=None, max_length=120),
 ) -> dict[str, Any]:
@@ -125,6 +135,53 @@ async def updater_check_now() -> dict[str, Any]:
         return await trigger_update_check_now(_PROJECT_ROOT)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Updater trigger failed: {exc}")) from exc
+
+
+@router.post("/debug/event", summary="Append a structured debug event")
+async def append_debug_event(payload: DebugEventPayload) -> dict[str, Any]:
+    try:
+        return write_debug_event(
+            _PROJECT_ROOT,
+            source=payload.source,
+            channel=payload.channel,
+            message=payload.message,
+            payload=payload.payload,
+            level=payload.level,
+            event_type=payload.event_type,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Debug event append failed: {exc}")) from exc
+
+
+@router.get("/debug/logs", summary="Read structured BellForge debug logs")
+async def debug_logs(
+    lines: int = Query(default=200, ge=1, le=2000),
+    channel: str | None = Query(default=None, max_length=120),
+    source: str | None = Query(default=None, max_length=80),
+    contains: str | None = Query(default=None, max_length=120),
+    level: str | None = Query(default=None, max_length=32),
+) -> dict[str, Any]:
+    try:
+        return read_debug_events(
+            _PROJECT_ROOT,
+            limit=lines,
+            channel=channel,
+            source=source,
+            contains=contains,
+            level=level,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Debug log retrieval failed: {exc}")) from exc
+
+
+@router.get("/debug/inspect", summary="Inspect recent debug events for BellForge failures")
+async def debug_inspect(
+    lines: int = Query(default=400, ge=1, le=2000),
+) -> dict[str, Any]:
+    try:
+        return inspect_debug_events(_PROJECT_ROOT, limit=lines)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Debug inspection failed: {exc}")) from exc
 
 
 @router.get("/display/pipeline", summary="Get end-to-end display pipeline diagnostics")

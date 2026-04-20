@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
+const net = require('node:net');
 const { spawn } = require('node:child_process');
 
 const { chromium } = require('playwright');
@@ -15,7 +16,6 @@ const {
 } = require('./layout_dom_utils.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const BASE_URL = 'http://127.0.0.1:8000';
 const STATUS_PATH = '/status';
 const SETTINGS_PATH = '/settings';
 const DISPLAY_STATUS_PATH = '/status?view=display';
@@ -26,12 +26,20 @@ const STORAGE_KEYS = [
   'bellforge.status.layout-command.v1',
   'bellforge.design-controls.live.v1',
   'bellforge.debug.fibo',
+  'bellforge.debug.verbose',
 ];
 const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+const MAX_CONSOLE_ENTRIES = 200;
+const MAX_CONSOLE_TEXT = 1000;
 
 let backendProcess = null;
 let startedBackend = false;
 let artifactSequence = 0;
+const PREFERRED_BACKEND_PORT = process.env.BELLFORGE_TEST_PORT
+  ? Number.parseInt(process.env.BELLFORGE_TEST_PORT, 10)
+  : 0;
+let backendPort = PREFERRED_BACKEND_PORT;
+let BASE_URL = `http://127.0.0.1:${backendPort}`;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -58,9 +66,13 @@ function recordSnapshotArtifact(label, snapshot, consoleEntries = [], extras = {
   });
 }
 
-function isServerHealthy() {
+function buildBaseUrl(port = backendPort) {
+  return `http://127.0.0.1:${port}`;
+}
+
+function isServerHealthy(port = backendPort) {
   return new Promise((resolve) => {
-    const request = http.get(`${BASE_URL}/health`, (response) => {
+    const request = http.get(`${buildBaseUrl(port)}/health`, (response) => {
       response.resume();
       resolve(response.statusCode === 200);
     });
@@ -72,13 +84,47 @@ function isServerHealthy() {
   });
 }
 
+function reservePort(preferredPort) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE' && preferredPort !== 0) {
+        resolve(reservePort(0));
+        return;
+      }
+      reject(error);
+    });
+    server.listen(preferredPort, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : preferredPort;
+      server.close((closeError) => {
+        if (closeError) {
+          reject(closeError);
+          return;
+        }
+        resolve(port);
+      });
+    });
+  });
+}
+
 function pythonCommandCandidates() {
   const candidates = [];
   const windowsVenv = path.join(REPO_ROOT, '.venv', 'Scripts', 'python.exe');
   const posixVenv = path.join(REPO_ROOT, '.venv', 'bin', 'python');
-  if (fs.existsSync(windowsVenv)) candidates.push({ command: windowsVenv, args: [] });
-  if (fs.existsSync(posixVenv)) candidates.push({ command: posixVenv, args: [] });
-  if (process.env.BELLFORGE_PYTHON) candidates.push({ command: process.env.BELLFORGE_PYTHON, args: [] });
+  if (process.env.BELLFORGE_PYTHON) {
+    candidates.push({ command: process.env.BELLFORGE_PYTHON, args: [] });
+  }
+  if (fs.existsSync(windowsVenv)) {
+    candidates.push({ command: windowsVenv, args: [] });
+  }
+  if (fs.existsSync(posixVenv)) {
+    candidates.push({ command: posixVenv, args: [] });
+  }
+  if (candidates.length > 0) {
+    return candidates;
+  }
   if (process.platform === 'win32') {
     candidates.push({ command: 'py', args: ['-3'] });
   }
@@ -88,9 +134,13 @@ function pythonCommandCandidates() {
 }
 
 async function ensureBackend() {
-  if (await isServerHealthy()) {
+  if (startedBackend && await isServerHealthy(backendPort)) {
     return;
   }
+
+  const startupPort = await reservePort(PREFERRED_BACKEND_PORT);
+  backendPort = startupPort;
+  BASE_URL = buildBaseUrl(startupPort);
 
   for (let pass = 0; pass < 3; pass += 1) {
     for (const candidate of pythonCommandCandidates()) {
@@ -103,7 +153,7 @@ async function ensureBackend() {
           '--host',
           '127.0.0.1',
           '--port',
-          '8000',
+          String(startupPort),
           '--log-level',
           'warning',
         ], {
@@ -122,7 +172,7 @@ async function ensureBackend() {
 
         const deadline = Date.now() + 45000;
         while (Date.now() < deadline) {
-          if (await isServerHealthy()) {
+          if (await isServerHealthy(startupPort)) {
             startedBackend = true;
             return;
           }
@@ -132,7 +182,7 @@ async function ensureBackend() {
           await sleep(750);
         }
 
-        if (await isServerHealthy()) {
+        if (await isServerHealthy(startupPort)) {
           startedBackend = true;
           return;
         }
@@ -152,14 +202,14 @@ async function ensureBackend() {
       }
     }
 
-    if (await isServerHealthy()) {
+    if (await isServerHealthy(startupPort)) {
       startedBackend = true;
       return;
     }
     await sleep(1500);
   }
 
-  throw new Error('Unable to start or reuse BellForge backend on http://127.0.0.1:8000');
+  throw new Error(`Unable to start or reuse BellForge backend on ${BASE_URL}`);
 }
 
 async function stopBackend() {
@@ -173,25 +223,22 @@ async function stopBackend() {
   }
   backendProcess = null;
   startedBackend = false;
+  backendPort = PREFERRED_BACKEND_PORT;
+  BASE_URL = buildBaseUrl(backendPort);
 }
 
 function attachConsole(target, label) {
   const entries = [];
   target.on('console', async (message) => {
-    const args = [];
-    for (const handle of message.args()) {
-      try {
-        args.push(await handle.jsonValue());
-      } catch {
-        args.push(await handle.toString());
-      }
-    }
+    const text = String(message.text() || '').slice(0, MAX_CONSOLE_TEXT);
     entries.push({
       label,
       type: message.type(),
-      text: message.text(),
-      args,
+      text,
     });
+    if (entries.length > MAX_CONSOLE_ENTRIES) {
+      entries.splice(0, entries.length - MAX_CONSOLE_ENTRIES);
+    }
   });
   return entries;
 }
@@ -237,6 +284,7 @@ function registerBrowserSuite() {
       await context.addInitScript((keys) => {
         keys.forEach((key) => localStorage.removeItem(key));
         localStorage.setItem('bellforge.debug.fibo', 'true');
+        localStorage.setItem('bellforge.debug.verbose', 'false');
       }, STORAGE_KEYS);
       return context;
     },
@@ -268,33 +316,23 @@ async function clickElement(page, selector) {
   await waitForAnimationFrame(page);
 }
 
-async function openPreviewModal(settingsPage) {
-  await settingsPage.evaluate(() => {
-    window.__bellforgeStatusPreview?.open();
-  });
-  await settingsPage.waitForFunction(() => window.__bellforgeStatusPreview?.isOpen?.() === true);
-  const deadline = Date.now() + 45000;
-  let lastError = null;
+async function openSettingsDisplayPage(settingsPage) {
+  const displayPage = await settingsPage.context().newPage();
+  await displayPage.goto(`${BASE_URL}${DISPLAY_STATUS_PATH}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await waitForLayoutReady(displayPage);
+  return displayPage.mainFrame();
+}
 
-  while (Date.now() < deadline) {
-    const handle = await settingsPage.$('#designStatusMirror');
-    assert.ok(handle, 'Preview iframe is missing');
-    const frame = await handle.contentFrame();
-    if (!frame) {
-      await sleep(250);
-      continue;
-    }
-
-    try {
-      await waitForLayoutReady(frame);
-      return frame;
-    } catch (error) {
-      lastError = error;
-      await sleep(500);
-    }
-  }
-
-  throw lastError || new Error('Preview iframe did not become ready');
+async function broadcastStatusLayoutCommand(page, commandType, payload = {}) {
+  await page.evaluate(({ commandType, payload }) => {
+    localStorage.setItem('bellforge.status.layout-command.v1', JSON.stringify({
+      source: 'browser-dom-verification',
+      timestamp: Date.now(),
+      type: commandType,
+      payload,
+    }));
+  }, { commandType, payload });
+  await waitForAnimationFrame(page);
 }
 
 async function openRealSurfaces(suite, viewport = DEFAULT_VIEWPORT, labelPrefix = 'layout') {
@@ -302,8 +340,8 @@ async function openRealSurfaces(suite, viewport = DEFAULT_VIEWPORT, labelPrefix 
   const status = await openPage(context, STATUS_PATH, `${labelPrefix}-status`);
   const display = await openPage(context, DISPLAY_STATUS_PATH, `${labelPrefix}-display`);
   const settings = await openPage(context, SETTINGS_PATH, `${labelPrefix}-settings`);
-  const previewFrame = await openPreviewModal(settings.page);
-  const previewConsole = attachConsole(previewFrame.page(), `${labelPrefix}-preview`);
+  const settingsDisplayPage = await openSettingsDisplayPage(settings.page);
+  const settingsDisplayConsole = attachConsole(settingsDisplayPage.page(), `${labelPrefix}-settings-display`);
   return {
     context,
     statusPage: status.page,
@@ -312,8 +350,8 @@ async function openRealSurfaces(suite, viewport = DEFAULT_VIEWPORT, labelPrefix 
     displayConsole: display.consoleEntries,
     settingsPage: settings.page,
     settingsConsole: settings.consoleEntries,
-    previewFrame,
-    previewConsole,
+    settingsDisplayPage,
+    settingsDisplayConsole,
   };
 }
 
@@ -328,7 +366,6 @@ async function resetPageLayout(page, kind) {
     if (kind === 'settings') {
       window.__bellforgeSettingsLayout?.resetState();
       window.__bellforgeSettingsLayout?.autoArrange();
-      window.__bellforgeStatusPreview?.close();
     }
   }, { kind, storageKeys: STORAGE_KEYS });
   await waitForLayoutReady(page);
@@ -358,8 +395,17 @@ async function withRepair(page, kind, label, runVerification) {
 }
 
 async function captureSnapshot(target, kind) {
-  return target.evaluate(({ kind }) => {
+  return target.evaluate(async ({ kind }) => {
     const round = (value) => Math.round(value * 100) / 100;
+    let debugInspector = null;
+    try {
+      const response = await fetch('/api/debug/inspect?lines=120', { cache: 'no-store' });
+      if (response.ok) {
+        debugInspector = await response.json();
+      }
+    } catch {
+      debugInspector = null;
+    }
     const cards = Array.from(document.querySelectorAll('[data-fibo-card]')).map((card) => {
       const rect = card.getBoundingClientRect();
       const style = getComputedStyle(card);
@@ -403,6 +449,8 @@ async function captureSnapshot(target, kind) {
     const containerRect = container ? container.getBoundingClientRect() : { width: 0, height: 0 };
     const containerStyle = container ? getComputedStyle(container) : null;
     const debugLayout = window.__bellforgeStatusLayout || window.__bellforgeSettingsLayout || null;
+    const layoutCache = debugLayout?.getLayoutCache?.() || null;
+    const rootStyle = getComputedStyle(document.documentElement);
     return {
       kind,
       url: window.location.href,
@@ -413,15 +461,18 @@ async function captureSnapshot(target, kind) {
       container: {
         width: round(containerRect.width),
         height: round(containerRect.height),
-        gap: round(Number.parseFloat(containerStyle?.columnGap || containerStyle?.gap || '0') || 0),
-        columns: Number(containerStyle?.getPropertyValue('--fibo-columns') || container?.style.getPropertyValue('--fibo-columns') || 0),
+        gap: round(Number.parseFloat(containerStyle?.columnGap || containerStyle?.gap || rootStyle.getPropertyValue('--bf-masonry-gap') || '0') || 0),
+        columns: Number(containerStyle?.getPropertyValue('--fibo-columns') || container?.style.getPropertyValue('--fibo-columns') || layoutCache?.columns || 0),
       },
       document: {
         scrollWidth: document.documentElement.scrollWidth,
         scrollHeight: document.documentElement.scrollHeight,
       },
-      layoutCache: debugLayout?.getLayoutCache?.() || null,
+      layoutMode: document.documentElement.dataset.designLayoutMode || layoutCache?.layoutMode || null,
+      layoutCache,
       state: debugLayout?.getState?.() || null,
+      pageDebug: window.__bellforgeDebug?.getLocalState?.() || null,
+      debugInspector,
       cards,
     };
   }, { kind });
@@ -452,7 +503,7 @@ function assertCollapseControls(snapshot, keys) {
 
 function assertFibonacciRatios(snapshot, tolerance = 0.03) {
   const issues = findFibonacciRatioIssues(snapshot, tolerance);
-  assert.equal(issues.length, 0, `${snapshot.kind}: ratio failed for ${issues[0]?.left}:${issues[0]?.right} (${issues[0]?.actualRatio} vs ${issues[0]?.expectedRatio})`);
+  assert.equal(issues.length, 0, `${snapshot.kind}: masonry span check failed for ${issues[0]?.left} (${issues[0]?.actualRatio} vs ${issues[0]?.expectedRatio})`);
 }
 
 function assertWeightOrdering(snapshot) {
@@ -788,7 +839,7 @@ async function runScratchScenario(page, scenario) {
         width: round(rect.width),
         height: round(rect.height),
         gap: round(Number.parseFloat(containerStyle.columnGap || containerStyle.gap || '0') || 0),
-        columns: Number(containerStyle.getPropertyValue('--fibo-columns') || container.style.getPropertyValue('--fibo-columns') || 0),
+        columns: Number(containerStyle.getPropertyValue('--fibo-columns') || container.style.getPropertyValue('--fibo-columns') || layoutHandle.getLayoutCache().columns || 0),
       },
       state: layoutHandle.getState(),
       layoutCache: layoutHandle.getLayoutCache(),
@@ -808,10 +859,11 @@ module.exports = {
   STORAGE_KEYS,
   registerBrowserSuite,
   openPage,
-  openPreviewModal,
+  openSettingsDisplayPage,
   openRealSurfaces,
   withRepair,
   captureSnapshot,
+  broadcastStatusLayoutCommand,
   clickElement,
   waitForLayoutReady,
   writeArtifact,

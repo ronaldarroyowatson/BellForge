@@ -6,6 +6,11 @@
   "install_dir": "/opt/bellforge",
   "staging_dir": "/opt/bellforge/.staging",
   "log_file": "/var/log/bellforge-updater.log",
+  "debug_enabled": true,
+  "debug_verbose": false,
+  "debug_log_file": "/var/log/bellforge-debug.jsonl",
+  "debug_log_max_bytes": 2000000,
+  "debug_log_max_age_days": 7,
   "kiosk": {
     "cec_power_on": true,
     "hdmi_wait_seconds": 45

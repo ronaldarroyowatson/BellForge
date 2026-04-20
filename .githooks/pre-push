@@ -4,7 +4,10 @@ set -eu
 echo "[bellforge] Running real-browser layout verification before push..."
 npm run test:layout
 
-echo "[bellforge] Running auth suite before push..."
-python tests/run_auth_suite.py --coverage
+echo "[bellforge] Running debug and display preference unit gates before push..."
+npm run test:python:debug
 
-echo "[bellforge] Layout and auth gates passed. Proceeding with push."
+echo "[bellforge] Running auth suite before push..."
+npm run test:auth
+
+echo "[bellforge] Layout, debug, and auth gates passed. Proceeding with push."

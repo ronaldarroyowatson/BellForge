@@ -39,7 +39,7 @@ test('null-set layout cases recover cleanly for empty, single-card, fully-collap
     assert.equal(singleSnapshot.cards.length, 1, 'Single-card layout should render exactly one card');
     assert.ok(singleSnapshot.cards[0].rect.width >= singleSnapshot.container.width * 0.55, 'Single-card layout did not maximize visible width');
 
-    const allCollapsedSnapshot = await runScratchScenario(surfaces.previewFrame, {
+    const allCollapsedSnapshot = await runScratchScenario(surfaces.settingsDisplayPage, {
       kind: 'scratch-all-collapsed-layout',
       mode: 'status-display',
       cards: [
@@ -52,7 +52,7 @@ test('null-set layout cases recover cleanly for empty, single-card, fully-collap
       maxPerRow: 2,
       storageKey: 'bellforge.test.scratch.collapsed',
     });
-    recordSnapshotArtifact('scratch-all-collapsed-layout', allCollapsedSnapshot, surfaces.previewConsole);
+    recordSnapshotArtifact('scratch-all-collapsed-layout', allCollapsedSnapshot, surfaces.settingsDisplayConsole);
     assert.equal(allCollapsedSnapshot.cards.every((card) => card.collapsed), true, 'All-collapsed layout did not keep every card collapsed');
     assert.equal(countVisibleCards(allCollapsedSnapshot), allCollapsedSnapshot.cards.length, 'All-collapsed layout did not maximize visible cards');
     assert.equal(allCollapsedSnapshot.cards.some((card) => card.colSpan < allCollapsedSnapshot.container.columns), true, 'All-collapsed layout did not preserve packed multi-card rows');

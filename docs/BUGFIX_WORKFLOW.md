@@ -11,15 +11,15 @@ Use this workflow for production bugfix cycles and nightly closeout.
 ## 2. Verify the Fix
 
 1. Run targeted tests for changed areas.
-2. Run browser-driven layout verification for any layout, card, token, collapse/expand, drag-and-drop, or preview-modal change:
+2. Run browser-driven layout verification for any layout, card, token, collapse/expand, drag-and-drop, or real display verification change:
    - `npm run test:layout`
-   - This starts or reuses the real backend on `http://127.0.0.1:8000`, opens the real Status and Settings pages in a headless browser, exercises collapse/expand, resize, drag-and-drop, and preview mirroring, then writes DOM geometry and console artifacts under `tests/logs/layout-browser/`.
+   - This starts or reuses the real backend on `http://127.0.0.1:8000`, opens the real Status page, Settings page, and display output in a headless browser, exercises collapse/expand, resize, drag-and-drop, and shared layout commands, then writes DOM geometry and console artifacts under `tests/logs/layout-browser/`.
    - The browser verifier resets saved layout state and re-runs once after an automatic layout-state repair. If it still fails, do not accept the fix.
 2. Run auth integrity suite (mandatory for any auth/device/account change):
    - `python tests/run_auth_suite.py --coverage`
    - `npm run test:auth`
 2. Run smoke tests:
-   - `python tests/smoke_test_windows.py` (dev/Windows)
+   - `node scripts/run_python.js tests/smoke_test_windows.py` (dev/Windows)
    - `bash tests/smoke_test.sh` (Pi/system install)
 3. Confirm service and API health on device:
    - `systemctl is-active bellforge-backend bellforge-client lightdm`
@@ -55,7 +55,7 @@ Recommended local hook setup:
 4. Verify the real Pi rollout before closing the bugfix:
     - Run `npm run verify:pi-rollout -- --pi-host 192.168.2.180 --expected-version X.Y.Z`
     - The verifier must prove all of these before the bugfix is considered closed:
-      - the real Status page is audited before rollout and while staged, then must pass with no browser-visible errors or regressions after apply
+       - the real Status page is audited before rollout and while staged, then passes with no browser-visible errors or regressions after apply
        - the Pi detects the new published version (`latest_detected_version`)
        - the update is fully downloaded and staged (`staged_update_pending=true`, `staged_release_version=X.Y.Z`, download progress at 100%)
        - the Pi is rebooted and returns to service
@@ -63,9 +63,19 @@ Recommended local hook setup:
        - the real browser surfaces on the Pi still behave correctly after apply:
           - `/status`
           - `/settings`
-          - the live status preview modal / preview card inside Settings
+          - `/status?view=display`
     - The verifier writes JSON and screenshot evidence under `tests/logs/pi-rollout/`.
     - Do not close the bugfix if the Pi is already on the expected version unless you intentionally rerun with `--allow-already-current` for audit-only evidence; first-closeout validation must capture stage plus apply.
+5. Automatic post-push enforcement on `main`:
+    - `.github/workflows/release.yml` now runs the full layout DOM suite, debug unit tests, auth suite, release publication, and then the live Pi rollout verifier automatically after each push to `main`.
+    - The post-push verifier must confirm, in order:
+       - published version detected on the Pi
+       - update fully downloaded
+       - update staged
+       - Pi rebooted
+       - expected version applied
+       - `/status`, `/settings`, and `/status?view=display` all pass live browser checks on the Pi
+    - The workflow uploads `tests/logs/pi-rollout/` and `tests/logs/bellforge-debug/` as artifacts.
 
 ## 5. Nightly Closeout
 

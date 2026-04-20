@@ -13,6 +13,8 @@ jobs:
   release:
     name: Bump version, regenerate manifest, and tag
     runs-on: ubuntu-latest
+    outputs:
+      released_version: ${{ steps.version.outputs.version }}
 
     # Don't run on commits made by this workflow itself
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
@@ -47,12 +49,24 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Install release validation dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install -r updater/requirements.txt
           pip install -r tests/requirements-auth.txt
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Enforce layout and debug suites before version bump
+        run: |
+          npm run test:layout
+          npm run test:python:debug
 
       - name: Enforce auth suite before version bump
         run: |
@@ -126,3 +140,56 @@ jobs:
             --title "BellForge v${{ steps.version.outputs.version }}" \
             --notes "Automated release. Pis will auto-update within one poll interval." \
             --latest
+
+  verify-pi-rollout:
+    name: Verify Published Pi Rollout
+    needs: release
+    runs-on: [self-hosted, linux]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install rollout verification dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r updater/requirements.txt
+          pip install -r tests/requirements-auth.txt
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Prepare SSH key
+        run: |
+          : "${BELLFORGE_PI_SSH_KEY:?BELLFORGE_PI_SSH_KEY is not set on the runner environment}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "${BELLFORGE_PI_SSH_KEY}" > ~/.ssh/bellforge_pi_key
+          chmod 600 ~/.ssh/bellforge_pi_key
+
+      - name: Verify published Pi rollout
+        env:
+          BELLFORGE_PI_SSH_KEY_PATH: ~/.ssh/bellforge_pi_key
+        run: |
+          : "${BELLFORGE_PI_HOST:?BELLFORGE_PI_HOST is not set on the runner environment}"
+          npm run verify:pi-rollout -- --pi-host "${BELLFORGE_PI_HOST}" --expected-version "${{ needs.release.outputs.released_version }}"
+
+      - name: Upload Pi rollout artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-rollout-${{ needs.release.outputs.released_version }}
+          path: |
+            tests/logs/pi-rollout/
+            tests/logs/bellforge-debug/

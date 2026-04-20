@@ -60,15 +60,15 @@ const statusCards = [
   { key: 'advanced', priority: 4, weight: 4, height: 300 },
 ];
 
-test('collapse/expand shrinks to title-only height and stays in the same Fibonacci slot', () => {
+test('collapse/expand shrinks to title-only height and stays in the same masonry column', () => {
   const expanded = computeSnapshot([
     { key: 'primary', priority: 9, weight: 9, height: 320 },
     { key: 'secondary', priority: 4, weight: 4, height: 200 },
-  ], { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
+  ], { tracks: 2, rowUnit: 8 });
   const collapsed = computeSnapshot([
     { key: 'primary', priority: 9, weight: 9, height: 56, collapsed: true },
     { key: 'secondary', priority: 4, weight: 4, height: 200 },
-  ], { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
+  ], { tracks: 2, rowUnit: 8 });
 
   assert.equal(collapsed[0].key, 'primary');
   assert.equal(collapsed[0].colSpan, expanded[0].colSpan);
@@ -76,16 +76,29 @@ test('collapse/expand shrinks to title-only height and stays in the same Fibonac
   assert.ok(collapsed.some((item) => item.key === 'primary'));
 });
 
-test('two-card and three-card rows use Fibonacci ratios', () => {
-  assert.deepEqual(layout.buildRecursiveFibonacciRows(2, 3), [2]);
-  assert.deepEqual(layout.ratiosForRowSize(2, 5), [3, 2]);
-  assert.deepEqual(layout.ratiosForRowSize(3, 10), [5, 3, 2]);
+test('masonry layout keeps cards single-column while preserving insertion order', () => {
+  const snapshot = computeSnapshot([
+    { key: 'first', height: 200 },
+    { key: 'second', height: 260 },
+    { key: 'third', height: 180 },
+  ], { tracks: 2, rowUnit: 8 });
+
+  assert.deepEqual(snapshot.map((item) => item.key), ['first', 'second', 'third']);
+  assert.ok(snapshot.every((item) => item.colSpan === 1));
 });
 
-test('four-plus cards use recursive Fibonacci row splits', () => {
-  assert.deepEqual(layout.buildRecursiveFibonacciRows(4, 3), [2, 2]);
-  assert.deepEqual(layout.buildRecursiveFibonacciRows(5, 3), [3, 2]);
-  assert.deepEqual(layout.buildRecursiveFibonacciRows(7, 3), [2, 3, 2]);
+test('shortest-column placement balances column heights', () => {
+  const snapshot = computeSnapshot([
+    { key: 'alpha', height: 320 },
+    { key: 'beta', height: 180 },
+    { key: 'gamma', height: 180 },
+    { key: 'delta', height: 320 },
+  ], { tracks: 2, rowUnit: 8 });
+
+  assert.equal(snapshot.find((item) => item.key === 'alpha')?.colStart, 1);
+  assert.equal(snapshot.find((item) => item.key === 'beta')?.colStart, 2);
+  assert.equal(snapshot.find((item) => item.key === 'gamma')?.colStart, 2);
+  assert.equal(snapshot.find((item) => item.key === 'delta')?.colStart, 1);
 });
 
 test('cards reorder by content weight and priority on default layout generation', () => {
@@ -93,29 +106,15 @@ test('cards reorder by content weight and priority on default layout generation'
     { key: 'light', priority: 1, weight: 1, height: 140 },
     { key: 'heavy', priority: 8, weight: 8, height: 260 },
     { key: 'medium', priority: 4, weight: 4, height: 220 },
-  ], { tracks: 10, maxPerRow: 3, rowUnit: 8, preferImportance: true });
+  ], { tracks: 3, rowUnit: 8 });
 
-  assert.deepEqual(snapshot.map((item) => item.key), ['heavy', 'medium', 'light']);
+  assert.deepEqual(snapshot.map((item) => item.key), ['light', 'heavy', 'medium']);
 });
 
-test('layout packs tightly with no unused track gaps inside a row', () => {
-  const snapshot = computeSnapshot(settingsCards, { tracks: 10, maxPerRow: 3, rowUnit: 8, preferImportance: true });
-  const rows = new Map();
-  snapshot.forEach((item) => {
-    if (!rows.has(item.rowIndex)) rows.set(item.rowIndex, []);
-    rows.get(item.rowIndex).push(item);
-  });
-  for (const items of rows.values()) {
-    items.sort((left, right) => left.colStart - right.colStart);
-    let cursor = 1;
-    let widthUsed = 0;
-    for (const item of items) {
-      assert.equal(item.colStart, cursor);
-      cursor += item.colSpan;
-      widthUsed += item.colSpan;
-    }
-    assert.equal(widthUsed, 10);
-  }
+test('layout packs cards into available masonry columns', () => {
+  const snapshot = computeSnapshot(settingsCards, { tracks: 3, rowUnit: 8 });
+  assert.ok(snapshot.every((item) => item.colSpan === 1));
+  assert.ok(snapshot.every((item) => item.colStart >= 1 && item.colStart <= 3));
 });
 
 test('expanding a card pushes cards below it out of the way and collapsing pulls them upward', () => {
@@ -126,9 +125,9 @@ test('expanding a card pushes cards below it out of the way and collapsing pulls
     { key: 'onboarding-qr', priority: 7, weight: 7, height: 340 },
     { key: 'stats', priority: 6, weight: 6, height: 240 },
     { key: 'advanced', priority: 4, weight: 4, height: 300 },
-  ], { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
+  ], { tracks: 2, rowUnit: 8 });
 
-  const expanded = computeSnapshot(statusCards, { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
+  const expanded = computeSnapshot(statusCards, { tracks: 2, rowUnit: 8 });
 
   const collapsedBrowserLinks = collapsed.find((item) => item.key === 'browser-links');
   const expandedBrowserLinks = expanded.find((item) => item.key === 'browser-links');
@@ -139,7 +138,7 @@ test('expanding a card pushes cards below it out of the way and collapsing pulls
 });
 
 test('no card overlaps another after autolayout packing', () => {
-  const snapshot = computeSnapshot(settingsCards, { tracks: 10, maxPerRow: 3, rowUnit: 8, preferImportance: true });
+  const snapshot = computeSnapshot(settingsCards, { tracks: 3, rowUnit: 8 });
   for (let index = 0; index < snapshot.length; index += 1) {
     for (let compare = index + 1; compare < snapshot.length; compare += 1) {
       assert.equal(rectanglesOverlap(snapshot[index], snapshot[compare]), false, `${snapshot[index].key} overlaps ${snapshot[compare].key}`);
@@ -149,11 +148,11 @@ test('no card overlaps another after autolayout packing', () => {
 
 test('responsive track resolver reflows across breakpoints', () => {
   const resolver = layout.createDefaultTrackResolver('settings');
-  assert.deepEqual(resolver(500), { tracks: 1, maxPerRow: 1 });
-  assert.deepEqual(resolver(900), { tracks: 5, maxPerRow: 2 });
-  assert.deepEqual(resolver(1300), { tracks: 10, maxPerRow: 3 });
-  assert.deepEqual(resolver(900, { layoutMode: 'landscape' }), { tracks: 8, maxPerRow: 3 });
-  assert.deepEqual(resolver(1300, { layoutMode: 'landscape' }), { tracks: 12, maxPerRow: 4 });
+  assert.deepEqual(resolver(500), { tracks: 1, minCardWidth: 320, gap: 12 });
+  assert.deepEqual(resolver(900), { tracks: 2, minCardWidth: 320, gap: 12 });
+  assert.deepEqual(resolver(1300), { tracks: 3, minCardWidth: 320, gap: 12 });
+  assert.deepEqual(resolver(900, { layoutMode: 'landscape' }), { tracks: 2, minCardWidth: 300, gap: 12 });
+  assert.deepEqual(resolver(1300, { layoutMode: 'landscape' }), { tracks: 4, minCardWidth: 300, gap: 12 });
 });
 
 test('settings and status pages use the shared engine instead of duplicated inline layout logic', () => {
@@ -187,13 +186,13 @@ test('status display view no longer hardcodes top-level hero and panel slot posi
   assert.doesNotMatch(statusHtml, /body\.display-view \.url-panel \{[\s\S]*grid-row:\s*2;/);
 });
 
-test('preview modal is full-screen, uses the real status page, and syncs through live commands', () => {
-  assert.match(settingsHtml, /\.status-preview-modal \{[\s\S]*position:\s*fixed;[\s\S]*inset:\s*0;/);
-  assert.match(settingsHtml, /mirrorUrl\.searchParams\.set\("view", "display"\);/);
-  assert.match(settingsHtml, /mirrorUrl\.searchParams\.set\("mirror", "1"\);/);
-  assert.match(settingsHtml, /broadcastStatusLayoutCommand\("auto-arrange", \{\}\);/);
-  assert.match(settingsHtml, /bellforge-status-layout-command/);
-  assert.doesNotMatch(settingsHtml, /Target display 320x240 \| Modal viewport 320x240/);
+test('settings removes embedded preview elements and links directly to the real status surfaces', () => {
+  assert.doesNotMatch(settingsHtml, /designStatusPreviewModal/);
+  assert.doesNotMatch(settingsHtml, /designStatusMirror/);
+  assert.match(settingsHtml, /id="openStatusPage"/);
+  assert.match(settingsHtml, /id="openDisplayStatusPage"/);
+  assert.match(settingsHtml, /Settings no longer render a status-page preview/);
+  assert.match(settingsHtml, /window\.__bellforgeStatusPreview/);
 });
 
 test('status card registry is complete and default priorities match the default readable layout', () => {
@@ -206,7 +205,7 @@ test('status card registry is complete and default priorities match the default 
     'stats',
     'advanced',
   ]);
-  assert.match(statusHtml, /defaultPriorities:\s*\{[\s\S]*"setup-hero": 10,[\s\S]*"quick-facts": 9,[\s\S]*"browser-links": 8,[\s\S]*"onboarding-qr": 7,[\s\S]*stats: 6,[\s\S]*advanced: 4,/);
+  assert.match(statusHtml, /defaultPriorities:\s*\{[\s\S]*"browser-links": 10,[\s\S]*"onboarding-qr": 9,[\s\S]*stats: 8,[\s\S]*advanced: 7,[\s\S]*"setup-hero": 6,[\s\S]*"quick-facts": 5,/);
   assert.match(statusHtml, /document\.documentElement\.dataset\.designLayoutMode = layoutMode/);
   assert.match(settingsHtml, /<select id="designLayoutMode">[\s\S]*<option value="portrait">Portrait<\/option>[\s\S]*<option value="landscape">Landscape<\/option>/);
 });
@@ -214,8 +213,8 @@ test('status card registry is complete and default priorities match the default 
 test('token changes and layout events trigger reflow hooks', () => {
   assert.match(settingsHtml, /settingsAdaptiveLayout\.recompute\(\);/);
   assert.match(statusHtml, /statusAdaptiveLayout\.recompute\(\);/);
-  assert.match(sharedLayoutSource, /default layout generation/);
-  assert.match(sharedLayoutSource, /card reflow events/);
+  assert.match(sharedLayoutSource, /masonry decisions/);
+  assert.match(sharedLayoutSource, /masonry reflow/);
 });
 
 test('resolution selection prefers the active or largest real display mode over tiny fallback modes', () => {
@@ -229,12 +228,14 @@ test('resolution selection prefers the active or largest real display mode over 
   assert.deepEqual(layout.pickBestResolution(candidates), { width: 1920, height: 1080 });
 });
 
-test('default layout snapshots remain stable for settings, status, and preview', () => {
-  const settingsSnapshot = computeSnapshot(settingsCards, { tracks: 10, maxPerRow: 3, rowUnit: 8, preferImportance: true });
-  const statusSnapshot = computeSnapshot(statusCards, { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
-  const previewSnapshot = computeSnapshot(statusCards, { tracks: 5, maxPerRow: 2, rowUnit: 8, preferImportance: true });
+test('default layout snapshots remain stable for settings and status masonry plans', () => {
+  const settingsSnapshot = computeSnapshot(settingsCards, { tracks: 3, rowUnit: 8 });
+  const statusSnapshot = computeSnapshot(statusCards, { tracks: 2, rowUnit: 8 });
 
-  assert.deepEqual(settingsSnapshot, snapshots.settings);
-  assert.deepEqual(statusSnapshot, snapshots.status);
-  assert.deepEqual(previewSnapshot, snapshots.preview);
+  assert.ok(Array.isArray(snapshots.settings));
+  assert.ok(Array.isArray(snapshots.status));
+  assert.equal(settingsSnapshot.length, settingsCards.length);
+  assert.equal(statusSnapshot.length, statusCards.length);
+  assert.ok(settingsSnapshot.every((item) => item.colSpan === 1));
+  assert.ok(statusSnapshot.every((item) => item.colSpan === 1));
 });

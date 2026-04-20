@@ -102,17 +102,17 @@ test('adaptive layout reflows around expand and collapse events without leaving 
     assertMovement(settingsCollapsed, settingsExpanded, { requireHorizontal: false, requireVertical: true });
     assertWhitespaceImproves(settingsBefore, settingsCollapsed, 'settings collapse density', 0.08);
 
-    await setCardCollapsed(surfaces.previewFrame, 'advanced', true);
-    const previewCollapsed = await captureSnapshot(surfaces.previewFrame, 'preview-collapsed');
-    recordSnapshotArtifact('preview-collapsed', previewCollapsed, surfaces.previewConsole);
-    assertNoOverlap(previewCollapsed);
-    assertSpacing(previewCollapsed, { minVisibleCards: 2 });
+    await setCardCollapsed(surfaces.settingsDisplayPage, 'advanced', true);
+    const settingsDisplayCollapsed = await captureSnapshot(surfaces.settingsDisplayPage, 'settings-display-collapsed');
+    recordSnapshotArtifact('settings-display-collapsed', settingsDisplayCollapsed, surfaces.settingsDisplayConsole);
+    assertNoOverlap(settingsDisplayCollapsed);
+    assertSpacing(settingsDisplayCollapsed, { minVisibleCards: 2 });
   } finally {
     await surfaces.context.close();
   }
 });
 
-test('deterministic random expand and collapse fully open cards, avoid clipping, and force full Fibonacci reflow on status settings and preview', async () => {
+test('deterministic random expand and collapse fully open cards, avoid clipping, and force full masonry reflow on status, settings, and linked display', async () => {
   const surfaces = await openRealSurfaces(suite, { width: 1280, height: 720 }, 'adaptive-random-card');
 
   try {
@@ -159,23 +159,23 @@ test('deterministic random expand and collapse fully open cards, avoid clipping,
       maxHorizontalGap: Math.max(settingsCollapsed.container.gap + 24, 32),
     });
 
-    const previewBaseline = await captureSnapshot(surfaces.previewFrame, 'preview-random-baseline');
-    const previewExpandTarget = previewBaseline.cards.find((card) => card.key === 'setup-hero') || pickDeterministicCard(previewBaseline, { seed: 11 });
-    await setCardCollapsed(surfaces.previewFrame, previewExpandTarget.key, true);
-    const previewCollapsed = await captureSnapshot(surfaces.previewFrame, 'preview-random-collapsed');
-    await setCardCollapsed(surfaces.previewFrame, previewExpandTarget.key, false);
-    const previewExpanded = await captureSnapshot(surfaces.previewFrame, 'preview-random-expanded');
-    recordSnapshotArtifact('preview-random-expand-collapse', previewExpanded, surfaces.previewConsole, {
-      baseline: previewBaseline,
-      collapsed: previewCollapsed,
-      target: previewExpandTarget.key,
+    const settingsDisplayBaseline = await captureSnapshot(surfaces.settingsDisplayPage, 'settings-display-random-baseline');
+    const settingsDisplayExpandTarget = settingsDisplayBaseline.cards.find((card) => card.key === 'setup-hero') || pickDeterministicCard(settingsDisplayBaseline, { seed: 11 });
+    await setCardCollapsed(surfaces.settingsDisplayPage, settingsDisplayExpandTarget.key, true);
+    const settingsDisplayCollapsed = await captureSnapshot(surfaces.settingsDisplayPage, 'settings-display-random-collapsed');
+    await setCardCollapsed(surfaces.settingsDisplayPage, settingsDisplayExpandTarget.key, false);
+    const settingsDisplayExpanded = await captureSnapshot(surfaces.settingsDisplayPage, 'settings-display-random-expanded');
+    recordSnapshotArtifact('settings-display-random-expand-collapse', settingsDisplayExpanded, surfaces.settingsDisplayConsole, {
+      baseline: settingsDisplayBaseline,
+      collapsed: settingsDisplayCollapsed,
+      target: settingsDisplayExpandTarget.key,
     });
-    assertExpandedCardFullyOpen(previewExpanded, previewExpandTarget.key);
-    assertCardShrank(previewBaseline, previewCollapsed, previewExpandTarget.key);
-    assertNoOverlap(previewCollapsed);
-    assertNoOverlap(previewExpanded);
-    assertMovement(previewCollapsed, previewExpanded, { requireHorizontal: false, requireVertical: true });
-    assertSpacing(previewExpanded, { minVisibleCards: 2 });
+    assertExpandedCardFullyOpen(settingsDisplayExpanded, settingsDisplayExpandTarget.key);
+    assertCardShrank(settingsDisplayBaseline, settingsDisplayCollapsed, settingsDisplayExpandTarget.key);
+    assertNoOverlap(settingsDisplayCollapsed);
+    assertNoOverlap(settingsDisplayExpanded);
+    assertMovement(settingsDisplayCollapsed, settingsDisplayExpanded, { requireHorizontal: false, requireVertical: true });
+    assertSpacing(settingsDisplayExpanded, { minVisibleCards: 2 });
   } finally {
     await surfaces.context.close();
   }

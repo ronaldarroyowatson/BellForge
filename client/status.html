@@ -91,6 +91,79 @@
       margin: 0 auto;
       padding: calc(24px * var(--bf-ui-scale));
     }
+    .layout-editor {
+      display: none;
+      margin: 0 auto;
+      max-width: 1240px;
+      padding: calc(16px * var(--bf-ui-scale)) calc(24px * var(--bf-ui-scale)) 0;
+    }
+    .layout-editor.is-visible {
+      display: block;
+    }
+    .layout-editor__card {
+      display: grid;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255, 251, 244, 0.94);
+      border: 1px solid rgba(215, 200, 181, 0.9);
+      box-shadow: 0 calc(14px * var(--bf-shadow-scale)) calc(28px * var(--bf-shadow-scale)) rgba(27, 39, 49, 0.10);
+    }
+    .layout-editor__topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .layout-editor__title {
+      display: grid;
+      gap: 4px;
+    }
+    .layout-editor__title h2 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .layout-editor__title p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .layout-editor__actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .layout-editor__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .layout-editor label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .layout-editor input,
+    .layout-editor button {
+      font: inherit;
+    }
+    .layout-editor__note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .layout-editor__status {
+      margin: 0;
+      color: var(--accent);
+      font-size: 0.88rem;
+    }
     .card {
       background: var(--paper);
       border: 1px solid rgba(215, 200, 181, 0.9);
@@ -418,8 +491,8 @@
       display: grid;
       grid-template-columns: repeat(var(--fibo-columns, 10), minmax(0, 1fr));
       grid-auto-rows: var(--fibo-row-unit);
-      grid-auto-flow: dense;
-      gap: var(--bf-space-2);
+      grid-auto-flow: row;
+      gap: var(--bf-masonry-gap, var(--bf-space-2));
       align-items: start;
     }
     .wrap.fibo-adaptive-grid > [data-fibo-card] {
@@ -568,7 +641,7 @@
     }
     body.display-view .wrap.fibo-adaptive-grid {
       grid-template-columns: repeat(var(--fibo-columns, 5), minmax(0, 1fr));
-      gap: var(--bf-space-2);
+      gap: var(--bf-masonry-gap, var(--bf-space-2));
     }
     body.display-view .wrap.fibo-adaptive-grid > [data-fibo-card] {
       grid-row: var(--fibo-row-start, auto) / span var(--fibo-row-span, 18) !important;
@@ -691,6 +764,31 @@
   </style>
 </head>
 <body>
+  <section id="layoutEditor" class="layout-editor" aria-live="polite">
+    <div class="layout-editor__card">
+      <div class="layout-editor__topbar">
+        <div class="layout-editor__title">
+          <h2>Real Status Layout Edit Mode</h2>
+          <p>Edits apply to the real status page only. Drag title bars to reorder cards when edit mode is enabled.</p>
+        </div>
+        <div class="layout-editor__actions">
+          <button id="layoutEditToggle" type="button">Enable Edit Mode</button>
+          <button id="layoutAutoArrange" type="button">Auto Arrange</button>
+          <button id="layoutReset" type="button">Reset Layout</button>
+        </div>
+      </div>
+      <div class="layout-editor__grid">
+        <label>Minimum Card Width
+          <input id="layoutMinWidth" type="range" min="220" max="520" step="10" value="300" />
+        </label>
+        <label>Card Gap
+          <input id="layoutGap" type="range" min="8" max="32" step="2" value="12" />
+        </label>
+      </div>
+      <p id="layoutEditorStatus" class="layout-editor__status">Sign in on the auth page to unlock edit mode on this real status page.</p>
+      <p id="layoutMetrics" class="layout-editor__note">Columns: 0 | Order: unavailable | Overflow: unknown</p>
+    </div>
+  </section>
   <main class="wrap">
     <section class="card setup-hero" data-fibo-card data-card-key="setup-hero" data-card-title="Setup Hero">
       <div class="setup-hero-body">
@@ -822,15 +920,23 @@
     </details>
   </main>
 
+  <script src="/client/js/bellforge_debug.js"></script>
   <script src="/client/js/fibonacci_layout.js"></script>
   <script>
     const REFRESH_MS = 10000;
     const STATUS_LAYOUT_STORAGE_KEY = "bellforge.status.fibo-cards.v1";
     const STATUS_LAYOUT_COMMAND_KEY = "bellforge.status.layout-command.v1";
     const DESIGN_CONTROLS_LIVE_KEY = "bellforge.design-controls.live.v1";
+    const STATUS_LAYOUT_SETTINGS_KEY = "bellforge.status.layout-settings.v1";
+    const ACCESS_TOKEN_KEY = "bellforge.access_token";
     const params = new URLSearchParams(window.location.search);
     const isDisplayView = params.get("view") === "display";
     const isMirrorView = params.get("mirror") === "1";
+    const debugClient = window.BellForgeDebug?.createClient({
+      source: isMirrorView ? "status-mirror" : isDisplayView ? "status-display" : "status",
+      verbose: localStorage.getItem("bellforge.debug.verbose") === "true",
+    });
+    window.__bellforgeDebug = debugClient;
     const advancedDetails = document.querySelector(".advanced");
     const advancedItems = Array.from(document.querySelectorAll(".advanced-item"));
     const advancedPager = document.getElementById("advancedPager");
@@ -846,6 +952,14 @@
     };
 
     const els = {
+      layoutEditor: document.getElementById("layoutEditor"),
+      layoutEditToggle: document.getElementById("layoutEditToggle"),
+      layoutAutoArrange: document.getElementById("layoutAutoArrange"),
+      layoutReset: document.getElementById("layoutReset"),
+      layoutMinWidth: document.getElementById("layoutMinWidth"),
+      layoutGap: document.getElementById("layoutGap"),
+      layoutEditorStatus: document.getElementById("layoutEditorStatus"),
+      layoutMetrics: document.getElementById("layoutMetrics"),
       hostname: document.getElementById("hostname"),
       localIpValue: document.getElementById("localIpValue"),
       externalIpValue: document.getElementById("externalIpValue"),
@@ -881,6 +995,126 @@
     if (isMirrorView) {
       document.body.classList.add("mirror-view");
     }
+    debugClient?.installGlobalObservers({ observeContainer: ".wrap" });
+
+    const defaultStatusOrder = ["browser-links", "onboarding-qr", "stats", "advanced", "setup-hero", "quick-facts"];
+    const defaultLayoutSettings = {
+      minCardWidth: 300,
+      gap: 12,
+      editEnabled: false,
+    };
+    let layoutEditorAuthorized = false;
+
+    function debugEvent(channel, message, payload, level = "info") {
+      if (!debugClient) {
+        return;
+      }
+      if (level === "warn") {
+        debugClient.warn(channel, message, payload);
+        return;
+      }
+      if (level === "error") {
+        debugClient.error(channel, message, payload);
+        return;
+      }
+      debugClient.log(channel, message, payload);
+    }
+
+    function readLayoutSettings() {
+      const stored = safeParseLayoutSettings(localStorage.getItem(STATUS_LAYOUT_SETTINGS_KEY));
+      return stored || { ...defaultLayoutSettings };
+    }
+
+    function safeParseLayoutSettings(raw) {
+      try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (!parsed || typeof parsed !== "object") {
+          return null;
+        }
+        return {
+          minCardWidth: clamp(parsed.minCardWidth, 220, 520, defaultLayoutSettings.minCardWidth),
+          gap: clamp(parsed.gap, 8, 32, defaultLayoutSettings.gap),
+          editEnabled: Boolean(parsed.editEnabled),
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    function writeLayoutSettings(nextSettings) {
+      const normalized = {
+        minCardWidth: clamp(nextSettings.minCardWidth, 220, 520, defaultLayoutSettings.minCardWidth),
+        gap: clamp(nextSettings.gap, 8, 32, defaultLayoutSettings.gap),
+        editEnabled: Boolean(nextSettings.editEnabled),
+      };
+      localStorage.setItem(STATUS_LAYOUT_SETTINGS_KEY, JSON.stringify(normalized));
+      return normalized;
+    }
+
+    function applyLayoutSettings(settings) {
+      const normalized = writeLayoutSettings(settings);
+      document.documentElement.style.setProperty("--bf-masonry-min-card-width", `${normalized.minCardWidth}px`);
+      document.documentElement.style.setProperty("--bf-masonry-gap", `${normalized.gap}px`);
+      if (els.layoutMinWidth) {
+        els.layoutMinWidth.value = String(normalized.minCardWidth);
+      }
+      if (els.layoutGap) {
+        els.layoutGap.value = String(normalized.gap);
+      }
+      if (window.__bellforgeStatusLayout?.setEditing) {
+        window.__bellforgeStatusLayout.setEditing(layoutEditorAuthorized && normalized.editEnabled && !isDisplayView);
+      }
+      if (els.layoutEditToggle) {
+        els.layoutEditToggle.textContent = normalized.editEnabled ? "Disable Edit Mode" : "Enable Edit Mode";
+      }
+      return normalized;
+    }
+
+    function updateLayoutMetrics(snapshot) {
+      const cache = snapshot || window.__bellforgeStatusLayout?.getLayoutCache?.() || {};
+      const currentOrder = Array.from(document.querySelectorAll("[data-fibo-card]"))
+        .map((card) => ({ key: card.dataset.cardKey, order: Number(card.dataset.fiboOrder || 0) }))
+        .sort((left, right) => left.order - right.order)
+        .map((card) => card.key)
+        .join(" -> ");
+      const overflow = document.documentElement.scrollHeight > window.innerHeight + 8 ? "vertical" : "none";
+      if (els.layoutMetrics) {
+        els.layoutMetrics.textContent = `Columns: ${cache.columns || 0} | Order: ${currentOrder || "unavailable"} | Overflow: ${overflow}`;
+      }
+    }
+
+    async function refreshLayoutEditorAuth() {
+      if (isDisplayView) {
+        return;
+      }
+      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY) || "";
+      if (!accessToken) {
+        layoutEditorAuthorized = false;
+        els.layoutEditor.classList.add("is-visible");
+        els.layoutEditorStatus.textContent = "Sign in on the auth page to unlock edit mode on this real status page.";
+        applyLayoutSettings({ ...readLayoutSettings(), editEnabled: false });
+        return;
+      }
+      try {
+        const response = await fetch("/api/auth/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ token: accessToken }),
+        });
+        layoutEditorAuthorized = response.ok;
+      } catch {
+        layoutEditorAuthorized = false;
+      }
+      els.layoutEditor.classList.add("is-visible");
+      els.layoutEditorStatus.textContent = layoutEditorAuthorized
+        ? "Authenticated. Edit mode can reorder cards and tune masonry spacing on the real page immediately."
+        : "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
+      const currentSettings = readLayoutSettings();
+      applyLayoutSettings({ ...currentSettings, editEnabled: layoutEditorAuthorized && currentSettings.editEnabled });
+    }
 
     function clamp(value, min, max, fallback = min) {
       const numeric = Number(value);
@@ -895,14 +1129,33 @@
         syncChannel: "bellforge-status-layout-state",
         mode: isDisplayView ? "status-display" : "status",
         defaultPriorities: {
-          "setup-hero": 10,
-          "quick-facts": 9,
-          "browser-links": 8,
-          "onboarding-qr": 7,
-          stats: 6,
-          advanced: 4,
+          "browser-links": 10,
+          "onboarding-qr": 9,
+          stats: 8,
+          advanced: 7,
+          "setup-hero": 6,
+          "quick-facts": 5,
         },
         getLayoutMode: () => document.documentElement.dataset.designLayoutMode || "portrait",
+        getDefaultCardState: (card, key) => ({
+          order: defaultStatusOrder.indexOf(key) >= 0
+            ? defaultStatusOrder.indexOf(key)
+            : (window.BellForgeFibonacciLayout?.ORDER_FALLBACK ?? 999),
+        }),
+        trackResolver: (width, context) => {
+          const layoutMode = document.documentElement.dataset.designLayoutMode || context.layoutMode || "portrait";
+          const settings = readLayoutSettings();
+          const minCardWidth = layoutMode === "landscape"
+            ? Math.max(220, Number(settings.minCardWidth || 300) - 20)
+            : Math.max(220, Number(settings.minCardWidth || 300));
+          const gap = Math.max(8, Number(settings.gap || 12));
+          const usableWidth = Math.max(width, minCardWidth);
+          return {
+            tracks: Math.max(1, Math.floor((usableWidth + gap) / (minCardWidth + gap))),
+            minCardWidth,
+            gap,
+          };
+        },
         ...options,
       });
     }
@@ -935,7 +1188,7 @@
       document.documentElement.style.setProperty("--bf-shadow-scale", String(shadowScale));
       document.documentElement.style.setProperty("--bf-status-page-scale", String(statusPageScale));
       document.documentElement.style.setProperty("--bf-space-6", `${Math.round(56 * uiScale)}px`);
-      console.log("[Fibonacci Layout] token application", { theme, fontScale, uiScale, cardRadius, shadowScale, statusPageScale, layoutMode });
+      debugEvent("orientation changes", "Applied status design controls", { theme, fontScale, uiScale, cardRadius, shadowScale, statusPageScale, layoutMode });
     }
 
     function pill(text, level) {
@@ -1119,7 +1372,7 @@
         if (!raw) return;
         const parsed = JSON.parse(raw);
         if (parsed && parsed.payload) {
-          console.log("[Fibonacci Layout] token application events", parsed.payload);
+          debugEvent("orientation changes", "Consumed live design controls from storage", parsed.payload);
           applyDesignControls(parsed.payload);
           statusAdaptiveLayout.recompute();
         }
@@ -1181,6 +1434,13 @@
         els.diskUsage.textContent = percentDisplay(data.disk_usage);
         els.memoryUsage.textContent = percentDisplay(data.memory_usage);
         els.refreshLabel.textContent = `Last refresh: ${new Date().toLocaleTimeString()} | Updates automatically every 10 seconds`;
+        debugEvent("network status", "Refreshed live status surface", {
+          online,
+          localIp,
+          backendReachable: data.backend_reachable,
+          updaterRunning: data.autoupdater_running,
+          deviceVersion: data.version,
+        });
       } catch (error) {
         els.networkStatus.innerHTML = pill("Fetch Failed", "bad");
         els.localIpValue.textContent = "Unavailable";
@@ -1194,6 +1454,7 @@
         els.onboardingQrStatus.textContent = "Unable to generate onboarding QR right now.";
         els.onboardingQr.removeAttribute("src");
         els.refreshLabel.textContent = `Last refresh failed at ${new Date().toLocaleTimeString()}`;
+        debugEvent("rendering failures", "Status refresh failed", { error: error.message || String(error) }, "error");
       }
     }
 
@@ -1218,7 +1479,11 @@
       storageKey: STATUS_LAYOUT_STORAGE_KEY,
       commandKey: STATUS_LAYOUT_COMMAND_KEY,
       mode: isDisplayView ? "status-display" : "status",
+      setEditing: (enabled) => statusAdaptiveLayout.setEditing(enabled),
     };
+    debugClient?.snapshot("layout engine decisions", "Status layout bootstrap", ".wrap", {
+      mode: window.__bellforgeStatusLayout.mode,
+    });
 
     let lastCommandTimestamp = 0;
 
@@ -1232,15 +1497,20 @@
       }
 
       if (command.type === "sync-request") {
+        debugEvent("card registry sync", "Received sync-request command", { source, command });
         statusAdaptiveLayout.emitLayoutSnapshot(`sync-request:${source}`);
         return;
       }
       if (command.type === "auto-arrange") {
+        debugEvent("auto-arrange events", "Received auto-arrange command", { source, command });
         statusAdaptiveLayout.autoArrange();
+        updateLayoutMetrics();
         return;
       }
       if (command.type === "apply-state" && command.payload && typeof command.payload === "object") {
+        debugEvent("card registry sync", "Applying remote layout state", { source, keys: Object.keys(command.payload) });
         statusAdaptiveLayout.applyRemoteState(command.payload, `command:${source}`);
+        updateLayoutMetrics();
       }
     }
 
@@ -1252,7 +1522,7 @@
         handleLayoutCommand(event.data.command, "postMessage");
       }
       if (event.data.type === "bellforge-design-controls" && event.data.payload) {
-        console.log("[Fibonacci Layout] token application events", event.data.payload);
+        debugEvent("orientation changes", "Received live design controls via postMessage", event.data.payload);
         applyDesignControls(event.data.payload);
         statusAdaptiveLayout.recompute();
       }
@@ -1278,7 +1548,7 @@
       if (event.key === DESIGN_CONTROLS_LIVE_KEY && event.newValue) {
         const payload = parseLayoutCommand(event.newValue);
         if (payload && payload.payload) {
-          console.log("[Fibonacci Layout] token application events", payload.payload);
+          debugEvent("orientation changes", "Received live design controls via storage event", payload.payload);
           applyDesignControls(payload.payload);
           statusAdaptiveLayout.recompute();
         }
@@ -1287,13 +1557,57 @@
 
     advancedDetails.addEventListener("toggle", () => statusAdaptiveLayout.recompute());
 
+    if (els.layoutEditToggle) {
+      els.layoutEditToggle.addEventListener("click", () => {
+        const settings = readLayoutSettings();
+        if (!layoutEditorAuthorized) {
+          els.layoutEditorStatus.textContent = "Authentication required. Sign in on the auth page, then reload this real status page.";
+          return;
+        }
+        applyLayoutSettings({ ...settings, editEnabled: !settings.editEnabled });
+        updateLayoutMetrics();
+      });
+    }
+    if (els.layoutAutoArrange) {
+      els.layoutAutoArrange.addEventListener("click", () => {
+        statusAdaptiveLayout.autoArrange();
+        updateLayoutMetrics();
+      });
+    }
+    if (els.layoutReset) {
+      els.layoutReset.addEventListener("click", () => {
+        localStorage.removeItem(STATUS_LAYOUT_STORAGE_KEY);
+        statusAdaptiveLayout.resetState("real-status-layout-reset");
+        updateLayoutMetrics();
+      });
+    }
+    if (els.layoutMinWidth) {
+      els.layoutMinWidth.addEventListener("input", () => {
+        applyLayoutSettings({ ...readLayoutSettings(), minCardWidth: Number(els.layoutMinWidth.value) });
+        statusAdaptiveLayout.recompute();
+        updateLayoutMetrics();
+      });
+    }
+    if (els.layoutGap) {
+      els.layoutGap.addEventListener("input", () => {
+        applyLayoutSettings({ ...readLayoutSettings(), gap: Number(els.layoutGap.value) });
+        statusAdaptiveLayout.recompute();
+        updateLayoutMetrics();
+      });
+    }
+
     scheduleDiagnosticsCarousel();
+    applyLayoutSettings(readLayoutSettings());
+    refreshLayoutEditorAuth();
     refreshDisplayPreferences();
     consumeLiveDesignControlsFromStorage();
     refresh();
     setInterval(refreshDisplayPreferences, REFRESH_MS);
     setInterval(refresh, REFRESH_MS);
-    setInterval(() => statusAdaptiveLayout.recompute(), REFRESH_MS);
+    setInterval(() => {
+      statusAdaptiveLayout.recompute();
+      updateLayoutMetrics();
+    }, REFRESH_MS);
   </script>
 </body>
 </html>

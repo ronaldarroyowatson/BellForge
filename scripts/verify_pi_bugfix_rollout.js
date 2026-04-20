@@ -12,7 +12,6 @@ const {
   collectSpacingMetrics,
   findFibonacciRatioIssues,
   findWeightOrderingIssues,
-  simplifyLayout,
 } = require('../tests/layout_dom_utils.js');
 
 const execFileAsync = promisify(execFile);
@@ -96,7 +95,7 @@ Required behavior:
   - verifies the update is downloaded and staged
   - reboots the Pi and waits for it to return
   - verifies the expected version is installed after reboot
-  - verifies status, settings, and preview card pages through a real browser
+  - verifies status, settings, and real display output through a real browser
 
 Options:
   --pi-host <host>                  Pi host or IP (default: ${DEFAULT_PI_HOST})
@@ -240,6 +239,25 @@ async function collectApiState(config, label) {
   return snapshot;
 }
 
+async function emitDebugEvent(config, channel, message, payload = {}, options = {}) {
+  try {
+    await fetchJson(`${config.baseUrl}/api/debug/event`, {
+      method: 'POST',
+      body: {
+        source: options.source || 'pi-rollout-verifier',
+        channel,
+        message,
+        level: options.level || 'info',
+        event_type: options.eventType || 'event',
+        payload,
+      },
+      timeoutMs: options.timeoutMs || 10_000,
+    });
+  } catch {
+    // Debug emission must never hide the actual rollout result.
+  }
+}
+
 async function captureRemoteTriage(config, label) {
   const result = await runSsh(config, 'python3 /opt/bellforge/scripts/bellforge_cli.py triage --host-label live-pi', { timeoutMs: 60_000 });
   const payload = {
@@ -267,8 +285,17 @@ async function waitForLayoutReady(target) {
 }
 
 async function captureGridSnapshot(target, label) {
-  const snapshot = await target.evaluate((artifactLabel) => {
+  const snapshot = await target.evaluate(async (artifactLabel) => {
     const round = (value) => Math.round(value * 100) / 100;
+    let debugInspector = null;
+    try {
+      const response = await fetch('/api/debug/inspect?lines=120', { cache: 'no-store' });
+      if (response.ok) {
+        debugInspector = await response.json();
+      }
+    } catch {
+      debugInspector = null;
+    }
     const cards = Array.from(document.querySelectorAll('[data-fibo-card]')).map((card) => {
       const rect = card.getBoundingClientRect();
       return {
@@ -297,12 +324,15 @@ async function captureGridSnapshot(target, label) {
       label: artifactLabel,
       url: window.location.href,
       viewport: { width: window.innerWidth, height: window.innerHeight },
+      layoutMode: document.documentElement.dataset.designLayoutMode || null,
       container: {
         width: round(containerRect.width),
         height: round(containerRect.height),
         gap: round(Number.parseFloat(containerStyle?.columnGap || containerStyle?.gap || '0') || 0),
         columns: Number(containerStyle?.getPropertyValue('--fibo-columns') || container?.style.getPropertyValue('--fibo-columns') || 0),
       },
+      pageDebug: window.__bellforgeDebug?.getLocalState?.() || null,
+      debugInspector,
       cards,
     };
   }, label);
@@ -354,7 +384,7 @@ function browserExpectationsFromState(state) {
   const latestDetectedVersion = state.updater.latest_detected_version || currentVersion;
   return {
     statusVersion: currentVersion,
-    previewVersion: currentVersion,
+    displayVersion: currentVersion,
     settingsCurrentVersion: currentVersion,
     settingsLatestVersion: latestDetectedVersion,
   };
@@ -382,7 +412,7 @@ async function verifyStatusPage(context, config, expectedVersion, artifactPrefix
   return { snapshot, overlaps, displayedVersion: displayedVersion?.trim() || null };
 }
 
-async function verifySettingsPage(context, config, expectedCurrentVersion, expectedLatestVersion, expectedPreviewVersion, artifactPrefix, options = {}) {
+async function verifySettingsPage(context, config, expectedCurrentVersion, expectedLatestVersion, expectedDisplayVersion, artifactPrefix, options = {}) {
   const page = await context.newPage();
   const consoleEntries = [];
   page.on('console', (message) => consoleEntries.push({ type: message.type(), text: message.text() }));
@@ -401,62 +431,37 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
     assertBrowserLayoutHealth(snapshot, { minVisibleCards: 3 });
   }
 
-  const modalMetrics = await page.evaluate(() => {
-    const modal = document.getElementById('designStatusPreviewModal');
-    const dialog = modal?.querySelector('.status-preview-modal__dialog');
-    const rootStyle = getComputedStyle(document.documentElement);
-    const modalRect = modal?.getBoundingClientRect();
-    const dialogRect = dialog?.getBoundingClientRect();
+  const accessMetrics = await page.evaluate(() => {
     return {
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      modalPosition: modal ? getComputedStyle(modal).position : null,
-      modalRect: modalRect ? { width: modalRect.width, height: modalRect.height } : null,
-      dialogRect: dialogRect ? { width: dialogRect.width, height: dialogRect.height } : null,
-      nativeWidth: Number(rootStyle.getPropertyValue('--status-preview-native-width') || 0),
-      nativeHeight: Number(rootStyle.getPropertyValue('--status-preview-native-height') || 0),
-      viewportWidth: Number.parseFloat(rootStyle.getPropertyValue('--status-preview-modal-width') || '0'),
-      viewportHeight: Number.parseFloat(rootStyle.getPropertyValue('--status-preview-modal-height') || '0'),
-      resolutionLabel: document.getElementById('designStatusResolution')?.textContent?.trim() || '',
+      hasOpenStatusButton: Boolean(document.getElementById('openStatusPage')),
+      hasOpenDisplayButton: Boolean(document.getElementById('openDisplayStatusPage')),
+      previewModalPresent: Boolean(document.getElementById('designStatusPreviewModal')),
+      previewIframePresent: Boolean(document.getElementById('designStatusMirror')),
+      accessNote: document.getElementById('designStatusAccessNote')?.textContent?.trim() || '',
     };
   });
 
-  await page.evaluate(() => {
-    if (window.__bellforgeStatusPreview?.open) {
-      window.__bellforgeStatusPreview.open();
-      return;
-    }
-    const toggle = document.getElementById('designStatusPreviewToggle');
-    if (!toggle) {
-      throw new Error('designStatusPreviewToggle is unavailable');
-    }
-    toggle.click();
-  });
-  await page.waitForFunction(() => window.__bellforgeStatusPreview?.isOpen?.() === true, { timeout: 10_000 });
-  await page.waitForSelector('#designStatusPreviewModal:not([hidden])', { timeout: 10_000 });
-  const frameHandle = await page.waitForSelector('#designStatusMirror', { timeout: 10_000 });
-  const frame = await frameHandle.contentFrame();
-  assertCondition(!!frame, `${artifactPrefix}: status preview iframe did not load`);
-  await waitForLayoutReady(frame);
-  await waitForText(frame, '#versionValue', options.enforceVersion !== false ? expectedPreviewVersion : null);
-  const displayedPreviewVersion = await frame.locator('#versionValue').textContent();
-  const previewSnapshot = await captureGridSnapshot(frame, `${artifactPrefix}-preview-grid`);
-  const previewOverlaps = collectOverlaps(previewSnapshot);
+  const displayPage = await context.newPage();
+  await displayPage.goto(`${config.baseUrl}/status?view=display`, { waitUntil: 'domcontentloaded' });
+  await waitForLayoutReady(displayPage);
+  await waitForText(displayPage, '#versionValue', options.enforceVersion !== false ? expectedDisplayVersion : null);
+  const displayedDisplayVersion = await displayPage.locator('#versionValue').textContent();
+  const displaySnapshot = await captureGridSnapshot(displayPage, `${artifactPrefix}-display-grid`);
+  const displayOverlaps = collectOverlaps(displaySnapshot);
   if (options.enforceNoOverlap !== false) {
-    assertNoOverlap(previewSnapshot);
-    assertBrowserLayoutHealth(previewSnapshot, { minVisibleCards: 3 });
+    assertNoOverlap(displaySnapshot);
+    assertBrowserLayoutHealth(displaySnapshot, { minVisibleCards: 3 });
   }
-  const displayReferencePage = await context.newPage();
-  await displayReferencePage.goto(`${config.baseUrl}/status?view=display`, { waitUntil: 'domcontentloaded' });
-  await waitForLayoutReady(displayReferencePage);
-  const displayReferenceSnapshot = await captureGridSnapshot(displayReferencePage, `${artifactPrefix}-preview-reference-grid`);
-  await displayReferencePage.close();
-  assertCondition(modalMetrics.modalPosition === 'fixed', `${artifactPrefix}: preview modal is not fixed`);
-  assertCondition(modalMetrics.nativeWidth >= 800 && modalMetrics.nativeHeight >= 480, `${artifactPrefix}: preview modal picked a tiny target resolution`);
-  assertCondition(modalMetrics.resolutionLabel.length > 0, `${artifactPrefix}: preview modal did not expose its resolution label`);
-  assertCondition(JSON.stringify(simplifyLayout(previewSnapshot)) === JSON.stringify(simplifyLayout(displayReferenceSnapshot)), `${artifactPrefix}: preview layout diverged from real display status layout`);
+
+  assertCondition(accessMetrics.hasOpenStatusButton, `${artifactPrefix}: settings is missing the real status page access button`);
+  assertCondition(accessMetrics.hasOpenDisplayButton, `${artifactPrefix}: settings is missing the real display output access button`);
+  assertCondition(accessMetrics.previewModalPresent === false, `${artifactPrefix}: settings still exposes the removed preview modal`);
+  assertCondition(accessMetrics.previewIframePresent === false, `${artifactPrefix}: settings still exposes the removed preview iframe`);
+  assertCondition(accessMetrics.accessNote.length > 0, `${artifactPrefix}: settings did not describe the real-status verification path`);
+
   await page.screenshot({ path: path.join(ARTIFACT_DIR, `${artifactPrefix}-settings.png`), fullPage: true });
-  await page.click('#designStatusModalClose');
   writeJsonArtifact(`${artifactPrefix}-settings-console`, consoleEntries);
+  await displayPage.close();
   await page.close();
   return {
     settings: {
@@ -464,13 +469,12 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
       overlaps: settingsOverlaps,
       displayedCurrentVersion: displayedCurrentVersion?.trim() || null,
       displayedLatestVersion: displayedLatestVersion?.trim() || null,
+      accessMetrics,
     },
-    preview: {
-      snapshot: previewSnapshot,
-      overlaps: previewOverlaps,
-      displayedVersion: displayedPreviewVersion?.trim() || null,
-      modalMetrics,
-      referenceSnapshot: displayReferenceSnapshot,
+    display: {
+      snapshot: displaySnapshot,
+      overlaps: displayOverlaps,
+      displayedVersion: displayedDisplayVersion?.trim() || null,
     },
   };
 }
@@ -485,7 +489,7 @@ async function verifyBrowserSurface(config, phase, expectations, options = {}) {
       config,
       expectations.settingsCurrentVersion,
       expectations.settingsLatestVersion,
-      expectations.previewVersion,
+      expectations.displayVersion,
       `${phase}`,
       options,
     );
@@ -533,10 +537,21 @@ async function main() {
   };
 
   try {
+    await emitDebugEvent(config, 'Pi update workflow', 'Starting Pi rollout verification', {
+      expectedVersion: config.expectedVersion,
+      allowAlreadyCurrent: config.allowAlreadyCurrent,
+      skipReboot: config.skipReboot,
+    }, { eventType: 'rollout-start' });
     logStep(`collecting pre-rollout state for ${config.baseUrl}`);
     const preState = await collectApiState(config, 'pre-rollout-api-state');
     await captureRemoteTriage(config, 'pre-rollout-triage');
     recordStep('pre-rollout-state', {
+      updaterState: preState.updater.state,
+      currentVersion: preState.updater.current_device_version,
+      latestDetectedVersion: preState.updater.latest_detected_version,
+      stagedReleaseVersion: preState.updater.staged_release_version,
+    });
+    await emitDebugEvent(config, 'Pi update workflow', 'Collected pre-rollout state', {
       updaterState: preState.updater.state,
       currentVersion: preState.updater.current_device_version,
       latestDetectedVersion: preState.updater.latest_detected_version,
@@ -552,16 +567,19 @@ async function main() {
       displayedStatusVersion: preBrowser.status.displayedVersion,
       displayedSettingsCurrentVersion: preBrowser.settings.settings.displayedCurrentVersion,
       displayedSettingsLatestVersion: preBrowser.settings.settings.displayedLatestVersion,
-      displayedPreviewVersion: preBrowser.settings.preview.displayedVersion,
+      displayedDisplayVersion: preBrowser.settings.display.displayedVersion,
       statusOverlaps: preBrowser.status.overlaps,
       settingsOverlaps: preBrowser.settings.settings.overlaps,
-      previewOverlaps: preBrowser.settings.preview.overlaps,
+      displayOverlaps: preBrowser.settings.display.overlaps,
     });
 
     const alreadyCurrent = preState.updater.current_device_version === config.expectedVersion && !preState.updater.staged_update_pending;
     if (alreadyCurrent) {
       assertCondition(config.allowAlreadyCurrent, `Pi is already on ${config.expectedVersion}; rerun with --allow-already-current only for audit-only validation`);
       recordStep('already-current', { message: 'Pi was already on the expected version before manual rollout validation.' });
+      await emitDebugEvent(config, 'Pi update workflow', 'Pi already on expected version during rollout audit', {
+        expectedVersion: config.expectedVersion,
+      }, { eventType: 'already-current' });
       summary.finishedAt = new Date().toISOString();
       writeJsonArtifact('summary', summary);
       return;
@@ -572,6 +590,7 @@ async function main() {
       const triggerResponse = await triggerCheckNow(config);
       writeJsonArtifact('check-now-response', triggerResponse);
       recordStep('check-now-triggered', { accepted: !!triggerResponse.accepted, message: triggerResponse.message });
+      await emitDebugEvent(config, 'Pi update workflow', 'Triggered manual updater check', triggerResponse, { eventType: 'check-now' });
     } else {
       recordStep('check-now-skipped', { message: `Pi already has ${config.expectedVersion} staged.` });
     }
@@ -598,6 +617,12 @@ async function main() {
       stagedReleaseVersion: stagedState.updater.staged_release_version,
       downloadProgress: stagedState.updater.download_progress,
     });
+    await emitDebugEvent(config, 'Pi update workflow', 'Confirmed staged update on Pi', {
+      currentVersion: stagedState.updater.current_device_version,
+      latestDetectedVersion: stagedState.updater.latest_detected_version,
+      stagedReleaseVersion: stagedState.updater.staged_release_version,
+      downloadProgress: stagedState.updater.download_progress,
+    }, { eventType: 'staged-confirmed' });
 
     assertCondition(stagedState.updater.download_progress.percent >= 100, 'Pi has not fully downloaded the staged release');
 
@@ -608,10 +633,10 @@ async function main() {
       displayedStatusVersion: stagedBrowser.status.displayedVersion,
       displayedSettingsCurrentVersion: stagedBrowser.settings.settings.displayedCurrentVersion,
       displayedSettingsLatestVersion: stagedBrowser.settings.settings.displayedLatestVersion,
-      displayedPreviewVersion: stagedBrowser.settings.preview.displayedVersion,
+      displayedDisplayVersion: stagedBrowser.settings.display.displayedVersion,
       statusOverlaps: stagedBrowser.status.overlaps,
       settingsOverlaps: stagedBrowser.settings.settings.overlaps,
-      previewOverlaps: stagedBrowser.settings.preview.overlaps,
+      displayOverlaps: stagedBrowser.settings.display.overlaps,
     });
 
     if (config.skipReboot) {
@@ -623,6 +648,9 @@ async function main() {
     logStep('rebooting Pi to apply the staged release');
     await rebootPi(config);
     recordStep('reboot-issued', {});
+    await emitDebugEvent(config, 'Pi update workflow', 'Issued Pi reboot to apply staged release', {
+      expectedVersion: config.expectedVersion,
+    }, { eventType: 'reboot-issued' });
 
     await waitFor('Pi SSH shutdown', async () => {
       const alive = await canReachSsh(config);
@@ -663,6 +691,12 @@ async function main() {
       latestDetectedVersion: appliedState.updater.latest_detected_version,
       lastUpdateResult: appliedState.updater.last_update_result,
     });
+    await emitDebugEvent(config, 'Pi update workflow', 'Confirmed expected version after reboot', {
+      state: appliedState.updater.state,
+      currentVersion: appliedState.updater.current_device_version,
+      latestDetectedVersion: appliedState.updater.latest_detected_version,
+      lastUpdateResult: appliedState.updater.last_update_result,
+    }, { eventType: 'apply-confirmed' });
 
     await captureRemoteTriage(config, 'post-rollout-triage');
     const postBrowser = await verifyBrowserSurface(config, 'post-rollout-browser', browserExpectationsFromState(appliedState));
@@ -672,19 +706,28 @@ async function main() {
       displayedStatusVersion: postBrowser.status.displayedVersion,
       displayedSettingsCurrentVersion: postBrowser.settings.settings.displayedCurrentVersion,
       displayedSettingsLatestVersion: postBrowser.settings.settings.displayedLatestVersion,
-      displayedPreviewVersion: postBrowser.settings.preview.displayedVersion,
+      displayedDisplayVersion: postBrowser.settings.display.displayedVersion,
       statusOverlaps: postBrowser.status.overlaps,
       settingsOverlaps: postBrowser.settings.settings.overlaps,
-      previewOverlaps: postBrowser.settings.preview.overlaps,
+      displayOverlaps: postBrowser.settings.display.overlaps,
     });
 
     summary.finishedAt = new Date().toISOString();
     writeJsonArtifact('summary', summary);
+    await emitDebugEvent(config, 'Pi update workflow', 'Pi rollout verification succeeded', {
+      expectedVersion: config.expectedVersion,
+      steps: summary.steps,
+    }, { eventType: 'rollout-finished' });
     logStep(`Pi rollout verification succeeded for ${config.expectedVersion}`);
   } catch (error) {
     summary.finishedAt = new Date().toISOString();
     summary.error = { message: error.message, stack: error.stack };
     writeJsonArtifact('summary', summary);
+    await emitDebugEvent(config, 'Pi update workflow', 'Pi rollout verification failed', {
+      expectedVersion: config.expectedVersion,
+      error: { message: error.message, stack: error.stack },
+      steps: summary.steps,
+    }, { level: 'error', eventType: 'rollout-failed' });
     console.error(`[rollout] ${error.stack || error.message}`);
     process.exitCode = 1;
   }

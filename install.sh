@@ -313,6 +313,19 @@ setup_updater_log_file() {
   run chown "${SERVICE_USER}:${SERVICE_GROUP}" "${updater_log_file}"
 }
 
+setup_debug_log_file() {
+  local debug_log_file="/var/log/bellforge-debug.jsonl"
+  run mkdir -p "$(dirname "${debug_log_file}")"
+  run touch "${debug_log_file}"
+  run chown "${SERVICE_USER}:${SERVICE_GROUP}" "${debug_log_file}"
+}
+
+setup_cli_command() {
+  local cli_wrapper="${INSTALL_DIR}/scripts/bellforge"
+  run chmod +x "${cli_wrapper}"
+  run ln -sf "${cli_wrapper}" /usr/local/bin/bellforge
+}
+
 sync_repo() {
   friendly "Synchronizing BellForge repository"
 
@@ -433,6 +446,8 @@ do_install() {
   setup_python
   write_local_config
   setup_updater_log_file
+  setup_debug_log_file
+  setup_cli_command
   configure_kiosk_boot
   configure_rpi_firmware
   install_services

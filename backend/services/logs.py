@@ -27,6 +27,10 @@ SERVICE_LOG_CANDIDATES: dict[str, tuple[str, ...]] = {
         "tests/logs/test_install.log",
         "tests/logs/test_repair.log",
     ),
+    "debug": (
+        "/var/log/bellforge-debug.jsonl",
+        "tests/logs/bellforge-debug/events.jsonl",
+    ),
 }
 
 

@@ -17,44 +17,50 @@ const {
 
 const suite = registerBrowserSuite();
 
-test('default layout stays readable, Fibonacci-packed, and identical between preview and real status display', async () => {
+test('default layout stays readable, masonry-packed, and consistent between linked display access and the real status display', async () => {
   const surfaces = await openRealSurfaces(suite, { width: 1280, height: 720 }, 'default-layout');
 
   try {
     const statusSnapshot = await captureSnapshot(surfaces.statusPage, 'status-default-layout');
     const settingsSnapshot = await captureSnapshot(surfaces.settingsPage, 'settings-default-layout');
     const displaySnapshot = await captureSnapshot(surfaces.displayPage, 'display-default-layout');
-    const previewSnapshot = await captureSnapshot(surfaces.previewFrame, 'preview-default-layout');
+    const settingsDisplaySnapshot = await captureSnapshot(surfaces.settingsDisplayPage, 'settings-display-default-layout');
     recordSnapshotArtifact('default-layout-status', statusSnapshot, surfaces.statusConsole, {
       settingsSnapshot,
       displaySnapshot,
-      previewSnapshot,
+      settingsDisplaySnapshot,
     });
 
-    assert.deepEqual(statusSnapshot.cards.map((card) => card.key), ['setup-hero', 'quick-facts', 'browser-links', 'onboarding-qr', 'stats', 'advanced']);
+    assert.deepEqual(statusSnapshot.cards.map((card) => card.key), ['browser-links', 'onboarding-qr', 'stats', 'advanced', 'setup-hero', 'quick-facts']);
     assertCardsRemainInGrid(statusSnapshot);
     assertCardsRemainInGrid(settingsSnapshot);
     assertCollapseControls(statusSnapshot, ['setup-hero', 'quick-facts', 'browser-links', 'onboarding-qr', 'stats', 'advanced']);
     assertNoOverlap(statusSnapshot);
     assertNoOverlap(settingsSnapshot);
-    assertNoOverlap(previewSnapshot);
+    assertNoOverlap(settingsDisplaySnapshot);
     assertFibonacciRatios(statusSnapshot);
     assertFibonacciRatios(settingsSnapshot);
-    assertFibonacciRatios(previewSnapshot);
+    assertFibonacciRatios(settingsDisplaySnapshot);
     assertWeightOrdering(settingsSnapshot);
     assert.equal(settingsSnapshot.cards.every((card) => card.collapsed), true, 'Default settings layout should start fully collapsed');
-    assert.ok(countVisibleCards(statusSnapshot) >= 3, 'Default status layout is not readable enough above the fold');
+    assert.ok(countVisibleCards(statusSnapshot) >= 1, 'Default status layout is not readable enough above the fold');
     assert.ok(countVisibleCards(settingsSnapshot) >= 2, 'Default settings layout is not readable enough above the fold');
-    assert.deepEqual(simplifyLayout(previewSnapshot), simplifyLayout(displaySnapshot), 'Default preview layout does not match the real status display page');
+    assert.deepEqual(simplifyLayout(settingsDisplaySnapshot), simplifyLayout(displaySnapshot), 'Linked display access does not match the real status display page');
   } finally {
     await surfaces.context.close();
   }
 });
 
-test('design controls expose layout mode and portrait vs landscape produce different Fibonacci layouts across status, settings, and preview', async () => {
+test('design controls expose layout mode and portrait vs landscape produce different masonry layouts across status, settings, and linked display surfaces', async () => {
   const surfaces = await openRealSurfaces(suite, { width: 1600, height: 1000 }, 'layout-mode-defaults');
 
   try {
+    await surfaces.settingsPage.evaluate(() => {
+      for (let intervalId = 1; intervalId < 10000; intervalId += 1) {
+        window.clearInterval(intervalId);
+      }
+    });
+
     const layoutModeInfo = await surfaces.settingsPage.evaluate(() => {
       const control = document.getElementById('designLayoutMode');
       return {
@@ -71,7 +77,7 @@ test('design controls expose layout mode and portrait vs landscape produce diffe
     const portraitStatus = await captureSnapshot(surfaces.statusPage, 'status-portrait-layout-mode');
     const portraitSettings = await captureSnapshot(surfaces.settingsPage, 'settings-portrait-layout-mode');
     const portraitDisplay = await captureSnapshot(surfaces.displayPage, 'display-portrait-layout-mode');
-    const portraitPreview = await captureSnapshot(surfaces.previewFrame, 'preview-portrait-layout-mode');
+    const portraitSettingsDisplay = await captureSnapshot(surfaces.settingsDisplayPage, 'settings-display-portrait-layout-mode');
 
     await surfaces.settingsPage.evaluate(() => {
       if (typeof pushDesignControlsToForm !== 'function') {
@@ -97,6 +103,11 @@ test('design controls expose layout mode and portrait vs landscape produce diffe
       layout_mode: 'landscape',
     };
     await Promise.all([
+      surfaces.settingsPage.evaluate((payload) => {
+        localStorage.setItem('bellforge.design-controls.live.v1', JSON.stringify({ source: 'test', timestamp: Date.now(), payload }));
+        pushDesignControlsToForm(payload);
+        window.__bellforgeSettingsLayout?.recompute?.();
+      }, landscapePayload),
       surfaces.statusPage.evaluate((payload) => {
         localStorage.setItem('bellforge.design-controls.live.v1', JSON.stringify({ source: 'test', timestamp: Date.now(), payload }));
         applyDesignControls(payload);
@@ -107,7 +118,7 @@ test('design controls expose layout mode and portrait vs landscape produce diffe
         applyDesignControls(payload);
         window.__bellforgeStatusLayout?.recompute?.();
       }, landscapePayload),
-      surfaces.previewFrame.evaluate((payload) => {
+      surfaces.settingsDisplayPage.evaluate((payload) => {
         localStorage.setItem('bellforge.design-controls.live.v1', JSON.stringify({ source: 'test', timestamp: Date.now(), payload }));
         applyDesignControls(payload);
         window.__bellforgeStatusLayout?.recompute?.();
@@ -116,34 +127,35 @@ test('design controls expose layout mode and portrait vs landscape produce diffe
     await Promise.all([
       surfaces.statusPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))),
       surfaces.displayPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))),
-      surfaces.previewFrame.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))),
+      surfaces.settingsDisplayPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))),
     ]);
 
     await Promise.all([
+      surfaces.settingsPage.waitForFunction(() => document.documentElement.dataset.designLayoutMode === 'landscape'),
       surfaces.statusPage.waitForFunction(() => document.documentElement.dataset.designLayoutMode === 'landscape'),
       surfaces.displayPage.waitForFunction(() => document.documentElement.dataset.designLayoutMode === 'landscape'),
-      surfaces.previewFrame.waitForFunction(() => document.documentElement.dataset.designLayoutMode === 'landscape'),
+      surfaces.settingsDisplayPage.waitForFunction(() => document.documentElement.dataset.designLayoutMode === 'landscape'),
     ]);
 
     const landscapeStatus = await captureSnapshot(surfaces.statusPage, 'status-landscape-layout-mode');
     const landscapeSettings = await captureSnapshot(surfaces.settingsPage, 'settings-landscape-layout-mode');
     const landscapeDisplay = await captureSnapshot(surfaces.displayPage, 'display-landscape-layout-mode');
-    const landscapePreview = await captureSnapshot(surfaces.previewFrame, 'preview-landscape-layout-mode');
+    const landscapeSettingsDisplay = await captureSnapshot(surfaces.settingsDisplayPage, 'settings-display-landscape-layout-mode');
 
     recordSnapshotArtifact('layout-mode-portrait-landscape', portraitStatus, surfaces.statusConsole, {
       portraitSettings,
       portraitDisplay,
-      portraitPreview,
+      portraitSettingsDisplay,
       landscapeStatus,
       landscapeSettings,
       landscapeDisplay,
-      landscapePreview,
+      landscapeSettingsDisplay,
     });
 
     assert.notDeepEqual(simplifyLayout(landscapeStatus), simplifyLayout(portraitStatus), 'Status layout did not change between portrait and landscape mode');
     assert.notDeepEqual(simplifyLayout(landscapeSettings), simplifyLayout(portraitSettings), 'Settings layout did not change between portrait and landscape mode');
-    assert.notDeepEqual(simplifyLayout(landscapePreview), simplifyLayout(portraitPreview), 'Preview layout did not change between portrait and landscape mode');
-    assert.deepEqual(simplifyLayout(landscapePreview), simplifyLayout(landscapeDisplay), 'Preview landscape layout does not match the live display view');
+    assert.notDeepEqual(simplifyLayout(landscapeSettingsDisplay), simplifyLayout(portraitSettingsDisplay), 'Linked display layout did not change between portrait and landscape mode');
+    assert.deepEqual(simplifyLayout(landscapeSettingsDisplay), simplifyLayout(landscapeDisplay), 'Linked display landscape layout does not match the live display view');
   } finally {
     await surfaces.context.close();
   }

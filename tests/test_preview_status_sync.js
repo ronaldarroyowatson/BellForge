@@ -7,82 +7,65 @@ const {
   captureSnapshot,
   recordSnapshotArtifact,
   waitForLayoutReady,
-  clickElement,
-  dragCard,
-  setCardCollapsed,
-  readOrderedState,
-  waitForOrderedState,
-  assertConsoleContains,
-  simplifyLayout,
 } = require('./layout_browser_harness.js');
 
 const suite = registerBrowserSuite();
 
-async function getCurrentPreviewFrame(settingsPage) {
-  const handle = await settingsPage.$('#designStatusMirror');
-  const frame = await handle?.contentFrame();
-  if (!frame) {
-    throw new Error('Preview iframe did not expose a content frame');
-  }
-  return frame;
-}
-
-test('preview modal stays identical to the status display page and pushes real updates back on sync actions', async () => {
-  const surfaces = await openRealSurfaces(suite, { width: 1280, height: 720 }, 'preview-sync');
+test('settings exposes direct access to real status surfaces and shared commands keep real display pages healthy', async () => {
+  const surfaces = await openRealSurfaces(suite, { width: 1280, height: 720 }, 'real-status-access');
 
   try {
-    const previewInitial = await captureSnapshot(surfaces.previewFrame, 'preview-initial-sync');
-    const displayInitial = await captureSnapshot(surfaces.displayPage, 'display-initial-sync');
-    recordSnapshotArtifact('preview-initial-sync', previewInitial, surfaces.previewConsole, {
-      displaySnapshot: displayInitial,
-    });
-    assert.deepEqual(simplifyLayout(previewInitial), simplifyLayout(displayInitial), 'Preview modal does not initially match the real status display page');
+    const settingsState = await surfaces.settingsPage.evaluate(() => ({
+      hasOpenStatusButton: Boolean(document.getElementById('openStatusPage')),
+      hasOpenDisplayButton: Boolean(document.getElementById('openDisplayStatusPage')),
+      previewModalPresent: Boolean(document.getElementById('designStatusPreviewModal')),
+      previewIframePresent: Boolean(document.getElementById('designStatusMirror')),
+      accessNote: document.getElementById('designStatusAccessNote')?.textContent?.trim() || '',
+    }));
 
-    await setCardCollapsed(surfaces.previewFrame, 'advanced', true);
-    await waitForOrderedState(surfaces.displayPage, await readOrderedState(surfaces.previewFrame));
+    assert.equal(settingsState.hasOpenStatusButton, true, 'Settings page is missing the real status page button');
+    assert.equal(settingsState.hasOpenDisplayButton, true, 'Settings page is missing the real display output button');
+    assert.equal(settingsState.previewModalPresent, false, 'Settings page still exposes the removed preview modal');
+    assert.equal(settingsState.previewIframePresent, false, 'Settings page still exposes the removed preview iframe');
+    assert.ok(settingsState.accessNote.length > 0, 'Settings page did not explain the real-status workflow');
+
+    const directDisplaySnapshot = await captureSnapshot(surfaces.settingsDisplayPage, 'real-status-access-settings-display');
+    const displaySnapshot = await captureSnapshot(surfaces.displayPage, 'real-status-access-display');
+    recordSnapshotArtifact('real-status-access-display', directDisplaySnapshot, surfaces.settingsDisplayConsole, {
+      referenceSnapshot: displaySnapshot,
+    });
+
+    assert.deepEqual(
+      directDisplaySnapshot.cards.map((card) => card.key),
+      displaySnapshot.cards.map((card) => card.key),
+      'Direct real display access does not expose the same card registry as the display page',
+    );
+    assert.ok(directDisplaySnapshot.cards.length >= 6, 'Direct display surface exposed too few cards');
+    assert.ok(displaySnapshot.cards.length >= 6, 'Display surface exposed too few cards');
+
+    await surfaces.settingsPage.evaluate(() => {
+      localStorage.setItem('bellforge.status.layout-command.v1', JSON.stringify({
+        source: 'browser-dom-verification',
+        timestamp: Date.now(),
+        type: 'auto-arrange',
+        payload: {},
+      }));
+    });
+    await waitForLayoutReady(surfaces.settingsDisplayPage);
     await waitForLayoutReady(surfaces.displayPage);
-    const previewCollapsed = await captureSnapshot(surfaces.previewFrame, 'preview-collapsed-sync');
-    const displayCollapsed = await captureSnapshot(surfaces.displayPage, 'display-collapsed-sync');
-    recordSnapshotArtifact('preview-collapsed-sync', previewCollapsed, surfaces.previewConsole, {
-      displaySnapshot: displayCollapsed,
-    });
-    assert.deepEqual(simplifyLayout(previewCollapsed), simplifyLayout(displayCollapsed), 'Preview collapse did not update the real status display page');
 
-    await dragCard(surfaces.previewFrame, 'advanced', 'browser-links');
-  await waitForOrderedState(surfaces.displayPage, await readOrderedState(surfaces.previewFrame));
-    await waitForLayoutReady(surfaces.displayPage);
-    const previewDragged = await captureSnapshot(surfaces.previewFrame, 'preview-dragged-sync');
-    const displayDragged = await captureSnapshot(surfaces.displayPage, 'display-dragged-sync');
-    recordSnapshotArtifact('preview-dragged-sync', previewDragged, surfaces.previewConsole, {
-      displaySnapshot: displayDragged,
+    const afterAutoDirect = await captureSnapshot(surfaces.settingsDisplayPage, 'real-status-access-settings-display-auto');
+    const afterAutoDisplay = await captureSnapshot(surfaces.displayPage, 'real-status-access-display-auto');
+    recordSnapshotArtifact('real-status-access-display-auto', afterAutoDirect, surfaces.settingsDisplayConsole, {
+      referenceSnapshot: afterAutoDisplay,
     });
-    assert.deepEqual(simplifyLayout(previewDragged), simplifyLayout(displayDragged), 'Preview drag-and-drop did not update the real status display page');
 
-    await clickElement(surfaces.settingsPage, '#designStatusModalArrange');
-    await waitForLayoutReady(surfaces.previewFrame);
-    await waitForOrderedState(surfaces.displayPage, await readOrderedState(surfaces.previewFrame));
-    await waitForLayoutReady(surfaces.displayPage);
-    const previewAutoArranged = await captureSnapshot(surfaces.previewFrame, 'preview-auto-arranged-sync');
-    const displayAutoArranged = await captureSnapshot(surfaces.displayPage, 'display-auto-arranged-sync');
-    recordSnapshotArtifact('preview-auto-arranged-sync', previewAutoArranged, surfaces.previewConsole, {
-      displaySnapshot: displayAutoArranged,
-    });
-    assert.deepEqual(simplifyLayout(previewAutoArranged), simplifyLayout(displayAutoArranged), 'Preview auto-arrange did not update the real status display page');
-
-    await dragCard(surfaces.displayPage, 'stats', 'advanced');
-    await clickElement(surfaces.settingsPage, '#designStatusModalReload');
-    const previewFrame = await getCurrentPreviewFrame(surfaces.settingsPage);
-    await waitForOrderedState(previewFrame, await readOrderedState(surfaces.displayPage));
-    await waitForLayoutReady(previewFrame);
-    const previewAfterReload = await captureSnapshot(previewFrame, 'preview-after-reload-sync');
-    const displayAfterReload = await captureSnapshot(surfaces.displayPage, 'display-after-reload-sync');
-    recordSnapshotArtifact('preview-after-reload-sync', previewAfterReload, surfaces.previewConsole, {
-      displaySnapshot: displayAfterReload,
-    });
-    assert.deepEqual(simplifyLayout(previewAfterReload), simplifyLayout(displayAfterReload), 'Reload Mirror did not refresh the preview to the current real status page layout');
-
-    assertConsoleContains(surfaces.settingsConsole, 'preview-to-status sync events', 'preview sync console');
-    assertConsoleContains(surfaces.settingsConsole, 'preview modal size calculations', 'preview sizing console');
+    assert.equal(afterAutoDirect.container.columns, afterAutoDisplay.container.columns, 'Shared command changed column counts inconsistently across real display surfaces');
+    assert.deepEqual(
+      afterAutoDirect.cards.map((card) => card.key),
+      afterAutoDisplay.cards.map((card) => card.key),
+      'Shared command left the two real display surfaces with different card registries',
+    );
   } finally {
     await surfaces.context.close();
   }
