@@ -66,6 +66,10 @@
             eventType: channel === "masonry reflow" ? "snapshot" : "event",
           });
         }
+        if (typeof console !== "undefined" && typeof console.debug === "function") {
+          console.debug(`[BellForge Masonry] ${channel}`, data || "");
+          return;
+        }
         if (this.enabled && typeof console !== "undefined" && typeof console.log === "function") {
           console.log(`[BellForge Masonry] ${channel}`, data || "");
         }
@@ -166,14 +170,16 @@
     return left.index - right.index;
   }
 
-  function computeRowSpan(height, rowUnit) {
+  function computeRowSpan(height, rowUnit, gap = 0) {
     const normalizedHeight = Math.max(rowUnit, Number(height) || rowUnit);
-    return Math.max(1, Math.ceil(normalizedHeight / rowUnit));
+    const normalizedGap = Math.max(0, Number(gap) || 0);
+    return Math.max(1, Math.ceil((normalizedHeight + normalizedGap) / (rowUnit + normalizedGap)));
   }
 
   function computeLayoutPlan(entries, options = {}) {
     const tracks = Math.max(1, Number(options.tracks) || 1);
     const rowUnit = Math.max(1, Number(options.rowUnit) || 8);
+    const gap = Math.max(0, Number(options.gap) || 0);
     const orderedEntries = entries.slice().sort(sortByOrder);
     const columnHeights = Array(tracks).fill(0);
     const items = [];
@@ -185,7 +191,7 @@
           selectedColumn = cursor;
         }
       }
-      const rowSpan = computeRowSpan(entry.height, rowUnit);
+      const rowSpan = computeRowSpan(entry.height, rowUnit, gap);
       const rowStart = columnHeights[selectedColumn] + 1;
       columnHeights[selectedColumn] += rowSpan;
       items.push({
@@ -252,6 +258,7 @@
     const getLayoutMode = typeof options.getLayoutMode === "function" ? options.getLayoutMode : null;
     const trackResolver = options.trackResolver || createDefaultTrackResolver(mode);
     const syncChannel = options.syncChannel || null;
+    const onSave = typeof options.onSave === "function" ? options.onSave : null;
     const logger = options.logger || defaultLogger({
       enabled: typeof localStorage !== "undefined" && localStorage.getItem("bellforge.debug.fibo") === "true",
       mode,
@@ -277,12 +284,33 @@
       ? safeParseJson(localStorage.getItem(storageKey) || "{}", {})
       : {};
     const layoutCache = { columns: 0, layoutMode: "portrait", positions: {}, heights: {}, columnHeights: [] };
+    const dragBindings = new WeakMap();
+    const dragHandles = new WeakMap();
+    const layoutConfig = {
+      minCardWidth: Number.isFinite(Number(options.minCardWidth)) ? Number(options.minCardWidth) : null,
+      gap: Number.isFinite(Number(options.gap)) ? Number(options.gap) : null,
+    };
     let frameToken = 0;
     let pendingAutoArrange = false;
     let isApplyingRemoteState = false;
     let skipPersistOnce = false;
-    let editingEnabled = true;
+    let editingEnabled = options.editingEnabled !== false;
+    let dirty = false;
     let dragSourceKey = "";
+    let pendingRecomputeReason = "reflow";
+
+    container.classList.add("fibo-adaptive-grid");
+
+    function setDirty(isDirty, reason) {
+      dirty = isDirty === true;
+      container.classList.toggle("is-layout-dirty", dirty);
+      if (dirty) {
+        container.dataset.layoutDirty = "true";
+        logger.log("layout dirty", { reason: reason || "unspecified" });
+        return;
+      }
+      delete container.dataset.layoutDirty;
+    }
 
     function resolveCollapsedHeight(card) {
       if (typeof getComputedStyle !== "function") {
@@ -334,28 +362,47 @@
       return state[key];
     }
 
-    function persistState(reason) {
+    function saveLayout(reason, options = {}) {
       const normalizedReason = typeof reason === "string" ? reason : "card-state";
       const isInternalRecompute = normalizedReason === "reflow" || normalizedReason === "auto-arrange";
       if (skipPersistOnce && isInternalRecompute) {
         skipPersistOnce = false;
-        return;
+        return true;
       }
       if (!storageKey || typeof localStorage === "undefined" || isApplyingRemoteState) {
         skipPersistOnce = false;
-        return;
+        return true;
       }
       if (skipPersistOnce) {
         skipPersistOnce = false;
       }
-      localStorage.setItem(storageKey, JSON.stringify(state));
-      logger.log("layout state persisted", { reason: normalizedReason, state });
+      logger.log("layout save attempt", { reason: normalizedReason, state, dirty });
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+        setDirty(false, normalizedReason);
+        logger.log("layout state persisted", { reason: normalizedReason, state });
+        if (onSave) {
+          onSave({ reason: normalizedReason, state: safeParseJson(JSON.stringify(state), {}), dirty: false });
+        }
+        if (options.emitSnapshot !== false) {
+          emitLayoutSnapshot(normalizedReason);
+        }
+        return true;
+      } catch (error) {
+        logger.log("layout state persistence failed", {
+          reason: normalizedReason,
+          error: error?.message || String(error),
+        });
+        setDirty(true, `${normalizedReason}:save-failed`);
+        return false;
+      }
     }
 
     function writeCardState(card, nextState, reason) {
       const key = ensureCardKey(card);
       state[key] = normalizeCardState({ ...readCardState(card), ...nextState });
-      persistState(reason || "card-state");
+      setDirty(true, reason || "card-state");
+      saveLayout(reason || "card-state");
     }
 
     function updateCardChrome(card) {
@@ -374,7 +421,9 @@
       const titlebar = card.querySelector(".card-titlebar");
       if (titlebar) {
         titlebar.setAttribute("draggable", editingEnabled ? "true" : "false");
+        titlebar.classList.toggle("is-layout-editable", editingEnabled);
       }
+      card.classList.toggle("is-layout-editable", editingEnabled);
     }
 
     function applyState(card) {
@@ -453,42 +502,99 @@
       ordered.forEach((card, index) => {
         state[ensureCardKey(card)] = { ...readCardState(card), order: index };
       });
+      setDirty(true, "drag-drop");
       logger.log("drag-and-drop", { draggedKey, targetKey, ordered: ordered.map((card) => ensureCardKey(card)) });
-      persistState("drag-drop");
-      scheduleRecompute();
+      requestLayout("drag-drop");
+      saveLayout("drag-drop");
     }
 
-    function attachDragHandlers(handle, card) {
-      handle.setAttribute("draggable", editingEnabled ? "true" : "false");
-      handle.addEventListener("dragstart", (event) => {
+    function createDragBinding(handle, card) {
+      return {
+        dragstart(event) {
         if (!editingEnabled) {
           event.preventDefault();
           return;
         }
         dragSourceKey = ensureCardKey(card);
+        logger.log("drag start", { card: dragSourceKey });
         event.dataTransfer?.setData("text/plain", dragSourceKey);
         if (typeof event.dataTransfer?.setDragImage === "function") {
           event.dataTransfer.setDragImage(card, 24, 24);
         }
         card.classList.add("is-dragging");
-      });
-      handle.addEventListener("dragend", () => {
+      },
+        dragend() {
+        logger.log("drag end", { card: ensureCardKey(card), dirty });
         dragSourceKey = "";
         card.classList.remove("is-dragging");
-      });
-      handle.addEventListener("dragover", (event) => {
+      },
+        dragover(event) {
         if (!editingEnabled) {
           return;
         }
         event.preventDefault();
-      });
-      handle.addEventListener("drop", (event) => {
+      },
+        drop(event) {
         if (!editingEnabled) {
           return;
         }
         event.preventDefault();
         const draggedKey = event.dataTransfer?.getData("text/plain") || dragSourceKey;
         reorderCards(draggedKey, ensureCardKey(card));
+      },
+      };
+    }
+
+    function enableDragHandle(handle, card) {
+      if (!handle) {
+        return;
+      }
+      let binding = dragBindings.get(handle);
+      if (!binding) {
+        binding = createDragBinding(handle, card);
+        dragBindings.set(handle, binding);
+      }
+      if (handle.dataset.dragControllerAttached === "true") {
+        handle.setAttribute("draggable", "true");
+        handle.classList.add("is-layout-editable");
+        return;
+      }
+      handle.addEventListener("dragstart", binding.dragstart);
+      handle.addEventListener("dragend", binding.dragend);
+      handle.addEventListener("dragover", binding.dragover);
+      handle.addEventListener("drop", binding.drop);
+      handle.dataset.dragControllerAttached = "true";
+      handle.setAttribute("draggable", "true");
+      handle.classList.add("is-layout-editable");
+      card.classList.add("is-layout-editable");
+    }
+
+    function disableDragHandle(handle, card) {
+      const binding = dragBindings.get(handle);
+      if (binding && handle.dataset.dragControllerAttached === "true") {
+        handle.removeEventListener("dragstart", binding.dragstart);
+        handle.removeEventListener("dragend", binding.dragend);
+        handle.removeEventListener("dragover", binding.dragover);
+        handle.removeEventListener("drop", binding.drop);
+      }
+      delete handle.dataset.dragControllerAttached;
+      handle.setAttribute("draggable", "false");
+      handle.classList.remove("is-layout-editable");
+      card.classList.remove("is-layout-editable");
+      card.classList.remove("is-dragging");
+    }
+
+    function syncDragControllers() {
+      cards.forEach((card) => {
+        const handle = dragHandles.get(card);
+        if (!handle) {
+          return;
+        }
+        if (editingEnabled) {
+          enableDragHandle(handle, card);
+          return;
+        }
+        disableDragHandle(handle, card);
       });
     }
 
@@ -519,7 +625,7 @@
           detailsContent.appendChild(summary.nextSibling);
         }
         card.appendChild(detailsContent);
-        attachDragHandlers(summary, card);
+        dragHandles.set(card, summary);
         summary.addEventListener("click", (event) => {
           if (event.target instanceof Element && event.target.closest(".card-tools")) {
             event.preventDefault();
@@ -569,7 +675,7 @@
 
       card.appendChild(titlebar);
       card.appendChild(content);
-      attachDragHandlers(titlebar, card);
+      dragHandles.set(card, titlebar);
       titlebar.addEventListener("click", () => {
         if (card.dataset.cardModalLauncher === "true") {
           return;
@@ -588,7 +694,9 @@
       const verticalPadding = numericCssValue(computed.paddingTop, 0) + numericCssValue(computed.paddingBottom, 0);
       const composedHeight = Math.ceil(titlebarHeight + contentHeight + verticalPadding);
       const scrollHeight = Math.ceil(card.scrollHeight || 0);
-      return Math.max(composedHeight, scrollHeight);
+      const offsetHeight = Math.ceil(card.offsetHeight || 0);
+      const renderedHeight = Math.ceil(card.getBoundingClientRect?.().height || 0);
+      return Math.max(composedHeight, scrollHeight, offsetHeight, renderedHeight);
     }
 
     function buildCardDescriptor(card, index) {
@@ -641,20 +749,33 @@
       frameToken = 0;
       cards.forEach((card) => applyState(card));
       const layoutMode = resolveLayoutMode();
-      const trackConfig = trackResolver(currentContainerWidth(), { mode, container, cards, layoutMode });
-      const gap = currentContainerGap();
+      const trackConfig = trackResolver(currentContainerWidth(), {
+        mode,
+        container,
+        cards,
+        layoutMode,
+        config: { ...layoutConfig },
+      });
+      const gap = Number.isFinite(Number(trackConfig.gap))
+        ? Number(trackConfig.gap)
+        : (layoutConfig.gap ?? currentContainerGap());
+      const minCardWidth = Number.isFinite(Number(trackConfig.minCardWidth))
+        ? Number(trackConfig.minCardWidth)
+        : (layoutConfig.minCardWidth ?? 300);
       const descriptors = cards.map((card, index) => buildCardDescriptor(card, index));
       const plan = computeLayoutPlan(descriptors, {
         tracks: trackConfig.tracks,
         rowUnit,
+        gap,
       });
 
       layoutCache.columns = trackConfig.tracks;
       layoutCache.layoutMode = layoutMode;
       layoutCache.columnHeights = plan.columnHeights.slice();
       container.style.setProperty("--fibo-columns", String(trackConfig.tracks));
-      container.style.setProperty("--bf-masonry-min-card-width", `${trackConfig.minCardWidth}px`);
+      container.style.setProperty("--bf-masonry-min-card-width", `${minCardWidth}px`);
       container.style.setProperty("--bf-masonry-gap", `${gap}px`);
+      container.style.setProperty("gap", `${gap}px`);
 
       plan.items.forEach((item) => {
         const card = item.card;
@@ -685,24 +806,32 @@
         layoutMode,
         containerWidth: currentContainerWidth(),
         columns: trackConfig.tracks,
-        minCardWidth: trackConfig.minCardWidth,
+        minCardWidth,
         gap,
+        reason: pendingRecomputeReason,
       });
       logger.log("masonry reflow", {
         columns: trackConfig.tracks,
         layoutMode,
+        reason: pendingRecomputeReason,
         snapshot: snapshotFromPlan(plan),
       });
-      persistState(pendingAutoArrange ? "auto-arrange" : "reflow");
-      emitLayoutSnapshot(pendingAutoArrange ? "auto-arrange" : "reflow");
       pendingAutoArrange = false;
+      pendingRecomputeReason = "reflow";
     }
 
-    function scheduleRecompute() {
+    function scheduleRecompute(reason) {
+      if (typeof reason === "string" && reason) {
+        pendingRecomputeReason = reason;
+      }
       if (frameToken) {
         return;
       }
       frameToken = globalScope.requestAnimationFrame(recompute);
+    }
+
+    function requestLayout(reason) {
+      scheduleRecompute(reason || "reflow");
     }
 
     function handleViewportReflow(reason) {
@@ -712,7 +841,7 @@
         viewportWidth: globalScope.innerWidth,
         viewportHeight: globalScope.innerHeight,
       });
-      scheduleRecompute();
+      requestLayout(reason || "viewport-change");
     }
 
     function autoArrange() {
@@ -731,17 +860,24 @@
         state[entry.key] = { ...readCardState(entry.card), order: index };
       });
       pendingAutoArrange = true;
+      setDirty(true, "auto-arrange");
       logger.log("auto-arrange", { ordered: ordered.map((entry) => entry.key) });
-      scheduleRecompute();
+      requestLayout("auto-arrange");
+      saveLayout("auto-arrange");
     }
 
     function resetState(reason) {
+      if (storageKey && typeof localStorage !== "undefined") {
+        localStorage.removeItem(storageKey);
+      }
       cards.forEach((card) => {
         state[ensureCardKey(card)] = defaultStateForCard(card);
       });
-      pendingAutoArrange = true;
-      persistState(reason || "reset-state");
-      scheduleRecompute();
+      pendingAutoArrange = false;
+      setDirty(true, reason || "reset-state");
+      logger.log("reset layout", { reason: reason || "reset-state" });
+      requestLayout(reason || "reset-state");
+      saveLayout(reason || "reset-state");
     }
 
     function setCardCollapsed(cardKey, collapsed, reason) {
@@ -751,7 +887,7 @@
       }
       writeCardState(card, { collapsed: Boolean(collapsed), hidden: false }, reason || "set-card-collapsed");
       applyState(card);
-      scheduleRecompute();
+      requestLayout(reason || "set-card-collapsed");
       return true;
     }
 
@@ -766,12 +902,29 @@
       isApplyingRemoteState = false;
       skipPersistOnce = true;
       logger.log("remote layout state", { reason: reason || "remote-sync", remoteState });
-      scheduleRecompute();
+      requestLayout(reason || "remote-sync");
     }
 
     function setEditing(enabled) {
       editingEnabled = enabled !== false;
+      logger.log(editingEnabled ? "edit mode enabled" : "edit mode disabled", { mode, editingEnabled });
       cards.forEach((card) => updateCardChrome(card));
+      syncDragControllers();
+    }
+
+    function updateConfig(nextConfig = {}) {
+      if (nextConfig.minCardWidth != null && Number.isFinite(Number(nextConfig.minCardWidth))) {
+        layoutConfig.minCardWidth = Number(nextConfig.minCardWidth);
+      }
+      if (nextConfig.gap != null && Number.isFinite(Number(nextConfig.gap))) {
+        layoutConfig.gap = Number(nextConfig.gap);
+        container.style.setProperty("gap", `${layoutConfig.gap}px`);
+      }
+      logger.log("layout config updated", { ...layoutConfig });
+    }
+
+    function isDirty() {
+      return dirty;
     }
 
     cards.forEach((card) => {
@@ -783,6 +936,8 @@
       applyState(card);
     });
 
+    syncDragControllers();
+
     globalScope.addEventListener("resize", () => handleViewportReflow("window-resize"));
     globalScope.addEventListener("orientationchange", () => handleViewportReflow("orientation-change"));
     if (globalScope.visualViewport) {
@@ -793,18 +948,42 @@
         handleViewportReflow("container-resize");
       });
       resizeObserver.observe(container);
+
+      cards.forEach((card) => {
+        resizeObserver.observe(card);
+      });
+    }
+    if (typeof MutationObserver === "function") {
+      const mutationObserver = new MutationObserver((mutations) => {
+        const hasContentChange = mutations.some((mutation) => mutation.type === "childList" || mutation.type === "characterData");
+        if (hasContentChange) {
+          requestLayout("card-content-mutation");
+        }
+      });
+      cards.forEach((card) => {
+        const contentTarget = card.querySelector(".card-content") || card;
+        mutationObserver.observe(contentTarget, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      });
     }
 
-    scheduleRecompute();
+    scheduleRecompute("initial-layout");
 
     return {
       recompute: scheduleRecompute,
+      requestLayout,
       autoArrange,
       resetState,
       setCardCollapsed,
       applyRemoteState,
       emitLayoutSnapshot,
+      saveLayout,
       setEditing,
+      updateConfig,
+      isDirty,
       getLayoutCache() {
         return {
           columns: layoutCache.columns,
@@ -817,8 +996,15 @@
       getSnapshot() {
         const descriptors = cards.map((card, index) => buildCardDescriptor(card, index));
         return snapshotFromPlan(computeLayoutPlan(descriptors, {
-          tracks: layoutCache.columns || trackResolver(currentContainerWidth(), { mode, container, cards, layoutMode: resolveLayoutMode() }).tracks,
+          tracks: layoutCache.columns || trackResolver(currentContainerWidth(), {
+            mode,
+            container,
+            cards,
+            layoutMode: resolveLayoutMode(),
+            config: { ...layoutConfig },
+          }).tracks,
           rowUnit,
+          gap: layoutConfig.gap ?? currentContainerGap(),
         }));
       },
       getState() {

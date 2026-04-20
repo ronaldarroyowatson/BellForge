@@ -1,3 +1,4 @@
+const { after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -40,6 +41,7 @@ const PREFERRED_BACKEND_PORT = process.env.BELLFORGE_TEST_PORT
   : 0;
 let backendPort = PREFERRED_BACKEND_PORT;
 let BASE_URL = `http://127.0.0.1:${backendPort}`;
+let exitScheduled = false;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -227,6 +229,17 @@ async function stopBackend() {
   BASE_URL = buildBaseUrl(backendPort);
 }
 
+after(async () => {
+  await stopBackend();
+  if (exitScheduled) {
+    return;
+  }
+  exitScheduled = true;
+  setImmediate(() => {
+    process.exit(process.exitCode ?? 0);
+  });
+});
+
 function attachConsole(target, label) {
   const entries = [];
   target.on('console', async (message) => {
@@ -358,6 +371,12 @@ async function openRealSurfaces(suite, viewport = DEFAULT_VIEWPORT, labelPrefix 
   const settings = await openPage(context, SETTINGS_PATH, `${labelPrefix}-settings`);
   const settingsDisplayPage = await openSettingsDisplayPage(settings.page);
   const settingsDisplayConsole = attachConsole(settingsDisplayPage.page(), `${labelPrefix}-settings-display`);
+  await Promise.all([
+    waitForLayoutReady(status.page),
+    waitForLayoutReady(display.page),
+    waitForLayoutReady(settings.page),
+    waitForLayoutReady(settingsDisplayPage),
+  ]);
   return {
     context,
     statusPage: status.page,

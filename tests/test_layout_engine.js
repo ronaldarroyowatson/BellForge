@@ -211,8 +211,8 @@ test('status card registry is complete and default priorities match the default 
 });
 
 test('token changes and layout events trigger reflow hooks', () => {
-  assert.match(settingsHtml, /settingsAdaptiveLayout\.recompute\(\);/);
-  assert.match(statusHtml, /statusAdaptiveLayout\.recompute\(\);/);
+  assert.match(settingsHtml, /settingsAdaptiveLayout\.(?:requestLayout|recompute)\(/);
+  assert.match(statusHtml, /statusAdaptiveLayout\.(?:requestLayout|recompute)\(/);
   assert.match(sharedLayoutSource, /masonry decisions/);
   assert.match(sharedLayoutSource, /masonry reflow/);
 });

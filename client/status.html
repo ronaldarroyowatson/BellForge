@@ -728,6 +728,14 @@
     body.display-view .advanced-item.active {
       display: block;
     }
+    body.display-view .advanced-item span,
+    body.display-view .advanced-item div {
+      display: block;
+      min-height: 1.25em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     body.display-view .advanced-pager {
       display: block;
     }
@@ -1003,7 +1011,9 @@
       gap: 12,
       editEnabled: false,
     };
+    const layoutAutoSaveEnabled = true;
     let layoutEditorAuthorized = false;
+    let statusAdaptiveLayout = null;
 
     function debugEvent(channel, message, payload, level = "info") {
       if (!debugClient) {
@@ -1061,13 +1071,46 @@
       if (els.layoutGap) {
         els.layoutGap.value = String(normalized.gap);
       }
-      if (window.__bellforgeStatusLayout?.setEditing) {
-        window.__bellforgeStatusLayout.setEditing(layoutEditorAuthorized && normalized.editEnabled && !isDisplayView);
+      if (statusAdaptiveLayout?.updateConfig) {
+        statusAdaptiveLayout.updateConfig({
+          minCardWidth: normalized.minCardWidth,
+          gap: normalized.gap,
+        });
+      }
+      if (layoutEditorAuthorized && normalized.editEnabled && !isDisplayView) {
+        enableEditMode();
+      } else {
+        disableEditMode();
       }
       if (els.layoutEditToggle) {
         els.layoutEditToggle.textContent = normalized.editEnabled ? "Disable Edit Mode" : "Enable Edit Mode";
       }
       return normalized;
+    }
+
+    function enableEditMode() {
+      console.debug("[BellForge Status Layout] edit mode enabled", {
+        authorized: layoutEditorAuthorized,
+        displayView: isDisplayView,
+      });
+      statusAdaptiveLayout?.setEditing?.(true);
+    }
+
+    function disableEditMode() {
+      console.debug("[BellForge Status Layout] edit mode disabled", {
+        authorized: layoutEditorAuthorized,
+        displayView: isDisplayView,
+      });
+      statusAdaptiveLayout?.setEditing?.(false);
+    }
+
+    function saveLayout(reason) {
+      console.debug("[BellForge Status Layout] saveLayout attempt", { reason });
+      const saved = statusAdaptiveLayout?.saveLayout?.(reason) !== false;
+      console.debug("[BellForge Status Layout] saveLayout result", { reason, saved });
+      debugEvent("layout save", saved ? "Saved status layout" : "Status layout save failed", { reason, saved }, saved ? "info" : "warn");
+      updateLayoutMetrics();
+      return saved;
     }
 
     function updateLayoutMetrics(snapshot) {
@@ -1145,10 +1188,11 @@
         trackResolver: (width, context) => {
           const layoutMode = document.documentElement.dataset.designLayoutMode || context.layoutMode || "portrait";
           const settings = readLayoutSettings();
+          const layoutConfig = context.config || {};
           const minCardWidth = layoutMode === "landscape"
-            ? Math.max(220, Number(settings.minCardWidth || 300) - 20)
-            : Math.max(220, Number(settings.minCardWidth || 300));
-          const gap = Math.max(8, Number(settings.gap || 12));
+            ? Math.max(220, Number(layoutConfig.minCardWidth ?? settings.minCardWidth ?? 300) - 20)
+            : Math.max(220, Number(layoutConfig.minCardWidth ?? settings.minCardWidth ?? 300));
+          const gap = Math.max(8, Number(layoutConfig.gap ?? settings.gap ?? 12));
           const usableWidth = Math.max(width, minCardWidth);
           return {
             tracks: Math.max(1, Math.floor((usableWidth + gap) / (minCardWidth + gap))),
@@ -1360,7 +1404,7 @@
         })();
         applyDesignControls(liveDesignControls || data.design_controls);
         scheduleDiagnosticsCarousel();
-        statusAdaptiveLayout.recompute();
+        statusAdaptiveLayout.requestLayout("display-preferences-refresh");
       } catch (error) {
         // Leave the current carousel timing in place.
       }
@@ -1374,7 +1418,7 @@
         if (parsed && parsed.payload) {
           debugEvent("orientation changes", "Consumed live design controls from storage", parsed.payload);
           applyDesignControls(parsed.payload);
-          statusAdaptiveLayout.recompute();
+          statusAdaptiveLayout.requestLayout("live-design-controls");
         }
       } catch {
         // no-op
@@ -1458,28 +1502,43 @@
       }
     }
 
-    const statusAdaptiveLayout = createFibonacciAdaptiveLayout({
+    statusAdaptiveLayout = createFibonacciAdaptiveLayout({
       container: document.querySelector(".wrap"),
       cardSelector: "[data-fibo-card]",
       storageKey: isMirrorView ? null : STATUS_LAYOUT_STORAGE_KEY,
       rowUnit: 8,
       collapsedHeight: 56,
+      editingEnabled: false,
+      minCardWidth: readLayoutSettings().minCardWidth,
+      gap: readLayoutSettings().gap,
     });
 
     window.__bellforgeStatusLayout = {
       autoArrange: () => statusAdaptiveLayout.autoArrange(),
       recompute: () => statusAdaptiveLayout.recompute(),
+      requestLayout: (reason = "status-debug-request") => statusAdaptiveLayout.requestLayout(reason),
       resetState: () => statusAdaptiveLayout.resetState("status-debug-reset"),
       setCardCollapsed: (cardKey, collapsed, reason = "status-debug-collapse") => statusAdaptiveLayout.setCardCollapsed(cardKey, collapsed, reason),
       applyRemoteState: (remoteState, reason = "status-debug-apply") => statusAdaptiveLayout.applyRemoteState(remoteState, reason),
       emitLayoutSnapshot: (reason = "status-debug-snapshot") => statusAdaptiveLayout.emitLayoutSnapshot(reason),
+      saveLayout: (reason = "status-debug-save") => statusAdaptiveLayout.saveLayout(reason),
+      updateConfig: (nextConfig = {}) => statusAdaptiveLayout.updateConfig(nextConfig),
       getLayoutCache: () => statusAdaptiveLayout.getLayoutCache(),
       getSnapshot: () => statusAdaptiveLayout.getSnapshot(),
       getState: () => statusAdaptiveLayout.getState(),
+      isDirty: () => statusAdaptiveLayout.isDirty(),
       storageKey: STATUS_LAYOUT_STORAGE_KEY,
       commandKey: STATUS_LAYOUT_COMMAND_KEY,
       mode: isDisplayView ? "status-display" : "status",
       setEditing: (enabled) => statusAdaptiveLayout.setEditing(enabled),
+      enableEditMode: () => {
+        enableEditMode();
+        return true;
+      },
+      disableEditMode: () => {
+        disableEditMode();
+        return true;
+      },
     };
     debugClient?.snapshot("layout engine decisions", "Status layout bootstrap", ".wrap", {
       mode: window.__bellforgeStatusLayout.mode,
@@ -1507,6 +1566,12 @@
         updateLayoutMetrics();
         return;
       }
+      if (command.type === "reset-layout") {
+        debugEvent("reset layout", "Received reset-layout command", { source, command });
+        statusAdaptiveLayout.resetState(`command:${source}:reset-layout`);
+        updateLayoutMetrics();
+        return;
+      }
       if (command.type === "apply-state" && command.payload && typeof command.payload === "object") {
         debugEvent("card registry sync", "Applying remote layout state", { source, keys: Object.keys(command.payload) });
         statusAdaptiveLayout.applyRemoteState(command.payload, `command:${source}`);
@@ -1524,7 +1589,7 @@
       if (event.data.type === "bellforge-design-controls" && event.data.payload) {
         debugEvent("orientation changes", "Received live design controls via postMessage", event.data.payload);
         applyDesignControls(event.data.payload);
-        statusAdaptiveLayout.recompute();
+        statusAdaptiveLayout.requestLayout("design-controls-message");
       }
     });
 
@@ -1550,12 +1615,12 @@
         if (payload && payload.payload) {
           debugEvent("orientation changes", "Received live design controls via storage event", payload.payload);
           applyDesignControls(payload.payload);
-          statusAdaptiveLayout.recompute();
+          statusAdaptiveLayout.requestLayout("design-controls-storage");
         }
       }
     });
 
-    advancedDetails.addEventListener("toggle", () => statusAdaptiveLayout.recompute());
+    advancedDetails.addEventListener("toggle", () => statusAdaptiveLayout.requestLayout("advanced-toggle"));
 
     if (els.layoutEditToggle) {
       els.layoutEditToggle.addEventListener("click", () => {
@@ -1570,28 +1635,41 @@
     }
     if (els.layoutAutoArrange) {
       els.layoutAutoArrange.addEventListener("click", () => {
+        console.debug("[BellForge Status Layout] auto arrange", { source: "status-button" });
         statusAdaptiveLayout.autoArrange();
         updateLayoutMetrics();
       });
     }
     if (els.layoutReset) {
       els.layoutReset.addEventListener("click", () => {
-        localStorage.removeItem(STATUS_LAYOUT_STORAGE_KEY);
+        console.debug("[BellForge Status Layout] reset layout", { source: "status-button" });
         statusAdaptiveLayout.resetState("real-status-layout-reset");
         updateLayoutMetrics();
       });
     }
     if (els.layoutMinWidth) {
       els.layoutMinWidth.addEventListener("input", () => {
-        applyLayoutSettings({ ...readLayoutSettings(), minCardWidth: Number(els.layoutMinWidth.value) });
-        statusAdaptiveLayout.recompute();
+        const minCardWidth = Number(els.layoutMinWidth.value);
+        console.debug("[BellForge Status Layout] slider change", { control: "minCardWidth", minCardWidth });
+        applyLayoutSettings({ ...readLayoutSettings(), minCardWidth });
+        statusAdaptiveLayout.updateConfig({ minCardWidth });
+        statusAdaptiveLayout.requestLayout("slider:min-card-width");
+        if (layoutAutoSaveEnabled) {
+          saveLayout("slider:min-card-width");
+        }
         updateLayoutMetrics();
       });
     }
     if (els.layoutGap) {
       els.layoutGap.addEventListener("input", () => {
-        applyLayoutSettings({ ...readLayoutSettings(), gap: Number(els.layoutGap.value) });
-        statusAdaptiveLayout.recompute();
+        const gap = Number(els.layoutGap.value);
+        console.debug("[BellForge Status Layout] slider change", { control: "gap", gap });
+        applyLayoutSettings({ ...readLayoutSettings(), gap });
+        statusAdaptiveLayout.updateConfig({ gap });
+        statusAdaptiveLayout.requestLayout("slider:gap");
+        if (layoutAutoSaveEnabled) {
+          saveLayout("slider:gap");
+        }
         updateLayoutMetrics();
       });
     }
@@ -1605,7 +1683,7 @@
     setInterval(refreshDisplayPreferences, REFRESH_MS);
     setInterval(refresh, REFRESH_MS);
     setInterval(() => {
-      statusAdaptiveLayout.recompute();
+      statusAdaptiveLayout.requestLayout("interval-refresh");
       updateLayoutMetrics();
     }, REFRESH_MS);
   </script>

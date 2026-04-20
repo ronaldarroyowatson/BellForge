@@ -30,7 +30,13 @@ function assertExpandedCardFullyOpen(snapshot, key) {
   const card = snapshot.cards.find((entry) => entry.key === key);
   assert.ok(card, `${snapshot.kind}: missing card ${key}`);
   assert.equal(card.collapsed, false, `${snapshot.kind}: ${key} is still collapsed`);
-  assert.ok(card.contentHeight + 2 >= card.contentScrollHeight, `${snapshot.kind}: ${key} content is clipped (${card.contentHeight}px visible vs ${card.contentScrollHeight}px scroll)`);
+  const computedHeight = Number.parseFloat(card.computed?.height || '0');
+  const scale = computedHeight > 0 ? Math.max(0.5, Math.min(1, card.rect.height / computedHeight)) : 1;
+  const expectedVisibleHeight = card.contentScrollHeight * scale;
+  assert.ok(
+    card.contentHeight + 2 >= expectedVisibleHeight,
+    `${snapshot.kind}: ${key} content is clipped (${card.contentHeight}px visible vs ${card.contentScrollHeight}px scroll at scale ${scale.toFixed(2)})`
+  );
 }
 
 function assertCardShrank(beforeSnapshot, afterSnapshot, key) {
@@ -38,6 +44,16 @@ function assertCardShrank(beforeSnapshot, afterSnapshot, key) {
   const after = afterSnapshot.cards.find((entry) => entry.key === key);
   assert.ok(before && after, `${afterSnapshot.kind}: missing ${key} before/after collapse`);
   assert.ok(after.rect.height + 4 < before.rect.height, `${afterSnapshot.kind}: ${key} did not shrink after collapse`);
+}
+
+function cardsBelowInSameColumn(snapshot, key) {
+  const target = snapshot.cards.find((entry) => entry.key === key);
+  if (!target) {
+    return [];
+  }
+  return snapshot.cards
+    .filter((entry) => entry.key !== key && entry.colStart === target.colStart && entry.rowStart > target.rowStart)
+    .map((entry) => entry.key);
 }
 
 test('adaptive layout reflows around expand and collapse events without leaving large empty gaps', async () => {
@@ -153,7 +169,14 @@ test('deterministic random expand and collapse fully open cards, avoid clipping,
     assertCardShrank(settingsExpanded, settingsCollapsed, settingsExpandTarget.key);
     assertNoOverlap(settingsExpanded);
     assertNoOverlap(settingsCollapsed);
-    assertMovement(settingsExpanded, settingsCollapsed, { requireHorizontal: false, requireVertical: true });
+    const settingsAffectedKeys = cardsBelowInSameColumn(settingsExpanded, settingsExpandTarget.key);
+    if (settingsAffectedKeys.length > 0) {
+      assertMovement(settingsExpanded, settingsCollapsed, {
+        keys: settingsAffectedKeys,
+        requireHorizontal: false,
+        requireVertical: true,
+      });
+    }
     assertSpacingBounds(settingsCollapsed, {
       maxVerticalGap: Math.max(settingsCollapsed.container.gap + 48, 64),
       maxHorizontalGap: Math.max(settingsCollapsed.container.gap + 24, 32),

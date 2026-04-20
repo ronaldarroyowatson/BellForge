@@ -933,7 +933,7 @@
       debugEvent("orientation changes", "Applied settings design controls", normalized);
       updateDesignControlLabels(normalized);
       renderDesignPreview(normalized);
-      settingsAdaptiveLayout.recompute();
+      settingsAdaptiveLayout.requestLayout("design-controls");
       return normalized;
     }
 
@@ -1288,11 +1288,15 @@
     window.__bellforgeSettingsLayout = {
       autoArrange: () => settingsAdaptiveLayout.autoArrange(),
       recompute: () => settingsAdaptiveLayout.recompute(),
+      requestLayout: (reason = "settings-debug-request") => settingsAdaptiveLayout.requestLayout(reason),
       resetState: () => settingsAdaptiveLayout.resetState("settings-debug-reset"),
       setCardCollapsed: (cardKey, collapsed, reason = "settings-debug-collapse") => settingsAdaptiveLayout.setCardCollapsed(cardKey, collapsed, reason),
+      saveLayout: (reason = "settings-debug-save") => settingsAdaptiveLayout.saveLayout(reason),
+      updateConfig: (nextConfig = {}) => settingsAdaptiveLayout.updateConfig(nextConfig),
       getLayoutCache: () => settingsAdaptiveLayout.getLayoutCache(),
       getSnapshot: () => settingsAdaptiveLayout.getSnapshot(),
       getState: () => settingsAdaptiveLayout.getState(),
+      isDirty: () => settingsAdaptiveLayout.isDirty(),
       storageKey: SETTINGS_LAYOUT_STORAGE_KEY,
     };
 

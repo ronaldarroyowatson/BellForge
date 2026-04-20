@@ -551,6 +551,9 @@ before(async () => {
 after(async () => {
   await browser?.close();
   await stopBackend();
+  setImmediate(() => {
+    process.exit(process.exitCode ?? 0);
+  });
 });
 
 test('browser verification validates real status DOM collapse, expand, drag, ratios, and default layout', async () => {
