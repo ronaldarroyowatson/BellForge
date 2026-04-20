@@ -1,6 +1,6 @@
 {
-  "version": "0.1.60",
-  "generated_at": "2026-04-19T22:28:29Z",
+  "version": "0.1.61",
+  "generated_at": "2026-04-20T14:35:55Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -146,10 +146,6 @@
       "sha256": "13c03db805d9f3a3a6db6aa4b8ae9d959bc94fc64322a8f56c136acebf59a901",
       "size": 65
     },
-    "config/auth_registry.json": {
-      "sha256": "cfa3b3f830c00aeeceb6f96c74626197ea7a8387b6ec190650d35dd99b89daff",
-      "size": 9746
-    },
     "config/payloads/default.html": {
       "sha256": "f78ca9919adb02aff765ddf4a2a7ea1e156d0168461f8ff1dc709f6fb5c166ff",
       "size": 394
@@ -167,7 +163,7 @@
       "size": 906
     },
     "config/version.json": {
-      "sha256": "666c956f41233114303c89052ee51369d54015142e007716d580931ddb5713c5",
+      "sha256": "e264d6fb82ac2804626d047364d73d87f479349a9fb89f05f3a77431d7c7ef74",
       "size": 234
     },
     "scripts/bellforge": {
@@ -223,8 +219,8 @@
       "size": 3356
     },
     "scripts/generate_manifest.py": {
-      "sha256": "40c977bb648843a5d85580f0db4c54296acadc0b17c6bac3de455bd7bdd3b045",
-      "size": 3694
+      "sha256": "1b65b0a9945cb8c668f90a19402aaf74e6cf9d48d5d3878ca0c886a4e7d19c31",
+      "size": 3794
     },
     "scripts/gpu_diagnostics.py": {
       "sha256": "29c33ba2d65d358e92eaf74c99aa770cd5612041126cd7e0316522412504eefc",
@@ -258,6 +254,10 @@
       "sha256": "9f5994fe0873576f367c92c5a27490f761bb4f505d3241f260f37af7e003ef61",
       "size": 6826
     },
+    "scripts/run_python.js": {
+      "sha256": "3b2c53e2e75a61b9a9553ee3ee412185cb05ffa5f66a7e61768c59383a88c171",
+      "size": 1760
+    },
     "scripts/self_heal_root.sh": {
       "sha256": "5c77e1aefd1b5ba165021ee3700000f615db80fdaaf9384bdab2bc9b1d19b194",
       "size": 929
@@ -271,8 +271,8 @@
       "size": 1932
     },
     "scripts/verify_pi_bugfix_rollout.js": {
-      "sha256": "4f744ec9aba1589de3ab95abc6808657ab6c261dfca79c1e4d433a97cf95b442",
-      "size": 30817
+      "sha256": "de5f2c254220bce512a8136495008a6f1ce33e680d6882c3d752e3ad8cd6f8de",
+      "size": 30937
     }
   }
 }

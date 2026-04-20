@@ -41,6 +41,7 @@ SKIP_RELATIVE = {
     "config/manifest.json",   # Prevent recursive self-hash churn.
     "config/settings.json",   # Device-local secrets and options.
     "config/client.env",      # Device-local client endpoint override.
+    "config/auth_registry.json",  # Generated runtime auth state; not a published release artifact.
 }
 
 TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh"}

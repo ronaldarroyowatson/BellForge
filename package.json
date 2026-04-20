@@ -10,7 +10,7 @@
     "test:layout": "node --test tests/test_layout_engine.js && npm run test:layout:browser",
     "test:layout:browser": "node --test tests/test_layout_browser.js && node --test tests/test_default_layout.js && node --test tests/test_adaptive_reflow.js && node --test tests/test_spacing_and_overlap.js && node --test tests/test_autolayout_behavior.js && node --test tests/test_manual_drag_and_drop.js && node --test tests/test_preview_status_sync.js && node --test tests/test_layout_null_sets.js && node --test tests/test_layout_corrupt_data.js && node --test tests/test_layout_extreme_values.js",
     "verify:pi-rollout": "node scripts/verify_pi_bugfix_rollout.js",
-    "test:python:debug": "node scripts/run_python.js -m unittest tests.test_display_preferences tests.test_debug_service",
+    "test:python:debug": "node scripts/run_python.js -m unittest tests.test_display_preferences tests.test_debug_service tests.test_release_manifest",
     "test:auth": "node tests/run_auth_suite.mjs --coverage",
     "test:auth:parallel": "node tests/run_auth_suite.mjs --parallel"
   }
