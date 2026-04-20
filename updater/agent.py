@@ -95,10 +95,16 @@ def configure_logging(log_file: Path) -> logging.Logger:
     return logger
 
 
+def _should_normalize_text(path: Path, data: bytes) -> bool:
+    if path.suffix.lower() in TEXT_SUFFIXES or path.name in {"Dockerfile", ".env"}:
+        return True
+    return data.startswith(b"#!")
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     data = path.read_bytes()
-    if path.suffix.lower() in TEXT_SUFFIXES or path.name in {"Dockerfile", ".env"}:
+    if _should_normalize_text(path, data):
         data = data.replace(b"\r\n", b"\n")
     for index in range(0, len(data), 65536):
         digest.update(data[index:index + 65536])

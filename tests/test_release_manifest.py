@@ -3,8 +3,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+import hashlib
 
 import scripts.generate_manifest as generate_manifest
+from updater.agent import sha256_file as updater_sha256_file
 
 
 class ReleaseManifestTests(unittest.TestCase):
@@ -36,6 +38,17 @@ class ReleaseManifestTests(unittest.TestCase):
 
             self.assertIn("backend/main.py", entries)
             self.assertNotIn("config/auth_registry.json", entries)
+
+    def test_shebang_script_hashes_are_lf_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script_path = Path(temp_dir) / "bellforge"
+            script_bytes = b"#!/usr/bin/env bash\r\nset -eu\r\necho ok\r\n"
+            script_path.write_bytes(script_bytes)
+
+            expected_hash = hashlib.sha256(script_bytes.replace(b"\r\n", b"\n")).hexdigest()
+
+            self.assertEqual(generate_manifest.sha256_file(script_path), expected_hash)
+            self.assertEqual(updater_sha256_file(script_path), expected_hash)
 
 
 if __name__ == "__main__":

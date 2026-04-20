@@ -1,6 +1,6 @@
 {
-  "version": "0.1.61",
-  "generated_at": "2026-04-20T14:35:55Z",
+  "version": "0.1.62",
+  "generated_at": "2026-04-20T14:42:37Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -139,8 +139,8 @@
       "size": 58524
     },
     "updater/agent.py": {
-      "sha256": "ae12e291131f87284e770fcdea945c35520cc82c7db627a475ab1dc020f1dae2",
-      "size": 36717
+      "sha256": "755a9d6093640e989db7575119f5eeb2f6de564720312cd367b611cd95aa3798",
+      "size": 36877
     },
     "updater/requirements.txt": {
       "sha256": "13c03db805d9f3a3a6db6aa4b8ae9d959bc94fc64322a8f56c136acebf59a901",
@@ -163,12 +163,12 @@
       "size": 906
     },
     "config/version.json": {
-      "sha256": "e264d6fb82ac2804626d047364d73d87f479349a9fb89f05f3a77431d7c7ef74",
+      "sha256": "69026211d6c2117f6542e83d788c8ac23cdf470d633309d4ebe918919e05e431",
       "size": 234
     },
     "scripts/bellforge": {
-      "sha256": "4442a12f09ca5b7489fcdba820fa460f3bde3e1a2f910185c68ba1a7a6680e98",
-      "size": 491
+      "sha256": "a5d97361843e7655c4e48dca1d6a2f00cee30fe752aeaef5dd1061f89bf13455",
+      "size": 477
     },
     "scripts/bellforge-backend.service": {
       "sha256": "f93a53b7b6a88cfd25a8651f9f989d56df2fcf4c89a15fa96e8d73fcdadc5b7c",
@@ -219,8 +219,8 @@
       "size": 3356
     },
     "scripts/generate_manifest.py": {
-      "sha256": "1b65b0a9945cb8c668f90a19402aaf74e6cf9d48d5d3878ca0c886a4e7d19c31",
-      "size": 3794
+      "sha256": "dbd8223f8c545cc81d7c37c527850aa8c09954b26eeeaa58a11a3152709f7c97",
+      "size": 3952
     },
     "scripts/gpu_diagnostics.py": {
       "sha256": "29c33ba2d65d358e92eaf74c99aa770cd5612041126cd7e0316522412504eefc",

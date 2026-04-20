@@ -47,9 +47,15 @@ SKIP_RELATIVE = {
 TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh"}
 
 
+def should_normalize_text(path: Path, data: bytes) -> bool:
+    if path.suffix.lower() in TEXT_SUFFIXES or path.name in {"Dockerfile", ".env"}:
+        return True
+    return data.startswith(b"#!")
+
+
 def canonical_file_bytes(path: Path) -> bytes:
     data = path.read_bytes()
-    if path.suffix.lower() in TEXT_SUFFIXES or path.name in {"Dockerfile", ".env"}:
+    if should_normalize_text(path, data):
         return data.replace(b"\r\n", b"\n")
     return data
 
