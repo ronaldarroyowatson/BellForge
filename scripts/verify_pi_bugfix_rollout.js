@@ -453,11 +453,13 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
     assertBrowserLayoutHealth(displaySnapshot, { minVisibleCards: 3 });
   }
 
-  assertCondition(accessMetrics.hasOpenStatusButton, `${artifactPrefix}: settings is missing the real status page access button`);
-  assertCondition(accessMetrics.hasOpenDisplayButton, `${artifactPrefix}: settings is missing the real display output access button`);
-  assertCondition(accessMetrics.previewModalPresent === false, `${artifactPrefix}: settings still exposes the removed preview modal`);
-  assertCondition(accessMetrics.previewIframePresent === false, `${artifactPrefix}: settings still exposes the removed preview iframe`);
-  assertCondition(accessMetrics.accessNote.length > 0, `${artifactPrefix}: settings did not describe the real-status verification path`);
+  if (options.requireRealStatusAccess !== false) {
+    assertCondition(accessMetrics.hasOpenStatusButton, `${artifactPrefix}: settings is missing the real status page access button`);
+    assertCondition(accessMetrics.hasOpenDisplayButton, `${artifactPrefix}: settings is missing the real display output access button`);
+    assertCondition(accessMetrics.previewModalPresent === false, `${artifactPrefix}: settings still exposes the removed preview modal`);
+    assertCondition(accessMetrics.previewIframePresent === false, `${artifactPrefix}: settings still exposes the removed preview iframe`);
+    assertCondition(accessMetrics.accessNote.length > 0, `${artifactPrefix}: settings did not describe the real-status verification path`);
+  }
 
   await page.screenshot({ path: path.join(ARTIFACT_DIR, `${artifactPrefix}-settings.png`), fullPage: true });
   writeJsonArtifact(`${artifactPrefix}-settings-console`, consoleEntries);
@@ -560,7 +562,11 @@ async function main() {
 
     assertCondition(preState.version.version === preState.updater.current_device_version, 'Pi /api/version does not match updater current_device_version');
 
-    const preBrowser = await verifyBrowserSurface(config, 'pre-rollout-browser', browserExpectationsFromState(preState), { enforceNoOverlap: false, enforceVersion: false });
+    const preBrowser = await verifyBrowserSurface(config, 'pre-rollout-browser', browserExpectationsFromState(preState), {
+      enforceNoOverlap: false,
+      enforceVersion: false,
+      requireRealStatusAccess: false,
+    });
     recordStep('pre-rollout-browser-ok', {
       currentVersion: preState.updater.current_device_version,
       latestDetectedVersion: preState.updater.latest_detected_version,
