@@ -14,6 +14,7 @@ Use this workflow for production bugfix cycles and nightly closeout.
 2. Run browser-driven layout verification for any layout, card, token, collapse/expand, drag-and-drop, or real display verification change:
    - `npm run test:layout`
    - This starts or reuses the real backend on `http://127.0.0.1:8000`, opens the real Status page, Settings page, and display output in a headless browser, exercises collapse/expand, resize, drag-and-drop, and shared layout commands, then writes DOM geometry and console artifacts under `tests/logs/layout-browser/`.
+   - The layout gate must cover the preview/live sync batch explicitly: preview bootstrap without auth, unsaved preview edits staying local until Save Layout is clicked, delayed shared-layout refreshes not overwriting pending local edits, and the saved preview layout propagating to the live display surface.
    - The browser verifier resets saved layout state and re-runs once after an automatic layout-state repair. If it still fails, do not accept the fix.
 2. Run auth integrity suite (mandatory for any auth/device/account change):
    - `python tests/run_auth_suite.py --coverage`

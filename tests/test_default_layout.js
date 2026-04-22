@@ -6,6 +6,7 @@ const {
   openRealSurfaces,
   captureSnapshot,
   recordSnapshotArtifact,
+  waitForLayoutReady,
   countVisibleCards,
   assertCardsRemainInGrid,
   assertCollapseControls,
@@ -17,10 +18,52 @@ const {
 
 const suite = registerBrowserSuite();
 
+function simplifyDisplayStructure(snapshot) {
+  return {
+    layoutMode: snapshot.layoutMode,
+    columns: snapshot.container.columns,
+    gap: snapshot.container.gap,
+    cards: snapshot.cards.map((card) => ({
+      key: card.key,
+      order: card.order,
+      colStart: card.colStart,
+      colSpan: card.colSpan,
+      collapsed: card.collapsed,
+    })),
+  };
+}
+
+async function freezeStatusSurface(page) {
+  await page.evaluate(() => {
+    for (let timerId = 1; timerId < 10000; timerId += 1) {
+      window.clearInterval(timerId);
+      window.clearTimeout(timerId);
+    }
+  });
+  await page.evaluate(async () => {
+    if (typeof refreshDisplayPreferences === 'function') {
+      await refreshDisplayPreferences();
+    }
+    if (typeof refresh === 'function') {
+      await refresh();
+    }
+    window.__bellforgeStatusLayout?.requestLayout?.('test-freeze');
+    window.__bellforgeSettingsLayout?.requestLayout?.('test-freeze');
+  });
+  await waitForLayoutReady(page);
+}
+
 test('default layout stays readable, masonry-packed, and consistent between linked display access and the real status display', async () => {
   const surfaces = await openRealSurfaces(suite, { width: 1280, height: 720 }, 'default-layout');
 
   try {
+    await Promise.all([
+      freezeStatusSurface(surfaces.statusPage),
+      freezeStatusSurface(surfaces.displayPage),
+      freezeStatusSurface(surfaces.settingsPage),
+      freezeStatusSurface(surfaces.settingsDisplayPage),
+    ]);
+
     const statusSnapshot = await captureSnapshot(surfaces.statusPage, 'status-default-layout');
     const settingsSnapshot = await captureSnapshot(surfaces.settingsPage, 'settings-default-layout');
     const displaySnapshot = await captureSnapshot(surfaces.displayPage, 'display-default-layout');
@@ -45,7 +88,7 @@ test('default layout stays readable, masonry-packed, and consistent between link
     assert.equal(settingsSnapshot.cards.every((card) => card.collapsed), true, 'Default settings layout should start fully collapsed');
     assert.ok(countVisibleCards(statusSnapshot) >= 1, 'Default status layout is not readable enough above the fold');
     assert.ok(countVisibleCards(settingsSnapshot) >= 2, 'Default settings layout is not readable enough above the fold');
-    assert.deepEqual(simplifyLayout(settingsDisplaySnapshot), simplifyLayout(displaySnapshot), 'Linked display access does not match the real status display page');
+    assert.deepEqual(simplifyDisplayStructure(settingsDisplaySnapshot), simplifyDisplayStructure(displaySnapshot), 'Linked display access does not match the real status display structure');
   } finally {
     await surfaces.context.close();
   }
@@ -55,11 +98,12 @@ test('design controls expose layout mode and portrait vs landscape produce diffe
   const surfaces = await openRealSurfaces(suite, { width: 1600, height: 1000 }, 'layout-mode-defaults');
 
   try {
-    await surfaces.settingsPage.evaluate(() => {
-      for (let intervalId = 1; intervalId < 10000; intervalId += 1) {
-        window.clearInterval(intervalId);
-      }
-    });
+    await Promise.all([
+      freezeStatusSurface(surfaces.statusPage),
+      freezeStatusSurface(surfaces.displayPage),
+      freezeStatusSurface(surfaces.settingsPage),
+      freezeStatusSurface(surfaces.settingsDisplayPage),
+    ]);
 
     const layoutModeInfo = await surfaces.settingsPage.evaluate(() => {
       const control = document.getElementById('designLayoutMode');
@@ -125,9 +169,10 @@ test('design controls expose layout mode and portrait vs landscape produce diffe
       }, landscapePayload),
     ]);
     await Promise.all([
-      surfaces.statusPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))),
-      surfaces.displayPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))),
-      surfaces.settingsDisplayPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))),
+      waitForLayoutReady(surfaces.statusPage),
+      waitForLayoutReady(surfaces.displayPage),
+      waitForLayoutReady(surfaces.settingsPage),
+      waitForLayoutReady(surfaces.settingsDisplayPage),
     ]);
 
     await Promise.all([
@@ -155,7 +200,7 @@ test('design controls expose layout mode and portrait vs landscape produce diffe
     assert.notDeepEqual(simplifyLayout(landscapeStatus), simplifyLayout(portraitStatus), 'Status layout did not change between portrait and landscape mode');
     assert.notDeepEqual(simplifyLayout(landscapeSettings), simplifyLayout(portraitSettings), 'Settings layout did not change between portrait and landscape mode');
     assert.notDeepEqual(simplifyLayout(landscapeSettingsDisplay), simplifyLayout(portraitSettingsDisplay), 'Linked display layout did not change between portrait and landscape mode');
-    assert.deepEqual(simplifyLayout(landscapeSettingsDisplay), simplifyLayout(landscapeDisplay), 'Linked display landscape layout does not match the live display view');
+    assert.deepEqual(simplifyDisplayStructure(landscapeSettingsDisplay), simplifyDisplayStructure(landscapeDisplay), 'Linked display landscape structure does not match the live display view');
   } finally {
     await surfaces.context.close();
   }

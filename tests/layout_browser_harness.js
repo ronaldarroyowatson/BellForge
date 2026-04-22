@@ -1,3 +1,4 @@
+const { after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,9 +20,11 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const STATUS_PATH = '/status';
 const SETTINGS_PATH = '/settings';
 const DISPLAY_STATUS_PATH = '/status?view=display';
+const STATUS_LAYOUT_FILE = path.join(REPO_ROOT, 'config', 'status_layout.json');
 const BROWSER_LOG_DIR = path.join(REPO_ROOT, 'tests', 'logs', 'layout-browser');
 const STORAGE_KEYS = [
   'bellforge.status.fibo-cards.v1',
+  'bellforge.status.layout-settings.v1',
   'bellforge.settings.fibo-cards.v1',
   'bellforge.status.layout-command.v1',
   'bellforge.design-controls.live.v1',
@@ -40,6 +43,7 @@ const PREFERRED_BACKEND_PORT = process.env.BELLFORGE_TEST_PORT
   : 0;
 let backendPort = PREFERRED_BACKEND_PORT;
 let BASE_URL = `http://127.0.0.1:${backendPort}`;
+let exitScheduled = false;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,6 +58,16 @@ function writeArtifact(label, payload) {
   artifactSequence += 1;
   const fileName = `${String(artifactSequence).padStart(2, '0')}-${sanitizeLabel(label)}.json`;
   fs.writeFileSync(path.join(BROWSER_LOG_DIR, fileName), JSON.stringify(payload, null, 2));
+}
+
+function resetSharedStatusLayout() {
+  try {
+    fs.unlinkSync(STATUS_LAYOUT_FILE);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+  }
 }
 
 function recordSnapshotArtifact(label, snapshot, consoleEntries = [], extras = {}) {
@@ -227,6 +241,17 @@ async function stopBackend() {
   BASE_URL = buildBaseUrl(backendPort);
 }
 
+after(async () => {
+  await stopBackend();
+  if (exitScheduled) {
+    return;
+  }
+  exitScheduled = true;
+  setImmediate(() => {
+    process.exit(process.exitCode ?? 0);
+  });
+});
+
 function attachConsole(target, label) {
   const entries = [];
   target.on('console', async (message) => {
@@ -279,6 +304,7 @@ function registerBrowserSuite() {
   return {
     async newContext(viewport = DEFAULT_VIEWPORT) {
       await ensureBackend();
+      resetSharedStatusLayout();
       const browser = await chromium.launch({ headless: true });
       const context = await browser.newContext({ viewport });
       const originalClose = context.close.bind(context);
@@ -358,6 +384,12 @@ async function openRealSurfaces(suite, viewport = DEFAULT_VIEWPORT, labelPrefix 
   const settings = await openPage(context, SETTINGS_PATH, `${labelPrefix}-settings`);
   const settingsDisplayPage = await openSettingsDisplayPage(settings.page);
   const settingsDisplayConsole = attachConsole(settingsDisplayPage.page(), `${labelPrefix}-settings-display`);
+  await Promise.all([
+    waitForLayoutReady(status.page),
+    waitForLayoutReady(display.page),
+    waitForLayoutReady(settings.page),
+    waitForLayoutReady(settingsDisplayPage),
+  ]);
   return {
     context,
     statusPage: status.page,

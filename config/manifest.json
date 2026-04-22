@@ -1,6 +1,6 @@
 {
-  "version": "0.1.63",
-  "generated_at": "2026-04-20T14:49:37Z",
+  "version": "0.1.64",
+  "generated_at": "2026-04-20T22:20:07Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -115,8 +115,8 @@
       "size": 8187
     },
     "client/js/fibonacci_layout.js": {
-      "sha256": "94f286cd8b2c4bb7ef649fcb197fa220e330a4e155b7571e616a3fa4cbc86748",
-      "size": 30948
+      "sha256": "f304f5566ca47d302e884e947f65105e656d699c0b20b274e3a88c7f5aa81c28",
+      "size": 37734
     },
     "client/js/main.js": {
       "sha256": "ecd13880a5fdc74412186225949bc4131e68e2d8617a206a3d098b903bce8c45",
@@ -131,12 +131,12 @@
       "size": 6978
     },
     "client/settings.html": {
-      "sha256": "fcc5b47b042dd3153d5f16426df2b9850f9d56d60604ebdcbf8d75aa30cdecad",
-      "size": 60315
+      "sha256": "5c487157ba1a54a6eaf4de7f1b87e9dbc047d366d21bad55ff8eccf236105fa2",
+      "size": 60684
     },
     "client/status.html": {
-      "sha256": "470d7a477fa1880e7257fc1cf363ee22c68c6bfeb03824fd6409e833a3ac7690",
-      "size": 58524
+      "sha256": "f02f1684592cd370ffafef02c5606694b7bcae8283bbaea8e5830ab0c5e6d35e",
+      "size": 61844
     },
     "updater/agent.py": {
       "sha256": "8ee71ec0cbb9f51452b5c89b13c0ef4f9bb0c4e427e5865d4b7de2a5616d1750",
@@ -163,7 +163,7 @@
       "size": 906
     },
     "config/version.json": {
-      "sha256": "0413765b91e45e0dd55b1c384349ff63221726b9e35b0a2cb5a0d15535101482",
+      "sha256": "009fd015da653e30c0f20ea947a7aa519edbdfdfb58ec7f7c9a8e821081a47c4",
       "size": 234
     },
     "scripts/bellforge": {

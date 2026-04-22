@@ -22,6 +22,30 @@ DEFAULT_CLIENT_ENV = {
     "BELLFORGE_LAYOUT_MODE": "portrait",
 }
 
+DEFAULT_STATUS_CARD_ORDER = [
+    "browser-links",
+    "onboarding-qr",
+    "stats",
+    "advanced",
+    "setup-hero",
+    "quick-facts",
+]
+
+DEFAULT_STATUS_LAYOUT = {
+    "min_card_width": 300,
+    "card_gap": 12,
+    "debug_enabled": False,
+    "card_order": DEFAULT_STATUS_CARD_ORDER,
+    "cards": {
+        key: {
+            "order": index,
+            "collapsed": False,
+            "hidden": False,
+        }
+        for index, key in enumerate(DEFAULT_STATUS_CARD_ORDER)
+    },
+}
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -29,6 +53,10 @@ def _utc_now() -> str:
 
 def _client_env_path(project_root: Path) -> Path:
     return project_root / "config" / "client.env"
+
+
+def _status_layout_path(project_root: Path) -> Path:
+    return project_root / "config" / "status_layout.json"
 
 
 def _read_client_env(project_root: Path) -> dict[str, str]:
@@ -53,6 +81,23 @@ def _write_client_env(project_root: Path, values: dict[str, str]) -> None:
     ordered = {**DEFAULT_CLIENT_ENV, **values}
     lines = [f"{key}={value}" for key, value in ordered.items()]
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _read_status_layout(project_root: Path) -> dict[str, Any]:
+    layout_path = _status_layout_path(project_root)
+    if not layout_path.is_file():
+        return {}
+    try:
+        parsed = json.loads(layout_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _write_status_layout(project_root: Path, payload: dict[str, Any]) -> None:
+    layout_path = _status_layout_path(project_root)
+    layout_path.parent.mkdir(parents=True, exist_ok=True)
+    layout_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def _scale_to_percent(raw_value: str | None) -> int:
@@ -98,6 +143,91 @@ def _layout_mode_value(raw_value: str | None) -> str:
     return value if value in {"portrait", "landscape"} else DEFAULT_CLIENT_ENV["BELLFORGE_LAYOUT_MODE"]
 
 
+def _normalize_status_cards(raw_cards: Any, fallback_cards: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    source_cards = raw_cards if isinstance(raw_cards, dict) else {}
+    for key in DEFAULT_STATUS_CARD_ORDER:
+        current = source_cards.get(key, fallback_cards.get(key, {}))
+        order = current.get("order") if isinstance(current, dict) else None
+        collapsed = current.get("collapsed") if isinstance(current, dict) else None
+        hidden = current.get("hidden") if isinstance(current, dict) else None
+        normalized[key] = {
+            "order": max(0, min(999, int(order))) if isinstance(order, (int, float)) else fallback_cards[key]["order"],
+            "collapsed": bool(collapsed),
+            "hidden": bool(hidden),
+        }
+    return normalized
+
+
+def _normalize_status_layout(raw_layout: Any) -> dict[str, Any]:
+    base_cards = json.loads(json.dumps(DEFAULT_STATUS_LAYOUT["cards"]))
+    parsed = raw_layout if isinstance(raw_layout, dict) else {}
+    cards = _normalize_status_cards(parsed.get("cards"), base_cards)
+    raw_order = parsed.get("card_order") if isinstance(parsed.get("card_order"), list) else []
+    ordered_keys = [str(key) for key in raw_order if str(key) in cards]
+    remaining = [key for key, _ in sorted(cards.items(), key=lambda item: (item[1]["order"], DEFAULT_STATUS_CARD_ORDER.index(item[0])) ) if key not in ordered_keys]
+    card_order = ordered_keys + remaining
+    for index, key in enumerate(card_order):
+        cards[key]["order"] = index
+    return {
+        "updated_at": str(parsed.get("updated_at") or _utc_now()),
+        "min_card_width": _int_value(str(parsed.get("min_card_width") or DEFAULT_STATUS_LAYOUT["min_card_width"]), str(DEFAULT_STATUS_LAYOUT["min_card_width"]), 220, 520),
+        "card_gap": _int_value(str(parsed.get("card_gap") or DEFAULT_STATUS_LAYOUT["card_gap"]), str(DEFAULT_STATUS_LAYOUT["card_gap"]), 8, 32),
+        "debug_enabled": bool(parsed.get("debug_enabled", DEFAULT_STATUS_LAYOUT["debug_enabled"])),
+        "card_order": card_order,
+        "cards": cards,
+    }
+
+
+def get_status_layout(project_root: Path) -> dict[str, Any]:
+    layout = _normalize_status_layout(_read_status_layout(project_root))
+    return {
+        "timestamp": _utc_now(),
+        **layout,
+    }
+
+
+def update_status_layout(
+    project_root: Path,
+    *,
+    min_card_width: int | None = None,
+    card_gap: int | None = None,
+    card_order: list[str] | None = None,
+    cards: dict[str, Any] | None = None,
+    debug_enabled: bool | None = None,
+    reset_to_defaults: bool = False,
+) -> dict[str, Any]:
+    current = _normalize_status_layout({} if reset_to_defaults else _read_status_layout(project_root))
+
+    if min_card_width is not None:
+        current["min_card_width"] = max(220, min(520, int(min_card_width)))
+    if card_gap is not None:
+        current["card_gap"] = max(8, min(32, int(card_gap)))
+    if debug_enabled is not None:
+        current["debug_enabled"] = bool(debug_enabled)
+    if cards is not None:
+        current["cards"] = _normalize_status_cards(cards, current["cards"])
+    if card_order is not None:
+        next_order = [str(key) for key in card_order if str(key) in current["cards"]]
+        remainder = [key for key in DEFAULT_STATUS_CARD_ORDER if key not in next_order]
+        current["card_order"] = next_order + remainder
+    else:
+        current["card_order"] = [key for key in current["card_order"] if key in current["cards"]]
+
+    seen = set(current["card_order"])
+    current["card_order"].extend([key for key in DEFAULT_STATUS_CARD_ORDER if key not in seen])
+    for index, key in enumerate(current["card_order"]):
+        current["cards"][key]["order"] = index
+    current["updated_at"] = _utc_now()
+    _write_status_layout(project_root, current)
+    return {
+        "timestamp": _utc_now(),
+        "updated": True,
+        "message": "Status layout saved.",
+        **current,
+    }
+
+
 def get_display_preferences(project_root: Path) -> dict[str, Any]:
     env_values = {**DEFAULT_CLIENT_ENV, **_read_client_env(project_root)}
     overscan_percent = _scale_to_percent(env_values.get("BELLFORGE_DISPLAY_SCALE"))
@@ -117,6 +247,7 @@ def get_display_preferences(project_root: Path) -> dict[str, Any]:
         "display_scale": round(overscan_percent / 100.0, 2),
         "diagnostics_rotation_seconds": rotation_seconds,
         "design_controls": design_controls,
+        "status_layout": get_status_layout(project_root),
         "preferences": {
             "kiosk_url": env_values.get("BELLFORGE_KIOSK_URL", DEFAULT_CLIENT_ENV["BELLFORGE_KIOSK_URL"]),
             "cec_power_on": env_values.get("BELLFORGE_CEC_POWER_ON", DEFAULT_CLIENT_ENV["BELLFORGE_CEC_POWER_ON"]) == "1",

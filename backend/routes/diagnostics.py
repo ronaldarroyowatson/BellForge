@@ -12,7 +12,12 @@ import qrcode.image.svg
 
 from backend.services.auth import get_auth_status
 from backend.services.debug_service import inspect_debug_events, read_debug_events, write_debug_event
-from backend.services.display_preferences import get_display_preferences, update_display_preferences
+from backend.services.display_preferences import (
+    get_display_preferences,
+    get_status_layout,
+    update_display_preferences,
+    update_status_layout,
+)
 from backend.services.device_info import collect_device_status
 from backend.services.display_pipeline import collect_display_pipeline, run_self_heal
 from backend.services.logs import read_logs
@@ -52,6 +57,21 @@ class DisplayPreferencesPayload(BaseModel):
     shadow_intensity: float | None = Field(default=None, ge=0.0, le=1.6)
     status_page_scale: float | None = Field(default=None, ge=0.75, le=1.0)
     layout_mode: Literal["portrait", "landscape"] | None = None
+
+
+class StatusLayoutCardPayload(BaseModel):
+    order: int | None = Field(default=None, ge=0, le=999)
+    collapsed: bool | None = None
+    hidden: bool | None = None
+
+
+class StatusLayoutPayload(BaseModel):
+    min_card_width: int | None = Field(default=None, ge=220, le=520)
+    card_gap: int | None = Field(default=None, ge=8, le=32)
+    card_order: list[str] | None = None
+    cards: dict[str, StatusLayoutCardPayload] | None = None
+    debug_enabled: bool | None = None
+    reset_to_defaults: bool = False
 
 
 class DebugEventPayload(BaseModel):
@@ -217,6 +237,36 @@ async def update_display_preferences_route(payload: DisplayPreferencesPayload) -
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Display preference update failed: {exc}")) from exc
+
+
+@router.get("/display/status-layout", summary="Get current shared status layout")
+async def status_layout() -> dict[str, Any]:
+    try:
+        return get_status_layout(_PROJECT_ROOT)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Status layout retrieval failed: {exc}")) from exc
+
+
+@router.post("/display/status-layout", summary="Update shared status layout")
+async def update_status_layout_route(payload: StatusLayoutPayload) -> dict[str, Any]:
+    try:
+        cards_payload = None
+        if payload.cards is not None:
+          cards_payload = {
+              key: value.model_dump(exclude_none=True)
+              for key, value in payload.cards.items()
+          }
+        return update_status_layout(
+            _PROJECT_ROOT,
+            min_card_width=payload.min_card_width,
+            card_gap=payload.card_gap,
+            card_order=payload.card_order,
+            cards=cards_payload,
+            debug_enabled=payload.debug_enabled,
+            reset_to_defaults=payload.reset_to_defaults,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_error_detail(f"Status layout update failed: {exc}")) from exc
 
 
 @router.post("/display/self-heal", summary="Run a display self-heal action")
