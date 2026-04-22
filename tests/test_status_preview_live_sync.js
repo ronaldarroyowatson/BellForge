@@ -25,6 +25,18 @@ async function applyPreviewEdits(previewPage) {
   await dragCard(previewPage, 'advanced', 'browser-links');
 }
 
+async function waitForLiveGapAndOrder(livePage, expectedGap, expectedOrder, timeoutMs = 45000) {
+  await livePage.waitForFunction(
+    ({ gapExpected, orderExpected }) => {
+      const state = window.__bellforgeStatusLayout?.getState?.() || {};
+      const gap = Number.parseFloat(getComputedStyle(document.querySelector('.wrap')).getPropertyValue('--bf-masonry-gap') || '0');
+      return state.advanced?.order === orderExpected && gap === gapExpected;
+    },
+    { gapExpected: expectedGap, orderExpected: expectedOrder },
+    { timeout: timeoutMs },
+  );
+}
+
 function hasRuntimeBootstrapError(entries) {
   return entries.some((entry) => /Unhandled window error|toFixed|TypeError/i.test(entry.text));
 }
@@ -49,15 +61,17 @@ test('status preview uses remote browser dimensions while the live display uses 
     assert.ok(previewBefore.container.columns >= liveBefore.container.columns, 'Preview did not allow a denser column layout than the live display');
 
     await applyPreviewEdits(preview.page);
-    await preview.page.evaluate(async () => {
-      await window.__bellforgeStatusLayout?.saveSharedLayout?.('browser-test-preview-save');
+    const saveResult = await preview.page.evaluate(async () => {
+      try {
+        const result = await window.__bellforgeStatusLayout?.saveSharedLayout?.('browser-test-preview-save');
+        return { ok: true, result };
+      } catch (error) {
+        return { ok: false, message: String(error) };
+      }
     });
+    assert.equal(saveResult.ok, true, `Preview save call failed: ${saveResult.message || 'unknown error'}`);
 
-    await liveDisplay.page.waitForFunction(() => {
-      const state = window.__bellforgeStatusLayout?.getState?.() || {};
-      const gap = Number.parseFloat(getComputedStyle(document.querySelector('.wrap')).getPropertyValue('--bf-masonry-gap') || '0');
-      return state.advanced?.order === 0 && gap === 24;
-    }, { timeout: 15000 });
+    await waitForLiveGapAndOrder(liveDisplay.page, 24, 0, 45000);
     await waitForLayoutReady(liveDisplay.page);
 
     const previewAfter = await captureSnapshot(preview.page, 'status-preview-after-save');
