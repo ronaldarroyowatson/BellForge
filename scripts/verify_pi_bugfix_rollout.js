@@ -218,22 +218,39 @@ async function waitFor(description, predicate, options = {}) {
   const intervalMs = options.intervalMs || 5_000;
   const startedAt = Date.now();
   let lastValue = null;
+  let lastError = null;
 
   while (Date.now() - startedAt <= timeoutMs) {
-    lastValue = await predicate();
-    if (lastValue) {
-      return lastValue;
+    try {
+      lastValue = await predicate();
+      if (lastValue) {
+        return lastValue;
+      }
+      lastError = null;
+    } catch (error) {
+      lastError = error;
     }
     await sleep(intervalMs);
   }
 
+  if (lastError) {
+    throw new Error(`Timed out waiting for ${description}: last error ${lastError.message || String(lastError)}`);
+  }
   throw new Error(`Timed out waiting for ${description}`);
 }
 
 async function collectApiState(config, label) {
   const updater = await fetchJson(`${config.baseUrl}/api/updater/status`, { timeoutMs: 15_000 });
-  const display = await fetchJson(`${config.baseUrl}/api/display/pipeline`, { timeoutMs: 15_000 });
   const version = await fetchJson(`${config.baseUrl}/api/version`, { timeoutMs: 15_000 });
+  let display = null;
+  try {
+    display = await fetchJson(`${config.baseUrl}/api/display/pipeline`, { timeoutMs: 15_000 });
+  } catch (error) {
+    display = {
+      error: error.message || String(error),
+      unavailable: true,
+    };
+  }
   const snapshot = { label, updater, display, version };
   writeJsonArtifact(label, snapshot);
   return snapshot;
