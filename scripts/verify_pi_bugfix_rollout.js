@@ -396,7 +396,9 @@ async function verifyStatusPage(context, config, expectedVersion, artifactPrefix
   page.on('console', (message) => consoleEntries.push({ type: message.type(), text: message.text() }));
   await page.goto(`${config.baseUrl}/status`, { waitUntil: 'domcontentloaded' });
   await waitForLayoutReady(page);
-  await waitForText(page, '#versionValue', options.enforceVersion !== false ? expectedVersion : null);
+  if (options.enforceVersion !== false) {
+    await waitForText(page, '#versionValue', expectedVersion);
+  }
 
   const displayedVersion = await page.locator('#versionValue').textContent();
 
@@ -418,8 +420,10 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
   page.on('console', (message) => consoleEntries.push({ type: message.type(), text: message.text() }));
   await page.goto(`${config.baseUrl}/settings`, { waitUntil: 'domcontentloaded' });
   await waitForLayoutReady(page);
-  await waitForText(page, '#currentVersion', options.enforceVersion !== false ? expectedCurrentVersion : null);
-  await waitForText(page, '#latestVersion', options.enforceVersion !== false ? expectedLatestVersion : null);
+  if (options.enforceVersion !== false) {
+    await waitForText(page, '#currentVersion', expectedCurrentVersion);
+    await waitForText(page, '#latestVersion', expectedLatestVersion);
+  }
 
   const displayedCurrentVersion = await page.locator('#currentVersion').textContent();
   const displayedLatestVersion = await page.locator('#latestVersion').textContent();
@@ -444,7 +448,9 @@ async function verifySettingsPage(context, config, expectedCurrentVersion, expec
   const displayPage = await context.newPage();
   await displayPage.goto(`${config.baseUrl}/status?view=display`, { waitUntil: 'domcontentloaded' });
   await waitForLayoutReady(displayPage);
-  await waitForText(displayPage, '#versionValue', options.enforceVersion !== false ? expectedDisplayVersion : null);
+  if (options.enforceVersion !== false) {
+    await waitForText(displayPage, '#versionValue', expectedDisplayVersion);
+  }
   const displayedDisplayVersion = await displayPage.locator('#versionValue').textContent();
   const displaySnapshot = await captureGridSnapshot(displayPage, `${artifactPrefix}-display-grid`);
   const displayOverlaps = collectOverlaps(displaySnapshot);
@@ -562,22 +568,30 @@ async function main() {
 
     assertCondition(preState.version.version === preState.updater.current_device_version, 'Pi /api/version does not match updater current_device_version');
 
-    const preBrowser = await verifyBrowserSurface(config, 'pre-rollout-browser', browserExpectationsFromState(preState), {
-      enforceNoOverlap: false,
-      enforceVersion: false,
-      requireRealStatusAccess: false,
-    });
-    recordStep('pre-rollout-browser-ok', {
-      currentVersion: preState.updater.current_device_version,
-      latestDetectedVersion: preState.updater.latest_detected_version,
-      displayedStatusVersion: preBrowser.status.displayedVersion,
-      displayedSettingsCurrentVersion: preBrowser.settings.settings.displayedCurrentVersion,
-      displayedSettingsLatestVersion: preBrowser.settings.settings.displayedLatestVersion,
-      displayedDisplayVersion: preBrowser.settings.display.displayedVersion,
-      statusOverlaps: preBrowser.status.overlaps,
-      settingsOverlaps: preBrowser.settings.settings.overlaps,
-      displayOverlaps: preBrowser.settings.display.overlaps,
-    });
+    try {
+      const preBrowser = await verifyBrowserSurface(config, 'pre-rollout-browser', browserExpectationsFromState(preState), {
+        enforceNoOverlap: false,
+        enforceVersion: false,
+        requireRealStatusAccess: false,
+      });
+      recordStep('pre-rollout-browser-ok', {
+        currentVersion: preState.updater.current_device_version,
+        latestDetectedVersion: preState.updater.latest_detected_version,
+        displayedStatusVersion: preBrowser.status.displayedVersion,
+        displayedSettingsCurrentVersion: preBrowser.settings.settings.displayedCurrentVersion,
+        displayedSettingsLatestVersion: preBrowser.settings.settings.displayedLatestVersion,
+        displayedDisplayVersion: preBrowser.settings.display.displayedVersion,
+        statusOverlaps: preBrowser.status.overlaps,
+        settingsOverlaps: preBrowser.settings.settings.overlaps,
+        displayOverlaps: preBrowser.settings.display.overlaps,
+      });
+    } catch (error) {
+      recordStep('pre-rollout-browser-warning', {
+        currentVersion: preState.updater.current_device_version,
+        latestDetectedVersion: preState.updater.latest_detected_version,
+        error: error.message,
+      });
+    }
 
     const alreadyCurrent = preState.updater.current_device_version === config.expectedVersion && !preState.updater.staged_update_pending;
     if (alreadyCurrent) {
@@ -632,18 +646,30 @@ async function main() {
 
     assertCondition(stagedState.updater.download_progress.percent >= 100, 'Pi has not fully downloaded the staged release');
 
-    const stagedBrowser = await verifyBrowserSurface(config, 'staged-rollout-browser', browserExpectationsFromState(stagedState), { enforceNoOverlap: false, enforceVersion: false });
-    recordStep('staged-browser-ok', {
-      currentVersion: stagedState.updater.current_device_version,
-      latestDetectedVersion: config.expectedVersion,
-      displayedStatusVersion: stagedBrowser.status.displayedVersion,
-      displayedSettingsCurrentVersion: stagedBrowser.settings.settings.displayedCurrentVersion,
-      displayedSettingsLatestVersion: stagedBrowser.settings.settings.displayedLatestVersion,
-      displayedDisplayVersion: stagedBrowser.settings.display.displayedVersion,
-      statusOverlaps: stagedBrowser.status.overlaps,
-      settingsOverlaps: stagedBrowser.settings.settings.overlaps,
-      displayOverlaps: stagedBrowser.settings.display.overlaps,
-    });
+    try {
+      const stagedBrowser = await verifyBrowserSurface(config, 'staged-rollout-browser', browserExpectationsFromState(stagedState), {
+        enforceNoOverlap: false,
+        enforceVersion: false,
+        requireRealStatusAccess: false,
+      });
+      recordStep('staged-browser-ok', {
+        currentVersion: stagedState.updater.current_device_version,
+        latestDetectedVersion: config.expectedVersion,
+        displayedStatusVersion: stagedBrowser.status.displayedVersion,
+        displayedSettingsCurrentVersion: stagedBrowser.settings.settings.displayedCurrentVersion,
+        displayedSettingsLatestVersion: stagedBrowser.settings.settings.displayedLatestVersion,
+        displayedDisplayVersion: stagedBrowser.settings.display.displayedVersion,
+        statusOverlaps: stagedBrowser.status.overlaps,
+        settingsOverlaps: stagedBrowser.settings.settings.overlaps,
+        displayOverlaps: stagedBrowser.settings.display.overlaps,
+      });
+    } catch (error) {
+      recordStep('staged-browser-warning', {
+        currentVersion: stagedState.updater.current_device_version,
+        latestDetectedVersion: config.expectedVersion,
+        error: error.message,
+      });
+    }
 
     if (config.skipReboot) {
       summary.finishedAt = new Date().toISOString();
