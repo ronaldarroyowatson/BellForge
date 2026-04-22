@@ -1,6 +1,6 @@
 {
-  "version": "0.1.65",
-  "generated_at": "2026-04-22T21:34:25Z",
+  "version": "0.1.66",
+  "generated_at": "2026-04-22T22:44:56Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -163,7 +163,7 @@
       "size": 906
     },
     "config/version.json": {
-      "sha256": "80c33a01f736563b80a9630b2fd82efaacf9b434962509449170d9967c273c62",
+      "sha256": "e47a13ca94fad4dd28cd3a9a89f161410eb5d5fc2eb0dc41c1c56f380f74565c",
       "size": 234
     },
     "scripts/bellforge": {
@@ -271,8 +271,8 @@
       "size": 1932
     },
     "scripts/verify_pi_bugfix_rollout.js": {
-      "sha256": "de5f2c254220bce512a8136495008a6f1ce33e680d6882c3d752e3ad8cd6f8de",
-      "size": 30937
+      "sha256": "abb21d16450a9ef76e17d2b997ad7e52ea4d6ca2a49309b6b87cf35261ac401a",
+      "size": 31946
     }
   }
 }
