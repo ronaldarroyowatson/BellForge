@@ -176,6 +176,44 @@
     return Math.max(1, Math.ceil((normalizedHeight + normalizedGap) / (rowUnit + normalizedGap)));
   }
 
+  function computeTrackMetrics(width, minCardWidth, gap) {
+    const resolvedGap = Math.max(0, Number(gap) || 0);
+    const resolvedMinCardWidth = Math.max(1, Number(minCardWidth) || 1);
+    const resolvedWidth = Math.max(resolvedMinCardWidth, Number(width) || resolvedMinCardWidth);
+    return {
+      width: resolvedWidth,
+      minCardWidth: resolvedMinCardWidth,
+      gap: resolvedGap,
+      tracks: Math.max(1, Math.floor((resolvedWidth + resolvedGap) / (resolvedMinCardWidth + resolvedGap))),
+    };
+  }
+
+  function computeViewportFrame(options = {}) {
+    const baseWidth = Math.max(1, Number(options.baseWidth) || 1920);
+    const baseHeight = Math.max(1, Number(options.baseHeight) || 1080);
+    const availableWidth = Math.max(1, Number(options.availableWidth) || baseWidth);
+    const availableHeight = Math.max(1, Number(options.availableHeight) || baseHeight);
+    const allowGrow = options.allowGrow === true;
+    const aspectRatio = baseWidth / baseHeight;
+    const widthScale = availableWidth / baseWidth;
+    const heightScale = availableHeight / baseHeight;
+    const unclampedScale = Math.min(widthScale, heightScale);
+    const scale = allowGrow ? unclampedScale : Math.min(1, unclampedScale);
+    return {
+      source: options.source || "container",
+      baseWidth,
+      baseHeight,
+      availableWidth,
+      availableHeight,
+      layoutWidth: Math.max(1, Number(options.layoutWidth) || baseWidth),
+      layoutHeight: Math.max(1, Number(options.layoutHeight) || baseHeight),
+      renderWidth: Math.round(baseWidth * scale),
+      renderHeight: Math.round(baseHeight * scale),
+      scale,
+      aspectRatio,
+    };
+  }
+
   function computeLayoutPlan(entries, options = {}) {
     const tracks = Math.max(1, Number(options.tracks) || 1);
     const rowUnit = Math.max(1, Number(options.rowUnit) || 8);
@@ -215,6 +253,51 @@
     };
   }
 
+  function computeAutoArrangeOrder(entries, options = {}) {
+    const preparedEntries = entries
+      .map((entry, index) => ({
+        ...entry,
+        index: Number.isFinite(entry.index) ? Number(entry.index) : index,
+        explicitOrder: Number.isFinite(entry.explicitOrder) ? Number(entry.explicitOrder) : ORDER_FALLBACK,
+        priority: Number(entry.priority || 0),
+        weight: Number(entry.weight || 0),
+        height: Math.max(1, Number(entry.height) || 1),
+      }))
+      .sort((left, right) => {
+        if (right.priority !== left.priority) {
+          return right.priority - left.priority;
+        }
+        if (right.weight !== left.weight) {
+          return right.weight - left.weight;
+        }
+        if (right.height !== left.height) {
+          return right.height - left.height;
+        }
+        if (left.explicitOrder !== right.explicitOrder) {
+          return left.explicitOrder - right.explicitOrder;
+        }
+        return left.index - right.index;
+      })
+      .map((entry, index) => ({
+        ...entry,
+        explicitOrder: index,
+      }));
+
+    const plan = computeLayoutPlan(preparedEntries, options);
+    return plan.items
+      .slice()
+      .sort((left, right) => {
+        if (left.rowStart !== right.rowStart) {
+          return left.rowStart - right.rowStart;
+        }
+        if (left.colStart !== right.colStart) {
+          return left.colStart - right.colStart;
+        }
+        return left.order - right.order;
+      })
+      .map((item) => item.key);
+  }
+
   function snapshotFromPlan(plan) {
     return plan.items.map((item) => ({
       key: item.key,
@@ -235,10 +318,9 @@
       const isSettings = mode === "settings";
       const minCardWidth = isSettings ? (layoutMode === "landscape" ? 300 : 320) : (layoutMode === "landscape" ? 280 : 300);
       const gap = 12;
-      const usableWidth = Math.max(width, minCardWidth);
-      const tracks = Math.max(1, Math.floor((usableWidth + gap) / (minCardWidth + gap)));
+      const metrics = computeTrackMetrics(width, minCardWidth, gap);
       return {
-        tracks,
+        tracks: metrics.tracks,
         minCardWidth,
         gap,
       };
@@ -256,6 +338,7 @@
     const defaultPriorities = options.defaultPriorities || {};
     const getDefaultCardState = typeof options.getDefaultCardState === "function" ? options.getDefaultCardState : null;
     const getLayoutMode = typeof options.getLayoutMode === "function" ? options.getLayoutMode : null;
+    const viewportResolver = typeof options.viewportResolver === "function" ? options.viewportResolver : null;
     const trackResolver = options.trackResolver || createDefaultTrackResolver(mode);
     const syncChannel = options.syncChannel || null;
     const onSave = typeof options.onSave === "function" ? options.onSave : null;
@@ -273,7 +356,7 @@
         applyRemoteState() {},
         emitLayoutSnapshot() {},
         setEditing() {},
-        getLayoutCache() { return { columns: 0, layoutMode: "portrait", positions: {}, heights: {}, columnHeights: [] }; },
+        getLayoutCache() { return { columns: 0, layoutMode: "portrait", positions: {}, heights: {}, columnHeights: [], viewport: null }; },
         getSnapshot() { return []; },
         getState() { return {}; },
       };
@@ -283,7 +366,7 @@
     const state = storageKey && typeof localStorage !== "undefined"
       ? safeParseJson(localStorage.getItem(storageKey) || "{}", {})
       : {};
-    const layoutCache = { columns: 0, layoutMode: "portrait", positions: {}, heights: {}, columnHeights: [] };
+    const layoutCache = { columns: 0, layoutMode: "portrait", positions: {}, heights: {}, columnHeights: [], viewport: null };
     const dragBindings = new WeakMap();
     const dragHandles = new WeakMap();
     const layoutConfig = {
@@ -333,6 +416,42 @@
       return Math.max(0, Math.round(numericCssValue(styles.columnGap || styles.gap, 12)));
     }
 
+    function resolveViewportProfile() {
+      const containerWidth = currentContainerWidth();
+      const containerHeight = Math.max(0, Math.round(container.clientHeight || container.getBoundingClientRect().height || globalScope.innerHeight || 0));
+      if (!viewportResolver) {
+        return computeViewportFrame({
+          source: "container",
+          baseWidth: containerWidth || globalScope.innerWidth || 1,
+          baseHeight: containerHeight || globalScope.innerHeight || 1,
+          availableWidth: containerWidth || globalScope.innerWidth || 1,
+          availableHeight: containerHeight || globalScope.innerHeight || 1,
+          layoutWidth: containerWidth || globalScope.innerWidth || 1,
+          layoutHeight: containerHeight || globalScope.innerHeight || 1,
+          allowGrow: true,
+        });
+      }
+      const resolved = viewportResolver({
+        mode,
+        container,
+        cards,
+        containerWidth,
+        containerHeight,
+        windowWidth: globalScope.innerWidth || containerWidth || 1,
+        windowHeight: globalScope.innerHeight || containerHeight || 1,
+      }) || {};
+      return computeViewportFrame({
+        source: resolved.source || "custom",
+        baseWidth: resolved.baseWidth || resolved.layoutWidth || containerWidth || globalScope.innerWidth || 1,
+        baseHeight: resolved.baseHeight || resolved.layoutHeight || containerHeight || globalScope.innerHeight || 1,
+        availableWidth: resolved.availableWidth || containerWidth || globalScope.innerWidth || 1,
+        availableHeight: resolved.availableHeight || containerHeight || globalScope.innerHeight || 1,
+        layoutWidth: resolved.layoutWidth || containerWidth || globalScope.innerWidth || 1,
+        layoutHeight: resolved.layoutHeight || containerHeight || globalScope.innerHeight || 1,
+        allowGrow: resolved.allowGrow === true,
+      });
+    }
+
     function resolveLayoutMode() {
       if (getLayoutMode) {
         return normalizeLayoutMode(getLayoutMode({ mode, container, cards }));
@@ -369,12 +488,22 @@
         skipPersistOnce = false;
         return true;
       }
-      if (!storageKey || typeof localStorage === "undefined" || isApplyingRemoteState) {
+      if (isApplyingRemoteState) {
         skipPersistOnce = false;
         return true;
       }
       if (skipPersistOnce) {
         skipPersistOnce = false;
+      }
+      if (!storageKey || typeof localStorage === "undefined") {
+        logger.log("layout save attempt", { reason: normalizedReason, state, dirty, persisted: false });
+        if (onSave) {
+          onSave({ reason: normalizedReason, state: safeParseJson(JSON.stringify(state), {}), dirty, persisted: false });
+        }
+        if (options.emitSnapshot !== false) {
+          emitLayoutSnapshot(normalizedReason);
+        }
+        return true;
       }
       logger.log("layout save attempt", { reason: normalizedReason, state, dirty });
       try {
@@ -749,12 +878,14 @@
       frameToken = 0;
       cards.forEach((card) => applyState(card));
       const layoutMode = resolveLayoutMode();
-      const trackConfig = trackResolver(currentContainerWidth(), {
+      const viewportProfile = resolveViewportProfile();
+      const trackConfig = trackResolver(viewportProfile.layoutWidth, {
         mode,
         container,
         cards,
         layoutMode,
         config: { ...layoutConfig },
+        viewport: viewportProfile,
       });
       const gap = Number.isFinite(Number(trackConfig.gap))
         ? Number(trackConfig.gap)
@@ -772,10 +903,14 @@
       layoutCache.columns = trackConfig.tracks;
       layoutCache.layoutMode = layoutMode;
       layoutCache.columnHeights = plan.columnHeights.slice();
+      layoutCache.viewport = { ...viewportProfile };
       container.style.setProperty("--fibo-columns", String(trackConfig.tracks));
       container.style.setProperty("--bf-masonry-min-card-width", `${minCardWidth}px`);
       container.style.setProperty("--bf-masonry-gap", `${gap}px`);
       container.style.setProperty("gap", `${gap}px`);
+      container.style.setProperty("--bf-layout-viewport-width", `${viewportProfile.layoutWidth}px`);
+      container.style.setProperty("--bf-layout-viewport-height", `${viewportProfile.layoutHeight}px`);
+      container.style.setProperty("--bf-layout-render-scale", `${viewportProfile.scale}`);
 
       plan.items.forEach((item) => {
         const card = item.card;
@@ -805,6 +940,9 @@
         mode,
         layoutMode,
         containerWidth: currentContainerWidth(),
+        layoutWidth: viewportProfile.layoutWidth,
+        layoutHeight: viewportProfile.layoutHeight,
+        viewportSource: viewportProfile.source,
         columns: trackConfig.tracks,
         minCardWidth,
         gap,
@@ -847,21 +985,35 @@
     function autoArrange() {
       const ordered = cards
         .map((card, index) => buildCardDescriptor(card, index))
-        .sort((left, right) => {
-          if (right.priority !== left.priority) {
-            return right.priority - left.priority;
-          }
-          if (right.weight !== left.weight) {
-            return right.weight - left.weight;
-          }
-          return left.index - right.index;
-        });
-      ordered.forEach((entry, index) => {
-        state[entry.key] = { ...readCardState(entry.card), order: index };
+      const viewportProfile = resolveViewportProfile();
+      const trackConfig = trackResolver(viewportProfile.layoutWidth, {
+        mode,
+        container,
+        cards,
+        layoutMode: resolveLayoutMode(),
+        config: { ...layoutConfig },
+        viewport: viewportProfile,
+      });
+      const orderedKeys = computeAutoArrangeOrder(cards.map((card, index) => buildCardDescriptor(card, index)), {
+        tracks: trackConfig.tracks,
+        rowUnit,
+        gap: Number.isFinite(Number(trackConfig.gap)) ? Number(trackConfig.gap) : (layoutConfig.gap ?? currentContainerGap()),
+      });
+      orderedKeys.forEach((key, index) => {
+        const entry = cards.find((card) => ensureCardKey(card) === key);
+        if (!entry) {
+          return;
+        }
+        state[ensureCardKey(entry)] = { ...readCardState(entry), order: index };
       });
       pendingAutoArrange = true;
       setDirty(true, "auto-arrange");
-      logger.log("auto-arrange", { ordered: ordered.map((entry) => entry.key) });
+      logger.log("auto-arrange", {
+        ordered: orderedKeys,
+        viewportSource: viewportProfile.source,
+        layoutWidth: viewportProfile.layoutWidth,
+        columns: trackConfig.tracks,
+      });
       requestLayout("auto-arrange");
       saveLayout("auto-arrange");
     }
@@ -991,17 +1143,20 @@
           positions: { ...layoutCache.positions },
           heights: { ...layoutCache.heights },
           columnHeights: layoutCache.columnHeights.slice(),
+          viewport: layoutCache.viewport ? { ...layoutCache.viewport } : null,
         };
       },
       getSnapshot() {
         const descriptors = cards.map((card, index) => buildCardDescriptor(card, index));
+        const viewportProfile = layoutCache.viewport || resolveViewportProfile();
         return snapshotFromPlan(computeLayoutPlan(descriptors, {
-          tracks: layoutCache.columns || trackResolver(currentContainerWidth(), {
+          tracks: layoutCache.columns || trackResolver(viewportProfile.layoutWidth, {
             mode,
             container,
             cards,
             layoutMode: resolveLayoutMode(),
             config: { ...layoutConfig },
+            viewport: viewportProfile,
           }).tracks,
           rowUnit,
           gap: layoutConfig.gap ?? currentContainerGap(),
@@ -1031,7 +1186,10 @@
     ratiosForRowSize,
     normalizeRatios,
     computeDescriptorWeight,
+    computeAutoArrangeOrder,
     computeLayoutPlan,
+    computeTrackMetrics,
+    computeViewportFrame,
     computeRowSpan,
     snapshotFromPlan,
     createAdaptiveLayout,

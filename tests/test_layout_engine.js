@@ -155,6 +155,64 @@ test('responsive track resolver reflows across breakpoints', () => {
   assert.deepEqual(resolver(1300, { layoutMode: 'landscape' }), { tracks: 4, minCardWidth: 300, gap: 12 });
 });
 
+test('track metric helper computes stable column counts from viewport width, card width, and gap', () => {
+  assert.deepEqual(layout.computeTrackMetrics(1280, 300, 12), {
+    width: 1280,
+    minCardWidth: 300,
+    gap: 12,
+    tracks: 4,
+  });
+  assert.deepEqual(layout.computeTrackMetrics(760, 320, 24), {
+    width: 760,
+    minCardWidth: 320,
+    gap: 24,
+    tracks: 2,
+  });
+});
+
+test('viewport frame helper distinguishes physical-display and preview scaling rules', () => {
+  const liveFrame = layout.computeViewportFrame({
+    source: 'physical-display',
+    baseWidth: 1920,
+    baseHeight: 1080,
+    availableWidth: 2560,
+    availableHeight: 1440,
+    layoutWidth: 1920,
+    layoutHeight: 1080,
+    allowGrow: false,
+  });
+  const previewFrame = layout.computeViewportFrame({
+    source: 'preview-remote-browser',
+    baseWidth: 1920,
+    baseHeight: 1080,
+    availableWidth: 2560,
+    availableHeight: 1440,
+    layoutWidth: 2560,
+    layoutHeight: 1440,
+    allowGrow: true,
+  });
+
+  assert.equal(liveFrame.renderWidth, 1920);
+  assert.equal(liveFrame.renderHeight, 1080);
+  assert.equal(liveFrame.layoutWidth, 1920);
+  assert.equal(previewFrame.layoutWidth, 2560);
+  assert.equal(previewFrame.renderWidth, 2560);
+  assert.ok(previewFrame.scale > liveFrame.scale);
+});
+
+test('auto-arrange helper produces deterministic row-major order for the same viewport inputs', () => {
+  const entries = [
+    descriptor({ key: 'hero', priority: 9, weight: 9, height: 420 }, 0),
+    descriptor({ key: 'links', priority: 8, weight: 8, height: 260 }, 1),
+    descriptor({ key: 'stats', priority: 7, weight: 7, height: 240 }, 2),
+    descriptor({ key: 'advanced', priority: 4, weight: 4, height: 180 }, 3),
+  ];
+  const first = layout.computeAutoArrangeOrder(entries, { tracks: 2, rowUnit: 8, gap: 12 });
+  const second = layout.computeAutoArrangeOrder(entries, { tracks: 2, rowUnit: 8, gap: 12 });
+  assert.deepEqual(first, second);
+  assert.deepEqual(first, ['hero', 'links', 'stats', 'advanced']);
+});
+
 test('settings and status pages use the shared engine instead of duplicated inline layout logic', () => {
   assert.match(settingsHtml, /<script src="\/client\/js\/fibonacci_layout\.js"><\/script>/);
   assert.match(statusHtml, /<script src="\/client\/js\/fibonacci_layout\.js"><\/script>/);
@@ -186,13 +244,20 @@ test('status display view no longer hardcodes top-level hero and panel slot posi
   assert.doesNotMatch(statusHtml, /body\.display-view \.url-panel \{[\s\S]*grid-row:\s*2;/);
 });
 
-test('settings removes embedded preview elements and links directly to the real status surfaces', () => {
-  assert.doesNotMatch(settingsHtml, /designStatusPreviewModal/);
-  assert.doesNotMatch(settingsHtml, /designStatusMirror/);
+test('settings hosts the real embedded status preview surface and links to the real status pages', () => {
   assert.match(settingsHtml, /id="openStatusPage"/);
   assert.match(settingsHtml, /id="openDisplayStatusPage"/);
-  assert.match(settingsHtml, /Settings no longer render a status-page preview/);
+  assert.match(settingsHtml, /id="designStatusPreviewFrame"/);
+  assert.match(settingsHtml, /embedded preview uses the same status layout engine/i);
   assert.match(settingsHtml, /window\.__bellforgeStatusPreview/);
+});
+
+test('status page exposes explicit save and preview editor hooks for shared layout persistence', () => {
+  assert.match(statusHtml, /id="layoutSave"/);
+  assert.match(statusHtml, /const REMOTE_LAYOUT_POLL_MS = 2000;/);
+  assert.match(statusHtml, /fetch\("\/api\/display\/status-layout"/);
+  assert.match(statusHtml, /persistSharedStatusLayout/);
+  assert.match(statusHtml, /isPreviewEditor/);
 });
 
 test('status card registry is complete and default priorities match the default readable layout', () => {

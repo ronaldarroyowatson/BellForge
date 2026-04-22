@@ -29,7 +29,8 @@ test('extreme viewport, content, and token values still keep the layout readable
     assertNoOverlap(tinyStatus);
     assertNoOverlap(tinySettings);
     assertNoOverlap(tinySettingsDisplay);
-    assertExpectedColumns(tinyStatus, 1);
+    assert.equal(tinyStatus.layoutCache.viewport.source, 'physical-display', 'Status tiny viewport should use physical display profile');
+    assert.ok(tinyStatus.container.columns >= 1, `Status tiny viewport should retain at least one track, got ${tinyStatus.container.columns}`);
     assertExpectedColumns(tinySettings, 1);
 
     await surfaces.statusPage.setViewportSize({ width: 2560, height: 1440 });

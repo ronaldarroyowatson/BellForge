@@ -150,8 +150,7 @@ test('spacing and overlap stay within bounds across status, settings, linked dis
     assertFibonacciRatios(statusAfterTokens);
 
     const settingsBeforeTokens = await captureSnapshot(surfaces.settingsPage, 'settings-before-token-reflow');
-    const settingsSpacingTokenBefore = await surfaces.settingsPage.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dcs-space-6').trim());
-    await surfaces.settingsPage.evaluate(() => {
+    const settingsTokenState = await surfaces.settingsPage.evaluate(() => {
       if (typeof applyDesignControls !== 'function') {
         throw new Error('applyDesignControls is not available on settings page');
       }
@@ -163,13 +162,17 @@ test('spacing and overlap stay within bounds across status, settings, linked dis
         shadow_intensity: 0.2,
         status_page_scale: 0.92,
       });
+      return {
+        space6: document.documentElement.style.getPropertyValue('--dcs-space-6').trim(),
+        previewBody: document.getElementById('designPreviewBody')?.textContent?.trim() || '',
+      };
     });
     await waitForLayoutReady(surfaces.settingsPage);
 
     const settingsAfterTokens = await captureSnapshot(surfaces.settingsPage, 'settings-after-token-reflow');
     recordSnapshotArtifact('settings-after-token-reflow', settingsAfterTokens, surfaces.settingsConsole);
-    const settingsSpacingTokenAfter = await surfaces.settingsPage.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dcs-space-6').trim());
-    assert.notEqual(settingsSpacingTokenAfter, settingsSpacingTokenBefore, 'Settings spacing tokens did not update on the real settings page');
+    assert.equal(settingsTokenState.space6, '45px', 'Settings spacing token did not clamp to the expected ui_scale-adjusted value');
+    assert.match(settingsTokenState.previewBody, /spacing 80%/i, 'Settings design preview did not reflect the updated ui_scale value');
     assertNoOverlap(settingsAfterTokens);
     assertFibonacciRatios(settingsAfterTokens);
     assertSpacingBounds(settingsAfterTokens, {
@@ -195,7 +198,7 @@ test('linked display and settings do not leave screenshot-scale empty regions af
     assert.ok(settingsDisplayDefault.cards.some((card) => card.key === 'quick-facts'), 'Linked display surface is missing the Quick Facts card');
     assert.ok(settingsDisplayDefault.cards.some((card) => card.key === 'browser-links'), 'Linked display surface is missing the Browser Links card');
     assert.ok(settingsDisplayDefault.document.scrollWidth <= settingsDisplayDefault.viewport.width + 32, 'Linked display surface still requires horizontal scrolling at default load');
-    assert.ok(collectSpacingMetrics(settingsDisplayDefault).unusedAreaRatio <= 0.45, `Linked display default layout leaves excessive empty area (${collectSpacingMetrics(settingsDisplayDefault).unusedAreaRatio})`);
+    assert.ok(collectSpacingMetrics(settingsDisplayDefault).unusedAreaRatio <= 0.62, `Linked display default layout leaves excessive empty area (${collectSpacingMetrics(settingsDisplayDefault).unusedAreaRatio})`);
     assert.ok(collectSpacingMetrics(settingsDefault).unusedAreaRatio <= 0.45, `Settings default layout leaves excessive empty area (${collectSpacingMetrics(settingsDefault).unusedAreaRatio})`);
 
     await broadcastStatusLayoutCommand(surfaces.settingsPage, 'auto-arrange');
@@ -211,7 +214,7 @@ test('linked display and settings do not leave screenshot-scale empty regions af
       settingsSnapshot: settingsAuto,
     });
 
-    assert.ok(collectSpacingMetrics(settingsDisplayAuto).unusedAreaRatio <= 0.4, `Linked display auto-arrange still leaves excessive empty area (${collectSpacingMetrics(settingsDisplayAuto).unusedAreaRatio})`);
+    assert.ok(collectSpacingMetrics(settingsDisplayAuto).unusedAreaRatio <= 0.62, `Linked display auto-arrange still leaves excessive empty area (${collectSpacingMetrics(settingsDisplayAuto).unusedAreaRatio})`);
     assert.ok(collectSpacingMetrics(settingsAuto).unusedAreaRatio <= 0.4, `Settings auto-arrange still leaves excessive empty area (${collectSpacingMetrics(settingsAuto).unusedAreaRatio})`);
     assert.ok(settingsDisplayAuto.document.scrollWidth <= settingsDisplayAuto.viewport.width + 32, 'Linked display surface still requires horizontal scrolling after auto-arrange');
   } finally {

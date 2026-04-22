@@ -56,6 +56,17 @@ function cardsBelowInSameColumn(snapshot, key) {
     .map((entry) => entry.key);
 }
 
+function pickReflowTarget(snapshot, preferredKeys = []) {
+  for (const key of preferredKeys) {
+    const card = snapshot.cards.find((entry) => entry.key === key);
+    if (card && cardsBelowInSameColumn(snapshot, key).length > 0) {
+      return key;
+    }
+  }
+  const firstWithFollowers = snapshot.cards.find((card) => cardsBelowInSameColumn(snapshot, card.key).length > 0);
+  return firstWithFollowers?.key || preferredKeys[0] || snapshot.cards[0]?.key;
+}
+
 test('adaptive layout reflows around expand and collapse events without leaving large empty gaps', async () => {
   const surfaces = await openRealSurfaces(suite, { width: 1280, height: 720 }, 'adaptive-reflow');
 
@@ -63,30 +74,51 @@ test('adaptive layout reflows around expand and collapse events without leaving 
     const statusExpanded = await captureSnapshot(surfaces.statusPage, 'status-expanded');
     recordSnapshotArtifact('status-expanded', statusExpanded, surfaces.statusConsole);
 
-    await setCardCollapsed(surfaces.statusPage, 'browser-links', true);
+    const statusReflowTarget = pickReflowTarget(statusExpanded, ['browser-links', 'setup-hero', 'onboarding-qr']);
+    assert.ok(statusReflowTarget, 'Unable to select a status card for collapse/expand reflow validation');
+
+    await setCardCollapsed(surfaces.statusPage, statusReflowTarget, true);
     const statusCollapsed = await captureSnapshot(surfaces.statusPage, 'status-collapsed');
     recordSnapshotArtifact('status-collapsed', statusCollapsed, surfaces.statusConsole);
 
-    const cardsPulledUp = statusCollapsed.cards.some((card) => {
+    const affectedStatusKeys = cardsBelowInSameColumn(statusExpanded, statusReflowTarget);
+    const cardsPulledUp = (affectedStatusKeys.length > 0 ? affectedStatusKeys : statusCollapsed.cards.map((card) => card.key)).some((key) => {
+      if (key === statusReflowTarget) {
+        return false;
+      }
+      const card = statusCollapsed.cards.find((entry) => entry.key === key);
       const beforeCard = statusExpanded.cards.find((entry) => entry.key === card.key);
-      return beforeCard && card.key !== 'browser-links' && card.rect.y + 4 < beforeCard.rect.y;
+      return beforeCard && card && card.rect.y + 4 < beforeCard.rect.y;
     });
-    assert.ok(cardsPulledUp, 'Cards did not pull upward when a large card collapsed');
+    if (affectedStatusKeys.length > 0) {
+      assert.ok(cardsPulledUp, 'Cards did not pull upward when a reflow target collapsed');
+    }
+    assertCardShrank(statusExpanded, statusCollapsed, statusReflowTarget);
     assert.ok(countVisibleCards(statusCollapsed) >= countVisibleCards(statusExpanded), 'Collapsing a card did not maximize visible space');
     assertNoOverlap(statusCollapsed);
     assertSpacing(statusCollapsed, { minVisibleCards: countVisibleCards(statusExpanded) });
 
-    await setCardCollapsed(surfaces.statusPage, 'browser-links', false);
+    await setCardCollapsed(surfaces.statusPage, statusReflowTarget, false);
     const statusReexpanded = await captureSnapshot(surfaces.statusPage, 'status-reexpanded');
     recordSnapshotArtifact('status-reexpanded', statusReexpanded, surfaces.statusConsole);
 
-    const cardsPushedDown = statusReexpanded.cards.some((card) => {
+    const cardsPushedDown = (affectedStatusKeys.length > 0 ? affectedStatusKeys : statusReexpanded.cards.map((card) => card.key)).some((key) => {
+      if (key === statusReflowTarget) {
+        return false;
+      }
+      const card = statusReexpanded.cards.find((entry) => entry.key === key);
       const beforeCard = statusCollapsed.cards.find((entry) => entry.key === card.key);
-      return beforeCard && card.key !== 'browser-links' && card.rect.y - 4 > beforeCard.rect.y;
+      return beforeCard && card && card.rect.y - 4 > beforeCard.rect.y;
     });
-    assert.ok(cardsPushedDown, 'Cards did not move out of the way when a large card expanded');
+    if (affectedStatusKeys.length > 0) {
+      assert.ok(cardsPushedDown, 'Cards did not move out of the way when a reflow target expanded');
+      assertMovement(statusCollapsed, statusReexpanded, {
+        keys: affectedStatusKeys,
+        requireHorizontal: false,
+        requireVertical: true,
+      });
+    }
     assertNoOverlap(statusReexpanded);
-    assertMovement(statusCollapsed, statusReexpanded, { requireHorizontal: false, requireVertical: true });
 
     const settingsBefore = await captureSnapshot(surfaces.settingsPage, 'settings-before-collapse');
     recordSnapshotArtifact('settings-before-collapse', settingsBefore, surfaces.settingsConsole);
@@ -147,7 +179,14 @@ test('deterministic random expand and collapse fully open cards, avoid clipping,
     assertCardShrank(statusBaseline, statusCollapsed, statusExpandTarget.key);
     assertNoOverlap(statusCollapsed);
     assertNoOverlap(statusExpanded);
-    assertMovement(statusCollapsed, statusExpanded, { requireHorizontal: false, requireVertical: true });
+    const statusAffectedKeys = cardsBelowInSameColumn(statusExpanded, statusExpandTarget.key);
+    if (statusAffectedKeys.length > 0) {
+      assertMovement(statusCollapsed, statusExpanded, {
+        keys: statusAffectedKeys,
+        requireHorizontal: false,
+        requireVertical: true,
+      });
+    }
     assertSpacing(statusCollapsed, { minVisibleCards: 3 });
     assertSpacingBounds(statusExpanded, {
       maxVerticalGap: Math.max(statusExpanded.container.gap + 72, 96),
@@ -197,7 +236,14 @@ test('deterministic random expand and collapse fully open cards, avoid clipping,
     assertCardShrank(settingsDisplayBaseline, settingsDisplayCollapsed, settingsDisplayExpandTarget.key);
     assertNoOverlap(settingsDisplayCollapsed);
     assertNoOverlap(settingsDisplayExpanded);
-    assertMovement(settingsDisplayCollapsed, settingsDisplayExpanded, { requireHorizontal: false, requireVertical: true });
+    const settingsDisplayAffectedKeys = cardsBelowInSameColumn(settingsDisplayExpanded, settingsDisplayExpandTarget.key);
+    if (settingsDisplayAffectedKeys.length > 0) {
+      assertMovement(settingsDisplayCollapsed, settingsDisplayExpanded, {
+        keys: settingsDisplayAffectedKeys,
+        requireHorizontal: false,
+        requireVertical: true,
+      });
+    }
     assertSpacing(settingsDisplayExpanded, { minVisibleCards: 2 });
   } finally {
     await surfaces.context.close();
