@@ -1228,9 +1228,14 @@
 
     async function persistSharedStatusLayout(reason) {
       const payload = serializeSharedStatusLayout();
+      const headers = { "Content-Type": "application/json" };
+      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY) || "";
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
       const response = await fetch("/api/display/status-layout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(payload),
       });
       if (!response.ok) {

@@ -5,15 +5,15 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 import qrcode
 import qrcode.image.svg
 
-from backend.routes.auth_api import user_principal_dependency
 from backend.services.auth import get_auth_status
 from backend.services.control_server import get_control_server_service
-from backend.services.unified_auth import TokenPrincipal
+from backend.services.unified_auth import AuthError, get_auth_service
 from backend.services.debug_service import inspect_debug_events, read_debug_events, write_debug_event
 from backend.services.display_preferences import (
     get_display_preferences,
@@ -29,6 +29,7 @@ from backend.services.updater_status import get_updater_status, trigger_update_c
 
 router = APIRouter()
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_auth_scheme = HTTPBearer(auto_error=False)
 
 
 class NetworkUpdatePayload(BaseModel):
@@ -253,9 +254,15 @@ async def status_layout() -> dict[str, Any]:
 @router.post("/display/status-layout", summary="Update shared status layout")
 async def update_status_layout_route(
     payload: StatusLayoutPayload,
-    principal: TokenPrincipal = Depends(user_principal_dependency),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_auth_scheme),
 ) -> dict[str, Any]:
-    user_id = principal.user_id or principal.subject
+    user_id = ""
+    if credentials and credentials.scheme.lower() == "bearer" and credentials.credentials:
+        try:
+            principal = get_auth_service().verify_bellforge_token(credentials.credentials)
+            user_id = principal.user_id or principal.subject
+        except AuthError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=_error_detail(exc.message)) from exc
     svc = get_control_server_service(_PROJECT_ROOT)
     if not svc.can_edit_layout(user_id):
         raise HTTPException(

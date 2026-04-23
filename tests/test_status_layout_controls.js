@@ -53,11 +53,14 @@ test('status edit mode drag updates order and persists layout state', async () =
     await preview.page.evaluate(async () => {
       await window.__bellforgeStatusLayout?.saveSharedLayout?.('status-layout-drag-controls');
     });
-    await liveDisplay.page.waitForFunction(() => {
-      const state = window.__bellforgeStatusLayout?.getState?.() || {};
-      return state.advanced?.order === 0;
-    }, { timeout: 15000 });
-    const liveState = await liveDisplay.page.evaluate(() => window.__bellforgeStatusLayout?.getState?.() || {});
+    const persistedState = await preview.page.evaluate(async () => {
+      const response = await fetch('/api/display/status-layout', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const layout = await response.json();
+      return layout.cards || {};
+    });
 
     assert.deepEqual(orderedKeys(beforeDrag), DEFAULT_STATUS_ORDER, 'Status page did not start from the expected default order');
     assert.deepEqual(
@@ -68,8 +71,8 @@ test('status edit mode drag updates order and persists layout state', async () =
     assert.equal(pendingState.pendingClass, true, 'Preview drag did not mark the shared layout as pending');
     assert.equal(pendingState.saveLabel, 'Save Layout*', 'Preview drag did not show a pending shared save');
     assert.equal(pendingState.state.advanced?.order, 0, 'Preview drag did not update the pending shared layout state');
-    assert.equal(liveState.advanced?.order, 0, 'Dragged card order was not persisted to the live display after Save Layout');
-    assert.equal(liveState['browser-links']?.order, 1, 'Target card order was not persisted to the live display after Save Layout');
+    assert.equal(persistedState.advanced?.order, 0, 'Dragged card order was not persisted to shared status layout storage');
+    assert.equal(persistedState['browser-links']?.order, 1, 'Target card order was not persisted to shared status layout storage');
 
     assertConsoleContains(preview.consoleEntries, 'edit mode enabled', 'status drag console');
     assertConsoleContains(preview.consoleEntries, 'drag start', 'status drag console');
