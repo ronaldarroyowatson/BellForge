@@ -11,6 +11,7 @@ const els = {
   localName: document.getElementById("local-name"),
   tokenAccess: document.getElementById("token-access"),
   tokenRefresh: document.getElementById("token-refresh"),
+  controlDeviceName: document.getElementById("control-device-name"),
   output: document.getElementById("auth-output"),
 };
 
@@ -134,6 +135,36 @@ async function logoutSession() {
   show(payload);
 }
 
+function authHeadersFromTextarea() {
+  const access = els.tokenAccess.value.trim();
+  const headers = { "Content-Type": "application/json" };
+  if (access) {
+    headers.Authorization = `Bearer ${access}`;
+  }
+  return headers;
+}
+
+async function promoteThisDevice() {
+  const deviceName = (els.controlDeviceName.value || "").trim() || "BellForge Device";
+  const payload = await api(
+    "/api/control/promote",
+    "POST",
+    { device_name: deviceName },
+    authHeadersFromTextarea(),
+  );
+  show(payload);
+}
+
+async function checkLayoutEditPermission() {
+  const payload = await api(
+    "/api/control/permissions/layout-edit",
+    "GET",
+    undefined,
+    authHeadersFromTextarea(),
+  );
+  show(payload);
+}
+
 async function run(action) {
   try {
     await action();
@@ -150,6 +181,8 @@ document.getElementById("local-reset-request").addEventListener("click", () => r
 document.getElementById("local-reset-confirm").addEventListener("click", () => run(localResetConfirm));
 document.getElementById("refresh-session").addEventListener("click", () => run(refreshSession));
 document.getElementById("logout-session").addEventListener("click", () => run(logoutSession));
+document.getElementById("control-promote").addEventListener("click", () => run(promoteThisDevice));
+document.getElementById("control-check-layout").addEventListener("click", () => run(checkLayoutEditPermission));
 
 const cachedAccess = localStorage.getItem("bellforge.access_token") || "";
 const cachedRefresh = localStorage.getItem("bellforge.refresh_token") || "";
