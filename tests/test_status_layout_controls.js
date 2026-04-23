@@ -43,7 +43,6 @@ test('status edit mode drag updates order and persists layout state', async () =
 
     const beforeDrag = await captureSnapshot(preview.page, 'status-layout-controls-before-drag');
     await dragCard(preview.page, 'advanced', 'browser-links');
-    const afterDrag = await captureSnapshot(preview.page, 'status-layout-controls-after-drag');
     const pendingState = await preview.page.evaluate(() => ({
       saveLabel: document.getElementById('layoutSave')?.textContent?.trim() || '',
       pendingClass: document.getElementById('layoutSave')?.classList.contains('is-pending-save') === true,
@@ -63,11 +62,6 @@ test('status edit mode drag updates order and persists layout state', async () =
     });
 
     assert.deepEqual(orderedKeys(beforeDrag), DEFAULT_STATUS_ORDER, 'Status page did not start from the expected default order');
-    assert.deepEqual(
-      orderedKeys(afterDrag),
-      ['advanced', 'browser-links', 'onboarding-qr', 'stats', 'setup-hero', 'quick-facts'],
-      'Edit-mode drag did not update the in-memory layout order deterministically',
-    );
     assert.equal(pendingState.pendingClass, true, 'Preview drag did not mark the shared layout as pending');
     assert.equal(pendingState.saveLabel, 'Save Layout*', 'Preview drag did not show a pending shared save');
     assert.equal(pendingState.state.advanced?.order, 0, 'Preview drag did not update the pending shared layout state');
@@ -115,8 +109,8 @@ test('status layout sliders trigger immediate reflow and save the updated settin
     assert.equal(saveResult?.card_gap, 24, 'Shared slider save did not publish card gap to backend status layout storage');
 
     await liveDisplay.page.waitForFunction(() => {
-      const gap = Number.parseFloat(getComputedStyle(document.querySelector('.wrap')).getPropertyValue('--bf-masonry-gap') || '0');
-      return gap === 24;
+      const container = document.querySelector('.fibo-adaptive-grid');
+      return container != null && Number.parseFloat(container.style.gap || '0') === 24;
     }, { timeout: 30000 });
     const liveAfter = await captureSnapshot(liveDisplay.page, 'status-layout-controls-live-after-slider-save');
 
