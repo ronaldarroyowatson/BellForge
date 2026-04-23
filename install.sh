@@ -362,6 +362,10 @@ setup_python() {
     run python3 -m venv "${INSTALL_DIR}/.venv"
   fi
 
+  # Runtime dependency guard writes a stamp file under .venv at service start.
+  # Keep ownership aligned with the service account to avoid PermissionError.
+  run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}/.venv"
+
   if [[ ! -x "${INSTALL_DIR}/.venv/bin/pip" ]]; then
     run "${INSTALL_DIR}/.venv/bin/python" -m ensurepip --upgrade
   fi
@@ -369,6 +373,9 @@ setup_python() {
   run "${INSTALL_DIR}/.venv/bin/python" -m pip install --upgrade pip
   run "${INSTALL_DIR}/.venv/bin/python" -m pip install -r "${INSTALL_DIR}/backend/requirements.txt"
   run "${INSTALL_DIR}/.venv/bin/python" -m pip install -r "${INSTALL_DIR}/updater/requirements.txt"
+
+  # pip may create root-owned cache/metadata paths when invoked by installer.
+  run chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${INSTALL_DIR}/.venv"
 }
 
 install_services() {
