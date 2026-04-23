@@ -4,9 +4,9 @@ Use this workflow for production bugfix cycles and nightly closeout.
 
 ## 1. Branch and Scope
 
-1. Branch from `main` using `bugfix/<short-name>` or `hotfix/<short-name>`.
+1. Do bugfix work directly on `main` unless explicitly instructed otherwise.
 2. Keep changes focused on one incident or bug class.
-3. Avoid unrelated refactors in bugfix branches.
+3. Avoid unrelated refactors in bugfix commits.
 
 ## 2. Verify the Fix
 
@@ -19,6 +19,8 @@ Use this workflow for production bugfix cycles and nightly closeout.
 2. Run auth integrity suite (mandatory for any auth/device/account change):
    - `python tests/run_auth_suite.py --coverage`
    - `npm run test:auth`
+3. Run control-server architecture tests (mandatory for any server/satellite role, discovery, onboarding authority, or layout permission change):
+   - `python -m pytest tests/test_control_server.py -q`
 2. Run smoke tests:
    - `node scripts/run_python.js tests/smoke_test_windows.py` (dev/Windows)
    - `bash tests/smoke_test.sh` (Pi/system install)
@@ -50,9 +52,10 @@ Recommended local hook setup:
 
 ## 4. Merge and Deploy
 
-1. Open PR to `main`.
-2. Ensure bugfix smoke workflow passes.
-3. Merge to `main`.
+1. Commit directly on `main` with a bugfix-focused message.
+2. Push directly to `origin/main`.
+3. Confirm remote sync:
+   - `git log --oneline origin/main | head -1`
 4. Verify the real Pi rollout before closing the bugfix:
     - Run `npm run verify:pi-rollout -- --pi-host 192.168.2.180 --expected-version X.Y.Z`
     - The verifier must prove all of these before the bugfix is considered closed:
@@ -67,7 +70,10 @@ Recommended local hook setup:
           - `/status?view=display`
     - The verifier writes JSON and screenshot evidence under `tests/logs/pi-rollout/`.
     - Do not close the bugfix if the Pi is already on the expected version unless you intentionally rerun with `--allow-already-current` for audit-only evidence; first-closeout validation must capture stage plus apply.
-5. Automatic post-push enforcement on `main`:
+5. Run live Pi lifecycle tests after rollout apply/reboot is confirmed:
+   - `BELLFORGE_PI_HOST=192.168.2.180 BELLFORGE_PI_SSH_KEY_PATH=<path-to-private-key> bash tests/live_pi_lifecycle.sh`
+   - This must pass after the Pi has applied `X.Y.Z` and returned from reboot.
+6. Automatic post-push enforcement on `main`:
     - `.github/workflows/release.yml` now runs the full layout DOM suite, debug unit tests, auth suite, release publication, and then the live Pi rollout verifier automatically after each push to `main`.
     - The post-push verifier must confirm, in order:
        - published version detected on the Pi
