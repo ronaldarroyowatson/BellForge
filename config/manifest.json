@@ -1,6 +1,6 @@
 {
-  "version": "0.1.67",
-  "generated_at": "2026-04-23T13:16:36Z",
+  "version": "0.1.68",
+  "generated_at": "2026-04-23T13:18:22Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -175,7 +175,7 @@
       "size": 906
     },
     "config/version.json": {
-      "sha256": "d63be4b12a0659c78bd941f39a9489e5c4710482c83edc7ed00696691ea9829f",
+      "sha256": "fe8e4967b70c7031e69c40dcaf7df57b97993a37cf5ffa4ffaeb0baaa222dfe6",
       "size": 328
     },
     "scripts/bellforge": {
