@@ -1381,14 +1381,47 @@
           },
           body: JSON.stringify({ token: accessToken }),
         });
-        layoutEditorAuthorized = response.ok;
+        if (!response.ok) {
+          layoutEditorAuthorized = false;
+          els.layoutEditor.classList.add("is-visible");
+          els.layoutEditorStatus.textContent = "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
+          const currentSettings = readLayoutSettings();
+          applyLayoutSettings({ ...currentSettings, editEnabled: false });
+          return;
+        }
+        // Token is valid — additionally check server authority.
+        let permReason = "";
+        try {
+          const permResponse = await fetch("/api/control/permissions/layout-edit", {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (permResponse.ok) {
+            const perm = await permResponse.json();
+            layoutEditorAuthorized = perm.permitted === true;
+            permReason = perm.reason || "";
+          } else {
+            // Endpoint returned error — deny to be safe.
+            layoutEditorAuthorized = false;
+            permReason = "Permission check failed.";
+          }
+        } catch {
+          // Network error on permission check — deny to be safe.
+          layoutEditorAuthorized = false;
+          permReason = "Could not reach permission service.";
+        }
+        els.layoutEditor.classList.add("is-visible");
+        if (layoutEditorAuthorized) {
+          els.layoutEditorStatus.textContent = "Authenticated. Edit mode can reorder cards and tune masonry spacing on the real page immediately.";
+        } else {
+          els.layoutEditorStatus.textContent = permReason
+            ? `Layout editing is not permitted: ${permReason} Visit the setup wizard to configure server authority.`
+            : "Layout editing is locked. This device does not have control-server authority. Visit the setup wizard to configure this device.";
+        }
       } catch {
         layoutEditorAuthorized = false;
+        els.layoutEditor.classList.add("is-visible");
+        els.layoutEditorStatus.textContent = "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
       }
-      els.layoutEditor.classList.add("is-visible");
-      els.layoutEditorStatus.textContent = layoutEditorAuthorized
-        ? "Authenticated. Edit mode can reorder cards and tune masonry spacing on the real page immediately."
-        : "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
       const currentSettings = readLayoutSettings();
       applyLayoutSettings({ ...currentSettings, editEnabled: layoutEditorAuthorized && currentSettings.editEnabled });
     }

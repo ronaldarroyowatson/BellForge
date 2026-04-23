@@ -112,6 +112,105 @@
     button.danger {
       background: var(--danger);
     }
+    /* ── Setup Wizard ──────────────────────────────────────────────────────── */
+    .wizard {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 252, 246, 0.96);
+      padding: 1.1rem 1.2rem;
+      box-shadow: 0 10px 28px rgba(43, 34, 22, 0.08);
+      margin-bottom: 1rem;
+    }
+    .wizard h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.25rem;
+      color: #14384f;
+    }
+    .wizard-steps {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      margin: 0.75rem 0 0.9rem;
+    }
+    .wizard-step-pip {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      opacity: 0.5;
+    }
+    .wizard-step-pip.active { opacity: 1; color: var(--accent); font-weight: 700; }
+    .wizard-step-pip.done   { opacity: 1; color: var(--accent-2); }
+    .wizard-step-pip .pip-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: currentColor;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.72rem;
+    }
+    .wizard-step-pip.active .pip-num { background: var(--accent); }
+    .wizard-step-pip.done   .pip-num { background: var(--accent-2); }
+    .wizard-panel {
+      display: none;
+      animation: fadeIn 0.18s ease;
+    }
+    .wizard-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .wizard-panel h3 { margin: 0 0 0.5rem; font-size: 1rem; color: #1f4157; }
+    .wizard-panel p  { margin: 0 0 0.7rem; color: var(--muted); font-size: 0.93rem; line-height: 1.4; }
+    .wizard-nav {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.85rem;
+      flex-wrap: wrap;
+    }
+    .wizard-msg {
+      margin: 0.55rem 0 0;
+      font-size: 0.88rem;
+      min-height: 1.2rem;
+    }
+    .wizard-msg.ok  { color: var(--accent-2); }
+    .wizard-msg.err { color: var(--danger); }
+    .wizard-msg.info{ color: #114a70; }
+    .wizard-provider-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 0.5rem 0 0;
+    }
+    .wizard-provider-list button {
+      background: #fff;
+      color: var(--accent);
+      border: 1.5px solid var(--accent);
+      border-radius: 8px;
+      padding: 0.45rem 0.9rem;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+    .wizard-provider-list button:hover { background: var(--accent); color: #fff; }
+    .server-list {
+      margin: 0.5rem 0;
+      display: grid;
+      gap: 0.4rem;
+    }
+    .server-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.45rem 0.7rem;
+      background: #fffcf5;
+    }
+    .server-item strong { font-size: 0.9rem; }
+    .server-item span   { color: var(--muted); font-size: 0.82rem; }
+    /* ── End Wizard ─────────────────────────────────────────────────────────── */
     .code {
       font-family: "Consolas", "Cascadia Mono", monospace;
       font-size: clamp(1.5rem, 3vw, 2.3rem);
@@ -161,6 +260,134 @@
 </head>
 <body>
   <div class="wrap">
+    <!-- ═══════════════════════════════════════════════════════════════════
+         UNIFIED SETUP WIZARD  (Steps 1–8)
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <section class="wizard" id="setupWizard">
+      <h2>BellForge Setup Wizard</h2>
+      <p class="muted" style="margin:0 0 0.2rem">Complete these steps to authenticate and configure this device.</p>
+
+      <!-- Step progress pips -->
+      <div class="wizard-steps" id="wizardPips">
+        <div class="wizard-step-pip" data-step="1"><span class="pip-num">1</span> Settings</div>
+        <div class="wizard-step-pip" data-step="2"><span class="pip-num">2</span> Auth Provider</div>
+        <div class="wizard-step-pip" data-step="3"><span class="pip-num">3</span> Sign In</div>
+        <div class="wizard-step-pip" data-step="4"><span class="pip-num">4</span> Discover</div>
+        <div class="wizard-step-pip" data-step="5"><span class="pip-num">5</span> Role</div>
+        <div class="wizard-step-pip" data-step="6"><span class="pip-num">6</span> Confirm</div>
+        <div class="wizard-step-pip" data-step="7"><span class="pip-num">7</span> Activate</div>
+        <div class="wizard-step-pip" data-step="8"><span class="pip-num">8</span> Ready</div>
+      </div>
+
+      <!-- Step 1: Settings / Device Name -->
+      <div class="wizard-panel active" id="wizStep1">
+        <h3>Step 1 — Device Settings</h3>
+        <p>Give this device a friendly name. It identifies this Pi in the BellForge network.</p>
+        <label for="wizDeviceName">Device Name</label>
+        <input id="wizDeviceName" type="text" value="BellForge Display" style="width:100%;margin-bottom:0.5rem;" />
+        <div class="wizard-nav">
+          <button id="wizStep1Next">Next →</button>
+        </div>
+        <p class="wizard-msg info" id="wizMsg1"></p>
+      </div>
+
+      <!-- Step 2: Choose auth provider -->
+      <div class="wizard-panel" id="wizStep2">
+        <h3>Step 2 — Choose Sign-In Provider</h3>
+        <p>Select how you want to authenticate. Your credentials are never stored — only a secure token.</p>
+        <div class="wizard-provider-list">
+          <button class="wizard-provider-btn" data-provider="google">Google</button>
+          <button class="wizard-provider-btn" data-provider="microsoft">Microsoft</button>
+          <button class="wizard-provider-btn" data-provider="apple">Apple</button>
+          <button class="wizard-provider-btn" data-provider="local">Email / Password</button>
+        </div>
+        <div class="wizard-nav">
+          <button id="wizStep2Back" class="secondary">← Back</button>
+        </div>
+        <p class="wizard-msg info" id="wizMsg2"></p>
+      </div>
+
+      <!-- Step 3: Complete login -->
+      <div class="wizard-panel" id="wizStep3">
+        <h3>Step 3 — Sign In</h3>
+        <p id="wizStep3Desc">Open the sign-in page and come back once you are authenticated.</p>
+        <div class="wizard-nav">
+          <button id="wizOpenAuth">Open Sign-In Page</button>
+          <button id="wizStep3Check" class="secondary">I'm Signed In — Check</button>
+          <button id="wizStep3Back" class="secondary">← Back</button>
+        </div>
+        <p class="wizard-msg info" id="wizMsg3"></p>
+      </div>
+
+      <!-- Step 4: Discover server -->
+      <div class="wizard-panel" id="wizStep4">
+        <h3>Step 4 — Checking for a Server</h3>
+        <p>Scanning the local network for an existing BellForge control server…</p>
+        <div class="wizard-nav">
+          <button id="wizScanAgain">Scan Again</button>
+          <button id="wizStep4Back" class="secondary">← Back</button>
+        </div>
+        <p class="wizard-msg info" id="wizMsg4">Scanning…</p>
+      </div>
+
+      <!-- Step 5a: Server found — become satellite -->
+      <div class="wizard-panel" id="wizStep5Server">
+        <h3>Step 5 — Server Found</h3>
+        <p>A BellForge control server was found on your network. Join it as a satellite device.</p>
+        <div id="wizServerList" class="server-list"></div>
+        <div class="wizard-nav">
+          <button id="wizJoinServer">Join Selected Server</button>
+          <button id="wizStep5BackFromServer" class="secondary">← Back</button>
+        </div>
+        <p class="wizard-msg info" id="wizMsg5Server"></p>
+      </div>
+
+      <!-- Step 5b: No server — offer promotion -->
+      <div class="wizard-panel" id="wizStep5NoServer">
+        <h3>Step 5 — No Server Found</h3>
+        <p>No BellForge control server was detected on your local network.</p>
+        <p>You can make <strong>this device</strong> the control server, or skip for now.</p>
+        <div class="wizard-nav">
+          <button id="wizBecomeServer">Make This Device the Server</button>
+          <button id="wizSkipServer" class="secondary">Skip (Stay Unconfigured)</button>
+          <button id="wizStep5BackFromNoServer" class="secondary">← Back</button>
+        </div>
+        <p class="wizard-msg info" id="wizMsg5NoServer"></p>
+      </div>
+
+      <!-- Step 6: Confirm -->
+      <div class="wizard-panel" id="wizStep6">
+        <h3>Step 6 — Confirm Role</h3>
+        <p id="wizStep6Desc">Review the role this device will take on.</p>
+        <div class="wizard-nav">
+          <button id="wizConfirm">Confirm &amp; Apply</button>
+          <button id="wizStep6Back" class="secondary">← Back</button>
+        </div>
+        <p class="wizard-msg info" id="wizMsg6"></p>
+      </div>
+
+      <!-- Step 7: Activate -->
+      <div class="wizard-panel" id="wizStep7">
+        <h3>Step 7 — Activating…</h3>
+        <p>Applying your settings to the device. This only takes a moment.</p>
+        <p class="wizard-msg info" id="wizMsg7">Working…</p>
+      </div>
+
+      <!-- Step 8: Done -->
+      <div class="wizard-panel" id="wizStep8">
+        <h3>Step 8 — Setup Complete</h3>
+        <p id="wizStep8Desc">This device is now configured. Layout editing is unlocked for the authenticated user.</p>
+        <div class="wizard-nav">
+          <button id="wizGoStatus">Open Status Page</button>
+          <button id="wizRestart" class="secondary">Restart Wizard</button>
+        </div>
+        <p class="wizard-msg ok" id="wizMsg8">✓ Ready</p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EXISTING PAIRING CONSOLE (kept for advanced / direct use)
+    ═══════════════════════════════════════════════════════════════════════ -->
     <section class="hero">
       <h1>BellForge Pairing Console</h1>
       <p class="muted">Create a pairing session, display a short-lived code and QR payload, then claim and complete registration from a signed-in user token.</p>
@@ -221,6 +448,270 @@
     </div>
   </div>
 
+  <script src="/client/js/control_server.js"></script>
   <script src="/client/js/onboarding.js"></script>
+  <script>
+    /* ── Setup Wizard controller ─────────────────────────────────────── */
+    "use strict";
+    (function () {
+      const ACCESS_KEY = "bellforge.access_token";
+      const REFRESH_KEY = "bellforge.refresh_token";
+      const BASE = window.BELLFORGE_SERVER_URL || window.location.origin;
+
+      let currentStep = 1;
+      let wizardState = {
+        deviceName: "BellForge Display",
+        provider: null,
+        serversFound: [],
+        selectedServer: null,
+        intendedRole: null, // "server" | "satellite" | "skip"
+      };
+
+      /* ── helpers ──────────────────────────────────────────────────── */
+      function getToken() {
+        return localStorage.getItem(ACCESS_KEY) || "";
+      }
+
+      function setMsg(id, text, type = "info") {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.className = `wizard-msg ${type}`;
+      }
+
+      function updatePips(step) {
+        document.querySelectorAll(".wizard-step-pip").forEach((pip) => {
+          const s = Number(pip.dataset.step);
+          pip.classList.toggle("active", s === step);
+          pip.classList.toggle("done", s < step);
+        });
+      }
+
+      function showPanel(id) {
+        document.querySelectorAll(".wizard-panel").forEach((p) => p.classList.remove("active"));
+        const target = document.getElementById(id);
+        if (target) target.classList.add("active");
+      }
+
+      function goStep(step) {
+        currentStep = step;
+        updatePips(step);
+        if (step === 1)                 showPanel("wizStep1");
+        else if (step === 2)            showPanel("wizStep2");
+        else if (step === 3)            showPanel("wizStep3");
+        else if (step === 4)            { showPanel("wizStep4"); runDiscovery(); }
+        else if (step === 5 && wizardState.serversFound.length > 0)
+                                        { showPanel("wizStep5Server"); renderServerList(); }
+        else if (step === 5)            showPanel("wizStep5NoServer");
+        else if (step === 6)            { showPanel("wizStep6"); renderConfirmDesc(); }
+        else if (step === 7)            { showPanel("wizStep7"); runActivation(); }
+        else if (step === 8)            { showPanel("wizStep8"); renderCompleteDesc(); }
+      }
+
+      /* ── Step 1 ───────────────────────────────────────────────────── */
+      document.getElementById("wizStep1Next").addEventListener("click", () => {
+        const name = document.getElementById("wizDeviceName").value.trim();
+        if (!name) { setMsg("wizMsg1", "Please enter a device name.", "err"); return; }
+        wizardState.deviceName = name;
+        setMsg("wizMsg1", "");
+        goStep(2);
+      });
+
+      /* ── Step 2 ───────────────────────────────────────────────────── */
+      document.getElementById("wizStep2Back").addEventListener("click", () => goStep(1));
+      document.querySelectorAll(".wizard-provider-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          wizardState.provider = btn.dataset.provider;
+          setMsg("wizMsg2", `Selected: ${wizardState.provider}`);
+          document.getElementById("wizStep3Desc").textContent =
+            wizardState.provider === "local"
+              ? "Use the sign-in page to register or log in with your email and password."
+              : `Use the sign-in page to authenticate with ${wizardState.provider}.`;
+          goStep(3);
+        });
+      });
+
+      /* ── Step 3 ───────────────────────────────────────────────────── */
+      document.getElementById("wizStep3Back").addEventListener("click", () => goStep(2));
+      document.getElementById("wizOpenAuth").addEventListener("click", () => {
+        window.open(`${BASE}/client/auth.html`, "_blank", "noopener,noreferrer");
+        setMsg("wizMsg3", "Sign in, then return here and click 'I'm Signed In — Check'.", "info");
+      });
+      document.getElementById("wizStep3Check").addEventListener("click", async () => {
+        const token = getToken();
+        if (!token) {
+          setMsg("wizMsg3", "No token found. Please sign in first.", "err");
+          return;
+        }
+        try {
+          const res = await fetch(`${BASE}/api/auth/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ token }),
+          });
+          if (!res.ok) { setMsg("wizMsg3", "Token is invalid or expired. Please sign in again.", "err"); return; }
+          setMsg("wizMsg3", "Authenticated. Moving to discovery step…", "ok");
+          setTimeout(() => goStep(4), 600);
+        } catch (err) {
+          setMsg("wizMsg3", `Verification error: ${err.message}`, "err");
+        }
+      });
+
+      /* ── Step 4 ───────────────────────────────────────────────────── */
+      document.getElementById("wizStep4Back").addEventListener("click", () => goStep(3));
+      document.getElementById("wizScanAgain").addEventListener("click", runDiscovery);
+
+      async function runDiscovery() {
+        setMsg("wizMsg4", "Scanning the local network for BellForge servers…", "info");
+        try {
+          const result = await window.BellForgeControlServer.discoverServers();
+          wizardState.serversFound = Array.isArray(result.servers) ? result.servers : [];
+          if (wizardState.serversFound.length > 0) {
+            setMsg("wizMsg4", `Found ${wizardState.serversFound.length} server(s). Proceeding…`, "ok");
+            setTimeout(() => goStep(5), 500);
+          } else {
+            setMsg("wizMsg4", "No servers found on the local network.", "info");
+            setTimeout(() => goStep(5), 500);
+          }
+        } catch (err) {
+          wizardState.serversFound = [];
+          setMsg("wizMsg4", `Discovery error: ${err.message}. Proceeding with no servers.`, "err");
+          setTimeout(() => goStep(5), 1200);
+        }
+      }
+
+      /* ── Step 5 Server ────────────────────────────────────────────── */
+      document.getElementById("wizStep5BackFromServer").addEventListener("click", () => goStep(4));
+      document.getElementById("wizJoinServer").addEventListener("click", async () => {
+        if (!wizardState.selectedServer) {
+          setMsg("wizMsg5Server", "Please select a server from the list.", "err");
+          return;
+        }
+        wizardState.intendedRole = "satellite";
+        goStep(6);
+      });
+
+      function renderServerList() {
+        const list = document.getElementById("wizServerList");
+        list.innerHTML = "";
+        wizardState.serversFound.forEach((srv, idx) => {
+          const item = document.createElement("div");
+          item.className = "server-item";
+          item.style.cursor = "pointer";
+          item.innerHTML = `
+            <input type="radio" name="serverSelect" value="${idx}" ${idx === 0 ? "checked" : ""} />
+            <strong>${srv.device_name || "Unknown"}</strong>
+            <span>${srv.address}</span>`;
+          item.addEventListener("click", () => {
+            item.querySelector("input[type=radio]").checked = true;
+            wizardState.selectedServer = srv;
+          });
+          list.appendChild(item);
+        });
+        if (wizardState.serversFound.length > 0) {
+          wizardState.selectedServer = wizardState.serversFound[0];
+        }
+      }
+
+      /* ── Step 5 No Server ─────────────────────────────────────────── */
+      document.getElementById("wizStep5BackFromNoServer").addEventListener("click", () => goStep(4));
+      document.getElementById("wizBecomeServer").addEventListener("click", () => {
+        wizardState.intendedRole = "server";
+        goStep(6);
+      });
+      document.getElementById("wizSkipServer").addEventListener("click", () => {
+        wizardState.intendedRole = "skip";
+        goStep(6);
+      });
+
+      /* ── Step 6 ───────────────────────────────────────────────────── */
+      document.getElementById("wizStep6Back").addEventListener("click", () => {
+        if (wizardState.serversFound.length > 0) goStep(5);
+        else goStep(5);
+      });
+
+      function renderConfirmDesc() {
+        const desc = document.getElementById("wizStep6Desc");
+        if (wizardState.intendedRole === "server") {
+          desc.textContent = `This device ("${wizardState.deviceName}") will become the BellForge control server. Layout editing will be unlocked for the authenticated user.`;
+        } else if (wizardState.intendedRole === "satellite") {
+          const srv = wizardState.selectedServer;
+          desc.textContent = `This device will join "${srv ? srv.device_name : "the server"}" (${srv ? srv.address : ""}) as a satellite. Layout editing must be done from the control server.`;
+        } else {
+          desc.textContent = "This device will remain unconfigured. Layout editing is available but will require server authority once a server is established.";
+        }
+      }
+
+      document.getElementById("wizConfirm").addEventListener("click", () => goStep(7));
+
+      /* ── Step 7 ───────────────────────────────────────────────────── */
+      async function runActivation() {
+        setMsg("wizMsg7", "Applying configuration…", "info");
+        try {
+          if (wizardState.intendedRole === "server") {
+            await window.BellForgeControlServer.promoteToServer(wizardState.deviceName);
+            setMsg("wizMsg7", "Server role applied.", "ok");
+          } else if (wizardState.intendedRole === "satellite" && wizardState.selectedServer) {
+            const srv = wizardState.selectedServer;
+            await window.BellForgeControlServer.joinAsSatellite({
+              serverAddress: srv.address,
+              serverDeviceId: srv.device_id || "",
+              serverDeviceName: srv.device_name || "",
+              serverUserId: srv.server_user_id || "",
+            });
+            setMsg("wizMsg7", "Joined as satellite.", "ok");
+          } else {
+            setMsg("wizMsg7", "No role change applied (skipped).", "info");
+          }
+          setTimeout(() => goStep(8), 800);
+        } catch (err) {
+          setMsg("wizMsg7", `Activation error: ${err.message}`, "err");
+          setTimeout(() => goStep(8), 1500);
+        }
+      }
+
+      /* ── Step 8 ───────────────────────────────────────────────────── */
+      function renderCompleteDesc() {
+        const desc = document.getElementById("wizStep8Desc");
+        if (wizardState.intendedRole === "server") {
+          desc.textContent = "This device is now the BellForge control server. Layout editing is unlocked on the status page for the signed-in user.";
+        } else if (wizardState.intendedRole === "satellite") {
+          desc.textContent = "This device is now a satellite. It will sync with the control server. Layout editing must be done from the server device.";
+        } else {
+          desc.textContent = "Setup skipped. This device remains unconfigured. Layout editing is available until a server is established.";
+        }
+      }
+
+      document.getElementById("wizGoStatus").addEventListener("click", () => {
+        window.location.href = `${BASE}/status`;
+      });
+      document.getElementById("wizRestart").addEventListener("click", () => {
+        wizardState = { deviceName: "BellForge Display", provider: null, serversFound: [], selectedServer: null, intendedRole: null };
+        goStep(1);
+      });
+
+      /* ── Auto-advance if already signed in ───────────────────────── */
+      (async function autoStart() {
+        const token = getToken();
+        if (!token) return;
+        try {
+          const res = await fetch(`${BASE}/api/auth/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ token }),
+          });
+          if (res.ok) {
+            // User is already authenticated; jump to discovery
+            goStep(4);
+          }
+        } catch {
+          // Leave at step 1
+        }
+      })();
+
+      // Initialise pips
+      updatePips(1);
+    })();
+  </script>
 </body>
 </html>

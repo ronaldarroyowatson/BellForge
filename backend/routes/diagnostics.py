@@ -4,13 +4,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 import qrcode
 import qrcode.image.svg
 
+from backend.routes.auth_api import user_principal_dependency
 from backend.services.auth import get_auth_status
+from backend.services.control_server import get_control_server_service
+from backend.services.unified_auth import TokenPrincipal
 from backend.services.debug_service import inspect_debug_events, read_debug_events, write_debug_event
 from backend.services.display_preferences import (
     get_display_preferences,
@@ -248,14 +251,27 @@ async def status_layout() -> dict[str, Any]:
 
 
 @router.post("/display/status-layout", summary="Update shared status layout")
-async def update_status_layout_route(payload: StatusLayoutPayload) -> dict[str, Any]:
+async def update_status_layout_route(
+    payload: StatusLayoutPayload,
+    principal: TokenPrincipal = Depends(user_principal_dependency),
+) -> dict[str, Any]:
+    user_id = principal.user_id or principal.subject
+    svc = get_control_server_service(_PROJECT_ROOT)
+    if not svc.can_edit_layout(user_id):
+        raise HTTPException(
+            status_code=403,
+            detail=_error_detail(
+                "Layout editing is not permitted. "
+                "This device must be the control server and you must be the server owner."
+            ),
+        )
     try:
         cards_payload = None
         if payload.cards is not None:
-          cards_payload = {
-              key: value.model_dump(exclude_none=True)
-              for key, value in payload.cards.items()
-          }
+            cards_payload = {
+                key: value.model_dump(exclude_none=True)
+                for key, value in payload.cards.items()
+            }
         return update_status_layout(
             _PROJECT_ROOT,
             min_card_width=payload.min_card_width,
@@ -265,6 +281,8 @@ async def update_status_layout_route(payload: StatusLayoutPayload) -> dict[str, 
             debug_enabled=payload.debug_enabled,
             reset_to_defaults=payload.reset_to_defaults,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_error_detail(f"Status layout update failed: {exc}")) from exc
 
