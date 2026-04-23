@@ -89,7 +89,11 @@ assert_file /opt/bellforge/config/manifest.json
 assert_service_state bellforge-backend.service
 assert_service_state bellforge-client.service
 assert_service_state bellforge-updater.service
-curl -fsS http://127.0.0.1:8000/status >/dev/null
+# Wait for backend to be ready with retries
+for i in {1..20}; do
+  curl -fsS http://127.0.0.1:8000/status >/dev/null && break
+  sleep 1
+done || { echo "[FAIL] Backend did not become ready"; exit 1; }
 
 echo "[STEP] Inject repair damage"
 sudo rm -f /etc/systemd/system/bellforge-client.service /etc/systemd/system/bellforge-updater.service
@@ -110,7 +114,11 @@ assert_file /etc/systemd/system/bellforge-updater.service
 assert_service_state bellforge-backend.service
 assert_service_state bellforge-client.service
 assert_service_state bellforge-updater.service
-curl -fsS http://127.0.0.1:8000/status >/dev/null
+# Wait for backend to be ready with retries
+for i in {1..20}; do
+  curl -fsS http://127.0.0.1:8000/status >/dev/null && break
+  sleep 1
+done || { echo "[FAIL] Backend did not become ready after repair"; exit 1; }
 
 echo "[STEP] Final uninstall"
 run_action --uninstall --purge
