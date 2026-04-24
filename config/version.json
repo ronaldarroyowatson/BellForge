@@ -1,6 +1,6 @@
 {
-  "version": "0.1.72",
-  "released_at": "2026-04-24T16:57:41Z",
+  "version": "0.1.73",
+  "released_at": "2026-04-24T18:13:34Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
   "notes": "Implement control server architecture: server/satellite roles, UDP LAN discovery, server authority permission model, unified 8-step onboarding wizard, layout-edit permission enforcement"
