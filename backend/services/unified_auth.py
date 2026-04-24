@@ -7,6 +7,7 @@ import json
 import os
 import secrets
 import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -168,7 +169,17 @@ class _JsonAuthStore:
 
     def write(self, payload: dict[str, Any]) -> None:
         with self._lock:
-            self._path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+            data = json.dumps(payload, indent=2, sort_keys=True)
+            attempts = 5
+            for attempt in range(attempts):
+                try:
+                    self._path.write_text(data, encoding="utf-8")
+                    return
+                except PermissionError:
+                    if attempt == attempts - 1:
+                        raise
+                    # Windows can transiently lock temp files across rapid test writes.
+                    time.sleep(0.02 * (attempt + 1))
 
 
 class _ProviderVerifier:
