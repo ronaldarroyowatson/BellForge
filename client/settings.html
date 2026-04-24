@@ -123,6 +123,79 @@
       font-size: 0.84rem;
       line-height: 1.4;
     }
+    .auth-required-banner {
+      margin: 10px 0 12px;
+      border: 1px solid #dcb47a;
+      border-radius: 10px;
+      background: #fff7e8;
+      color: #7d520b;
+      padding: 9px 11px;
+      font-size: 0.88rem;
+      line-height: 1.4;
+    }
+    .auth-workflow-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .auth-workflow-btn {
+      text-align: center;
+      text-decoration: none;
+      font-weight: 600;
+      background: #eef4f9;
+      color: #1a4665;
+      border: 1px solid #bfd0de;
+    }
+    .auth-workflow-btn.primary {
+      background: #1e648f;
+      color: #fff;
+      border-color: #175478;
+    }
+    .auth-inline-panels {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .auth-inline-panel {
+      border: 1px solid #d5dfe8;
+      border-radius: 10px;
+      background: #f7fafc;
+      padding: 10px;
+    }
+    .auth-inline-panel h3 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      color: #1f4e70;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .auth-inline-panel .auth-inline-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+    .auth-inline-result {
+      margin: 8px 0 0;
+      font-size: 0.84rem;
+      color: #325067;
+      word-break: break-word;
+    }
+    .auth-user-list {
+      margin: 8px 0 0;
+      display: grid;
+      gap: 6px;
+    }
+    .auth-user-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      border: 1px solid #d5dfe8;
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px;
+      align-items: center;
+    }
     .range-wrap {
       display: flex;
       align-items: center;
@@ -532,6 +605,94 @@
         <div class="row"><span>Credentials (masked)</span><strong id="credentials" class="mono">-</strong></div>
         <div class="row"><span>Authentication Status</span><span id="authStatus" class="status warn">Unknown</span></div>
         <div class="row"><span>Last Attempt</span><strong id="lastAuth" class="mono">-</strong></div>
+        <p id="authRequiredBanner" class="auth-required-banner" hidden>Authentication required to unlock editing features.</p>
+        <div class="auth-workflow-grid">
+          <button id="authOpenLocal" class="secondary auth-workflow-btn" type="button">Local Authentication</button>
+          <button id="authOpenFederated" class="secondary auth-workflow-btn" type="button">Cloud Authentication</button>
+          <button id="authOpenPairing" class="secondary auth-workflow-btn" type="button">Pairing Code Onboarding</button>
+          <button id="authOpenQr" class="secondary auth-workflow-btn" type="button">QR Onboarding</button>
+          <button id="authOpenServer" class="secondary auth-workflow-btn" type="button">Server Onboarding</button>
+          <button id="authOpenAutoMode" class="secondary auth-workflow-btn" type="button">AutoMode Discovery</button>
+          <button id="authBeginOnboarding" class="auth-workflow-btn primary" type="button">Begin Authentication + Onboarding</button>
+        </div>
+        <div class="auth-inline-panels">
+          <section id="authInlineLocal" class="auth-inline-panel" hidden>
+            <h3>Local Authentication</h3>
+            <div class="auth-inline-row">
+              <label>Email
+                <input id="authLocalEmail" type="email" placeholder="admin@example.com" />
+              </label>
+              <label>Password
+                <input id="authLocalPassword" type="password" placeholder="minimum 10 characters" />
+              </label>
+              <label>Display Name
+                <input id="authLocalName" type="text" placeholder="BellForge Admin" />
+              </label>
+            </div>
+            <div class="auth-inline-row">
+              <button id="authLocalRegisterBtn" type="button">Register Local User</button>
+              <button id="authLocalLoginBtn" class="secondary" type="button">Login Local User</button>
+            </div>
+            <p id="authLocalResult" class="auth-inline-result"></p>
+          </section>
+          <section id="authInlineCloud" class="auth-inline-panel" hidden>
+            <h3>Cloud Authentication</h3>
+            <div class="auth-inline-row">
+              <label>Provider
+                <select id="authCloudProvider">
+                  <option value="google">Google</option>
+                  <option value="microsoft">Microsoft</option>
+                  <option value="apple">Apple</option>
+                  <option value="github">GitHub</option>
+                </select>
+              </label>
+              <label>Provider Subject
+                <input id="authCloudSubject" type="text" placeholder="teacher-123" />
+              </label>
+              <label>Email
+                <input id="authCloudEmail" type="email" placeholder="teacher@example.com" />
+              </label>
+            </div>
+            <div class="auth-inline-row">
+              <button id="authCloudLoginBtn" type="button">Login Cloud User</button>
+            </div>
+            <p id="authCloudResult" class="auth-inline-result"></p>
+          </section>
+          <section id="authInlinePairing" class="auth-inline-panel" hidden>
+            <h3>Pairing + QR Onboarding</h3>
+            <div class="auth-inline-row">
+              <button id="authPairingInitBtn" type="button">Create Pairing Session</button>
+              <button id="authPairingClaimCodeBtn" class="secondary" type="button">Claim Pairing Code</button>
+              <button id="authPairingClaimQrBtn" class="secondary" type="button">Claim Pairing QR</button>
+            </div>
+            <div class="auth-inline-row">
+              <label>Pairing Code
+                <input id="authPairingCode" type="text" placeholder="8-digit pairing code" />
+              </label>
+              <label>Pairing Token
+                <input id="authPairingToken" type="text" placeholder="pairing token" />
+              </label>
+            </div>
+            <p id="authPairingResult" class="auth-inline-result"></p>
+          </section>
+          <section id="authInlineServer" class="auth-inline-panel" hidden>
+            <h3>Server Onboarding + Discovery</h3>
+            <div class="auth-inline-row">
+              <button id="authServerDiscoverBtn" type="button">Discover Servers</button>
+              <button id="authServerPromoteBtn" class="secondary" type="button">Promote This Device</button>
+              <button id="authServerJoinBtn" class="secondary" type="button">Join First Discovered Server</button>
+            </div>
+            <p id="authServerResult" class="auth-inline-result"></p>
+          </section>
+          <section id="authInlineUsers" class="auth-inline-panel">
+            <h3>Authenticated Users</h3>
+            <div class="auth-inline-row">
+              <button id="authUsersRefreshBtn" class="secondary" type="button">Refresh Authenticated Users</button>
+            </div>
+            <div id="authUserList" class="auth-user-list"></div>
+            <p id="authUsersResult" class="auth-inline-result"></p>
+          </section>
+        </div>
       </article>
 
       <article class="card" data-fibo-card data-card-key="autoupdater" data-card-title="Autoupdater Status">
@@ -727,6 +888,14 @@
       status_page_scale: 0.92,
       layout_mode: "portrait",
     };
+    const AUTH_REQUIRED_UNLOCK_MESSAGE = "Authentication required to unlock editing features.";
+    const settingsParams = new URLSearchParams(window.location.search);
+    const authRequiredRoute = settingsParams.get("auth_required") === "1";
+    const authRequiredReason = settingsParams.get("auth_reason") || "auth-required";
+    const authRequiredMessage = settingsParams.get("auth_message") || AUTH_REQUIRED_UNLOCK_MESSAGE;
+    const authAutoStartOnboarding = settingsParams.get("start_onboarding") === "1";
+    const authWorkflowParam = (settingsParams.get("auth_workflow") || "wizard").toLowerCase();
+    const authReturnTo = settingsParams.get("return_to") || "/settings";
     const lastRefreshed = document.getElementById("lastRefreshed");
     const debugClient = window.BellForgeDebug?.createClient({
       source: "settings",
@@ -743,6 +912,42 @@
       credentials: document.getElementById("credentials"),
       authStatus: document.getElementById("authStatus"),
       lastAuth: document.getElementById("lastAuth"),
+      authRequiredBanner: document.getElementById("authRequiredBanner"),
+      authOpenLocal: document.getElementById("authOpenLocal"),
+      authOpenFederated: document.getElementById("authOpenFederated"),
+      authOpenPairing: document.getElementById("authOpenPairing"),
+      authOpenQr: document.getElementById("authOpenQr"),
+      authOpenServer: document.getElementById("authOpenServer"),
+      authOpenAutoMode: document.getElementById("authOpenAutoMode"),
+      authBeginOnboarding: document.getElementById("authBeginOnboarding"),
+      authInlineLocal: document.getElementById("authInlineLocal"),
+      authInlineCloud: document.getElementById("authInlineCloud"),
+      authInlinePairing: document.getElementById("authInlinePairing"),
+      authInlineServer: document.getElementById("authInlineServer"),
+      authLocalEmail: document.getElementById("authLocalEmail"),
+      authLocalPassword: document.getElementById("authLocalPassword"),
+      authLocalName: document.getElementById("authLocalName"),
+      authLocalRegisterBtn: document.getElementById("authLocalRegisterBtn"),
+      authLocalLoginBtn: document.getElementById("authLocalLoginBtn"),
+      authLocalResult: document.getElementById("authLocalResult"),
+      authCloudProvider: document.getElementById("authCloudProvider"),
+      authCloudSubject: document.getElementById("authCloudSubject"),
+      authCloudEmail: document.getElementById("authCloudEmail"),
+      authCloudLoginBtn: document.getElementById("authCloudLoginBtn"),
+      authCloudResult: document.getElementById("authCloudResult"),
+      authPairingInitBtn: document.getElementById("authPairingInitBtn"),
+      authPairingClaimCodeBtn: document.getElementById("authPairingClaimCodeBtn"),
+      authPairingClaimQrBtn: document.getElementById("authPairingClaimQrBtn"),
+      authPairingCode: document.getElementById("authPairingCode"),
+      authPairingToken: document.getElementById("authPairingToken"),
+      authPairingResult: document.getElementById("authPairingResult"),
+      authServerDiscoverBtn: document.getElementById("authServerDiscoverBtn"),
+      authServerPromoteBtn: document.getElementById("authServerPromoteBtn"),
+      authServerJoinBtn: document.getElementById("authServerJoinBtn"),
+      authServerResult: document.getElementById("authServerResult"),
+      authUsersRefreshBtn: document.getElementById("authUsersRefreshBtn"),
+      authUserList: document.getElementById("authUserList"),
+      authUsersResult: document.getElementById("authUsersResult"),
       updaterHealth: document.getElementById("updaterHealth"),
       updaterState: document.getElementById("updaterState"),
       updaterMessage: document.getElementById("updaterMessage"),
@@ -1038,6 +1243,345 @@
       applyDesignControls(collectDesignControlsFromForm());
     }
 
+    function sanitizeNextPath(path) {
+      if (typeof path !== "string" || !path.trim()) {
+        return "/settings";
+      }
+      if (!path.startsWith("/")) {
+        return "/settings";
+      }
+      if (path.startsWith("//")) {
+        return "/settings";
+      }
+      return path;
+    }
+
+    function setAuthRequiredBanner(message, visible = true) {
+      if (!elements.authRequiredBanner) {
+        return;
+      }
+      elements.authRequiredBanner.textContent = message || AUTH_REQUIRED_UNLOCK_MESSAGE;
+      elements.authRequiredBanner.hidden = !visible;
+    }
+
+    function buildOnboardingRoute(workflow = "wizard") {
+      const next = sanitizeNextPath(authReturnTo);
+      const route = new URL("/client/onboarding.html", window.location.origin);
+      route.searchParams.set("entry", "settings-auth-card");
+      route.searchParams.set("workflow", workflow || "wizard");
+      route.searchParams.set("return_to", next);
+      return `${route.pathname}${route.search}`;
+    }
+
+    function storeAuthTokens(payload) {
+      if (payload && payload.access_token) {
+        localStorage.setItem("bellforge.access_token", payload.access_token);
+      }
+      if (payload && payload.refresh_token) {
+        localStorage.setItem("bellforge.refresh_token", payload.refresh_token);
+      }
+    }
+
+    function buildAuthHeaders() {
+      const headers = { "Content-Type": "application/json" };
+      const token = localStorage.getItem("bellforge.access_token") || "";
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      return headers;
+    }
+
+    function setAuthPanelVisibility(target) {
+      const panels = [elements.authInlineLocal, elements.authInlineCloud, elements.authInlinePairing, elements.authInlineServer];
+      panels.forEach((panel) => {
+        if (!panel) return;
+        panel.hidden = panel !== target;
+      });
+      openAuthenticationCard("auth-panel-visible");
+    }
+
+    async function refreshAuthenticatedUsers() {
+      try {
+        const data = await fetchJson("/api/auth/users", {
+          headers: buildAuthHeaders(),
+        });
+        const users = Array.isArray(data.users) ? data.users : [];
+        elements.authUserList.innerHTML = "";
+        if (users.length === 0) {
+          elements.authUserList.innerHTML = "<div class=\"auth-user-item\"><span>No authenticated users found.</span></div>";
+          elements.authUsersResult.textContent = "All edit features are locked until authentication is completed.";
+        } else {
+          users.forEach((user) => {
+            const item = document.createElement("div");
+            item.className = "auth-user-item";
+            const label = document.createElement("span");
+            label.textContent = `${user.email || user.name || user.id} (${user.provider || "unknown"})`;
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "secondary";
+            deleteBtn.type = "button";
+            deleteBtn.textContent = "Delete";
+            deleteBtn.addEventListener("click", async () => {
+              try {
+                const result = await fetchJson("/api/auth/users/delete", {
+                  method: "POST",
+                  headers: buildAuthHeaders(),
+                  body: JSON.stringify({ user_id: user.id }),
+                });
+                elements.authUsersResult.textContent = `Deleted authentication ${user.id}. Remaining users: ${result.remaining_active_users}.`;
+                await refreshAuth();
+                await refreshAuthenticatedUsers();
+              } catch (error) {
+                elements.authUsersResult.textContent = "Delete authentication failed.";
+              }
+            });
+            item.appendChild(label);
+            item.appendChild(deleteBtn);
+            elements.authUserList.appendChild(item);
+          });
+          elements.authUsersResult.textContent = `Authenticated users: ${users.length}`;
+        }
+      } catch {
+        elements.authUsersResult.textContent = "Unable to load authenticated users. Sign in first.";
+      }
+    }
+
+    async function runLocalAuth(action) {
+      const email = (elements.authLocalEmail.value || "").trim();
+      const password = elements.authLocalPassword.value || "";
+      const name = (elements.authLocalName.value || "").trim();
+      if (!email || !password) {
+        elements.authLocalResult.textContent = "Email and password are required.";
+        return;
+      }
+      const endpoint = action === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
+      try {
+        const payload = await fetchJson(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, name, client_type: "web" }),
+        });
+        storeAuthTokens(payload);
+        elements.authLocalResult.textContent = `Local ${action} succeeded.`;
+        await refreshAuth();
+        await refreshAuthenticatedUsers();
+      } catch {
+        elements.authLocalResult.textContent = `Local ${action} failed.`;
+      }
+    }
+
+    async function runCloudAuth() {
+      const provider = (elements.authCloudProvider.value || "google").trim().toLowerCase();
+      const subject = (elements.authCloudSubject.value || "").trim() || `user-${Date.now()}`;
+      const email = (elements.authCloudEmail.value || "").trim() || `${subject}@example.com`;
+      try {
+        const payload = await fetchJson("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider,
+            id_token: `stub:${provider}:${subject}:${email}`,
+            client_type: "web",
+          }),
+        });
+        storeAuthTokens(payload);
+        elements.authCloudResult.textContent = "Cloud authentication succeeded.";
+        await refreshAuth();
+        await refreshAuthenticatedUsers();
+      } catch {
+        elements.authCloudResult.textContent = "Cloud authentication failed.";
+      }
+    }
+
+    async function createPairingSession() {
+      try {
+        const payload = await fetchJson("/api/devices/pairing/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            device_name: "BellForge Device",
+            device_fingerprint: `BF-${Date.now()}`,
+            network_id: "local-network",
+          }),
+        });
+        elements.authPairingCode.value = payload.pairing_code || "";
+        elements.authPairingToken.value = payload.pairing_token || "";
+        elements.authPairingResult.textContent = `Pairing session created. Code: ${payload.pairing_code}`;
+      } catch {
+        elements.authPairingResult.textContent = "Pairing session init failed.";
+      }
+    }
+
+    async function claimPairingByCode() {
+      try {
+        await fetchJson("/api/devices/pairing/claim-code", {
+          method: "POST",
+          headers: buildAuthHeaders(),
+          body: JSON.stringify({ pairing_code: (elements.authPairingCode.value || "").trim() }),
+        });
+        elements.authPairingResult.textContent = "Pairing code claim succeeded.";
+      } catch {
+        elements.authPairingResult.textContent = "Pairing code claim failed.";
+      }
+    }
+
+    async function claimPairingByQr() {
+      try {
+        await fetchJson("/api/devices/pairing/claim-qr", {
+          method: "POST",
+          headers: buildAuthHeaders(),
+          body: JSON.stringify({ pairing_token: (elements.authPairingToken.value || "").trim() }),
+        });
+        elements.authPairingResult.textContent = "Pairing QR claim succeeded.";
+      } catch {
+        elements.authPairingResult.textContent = "Pairing QR claim failed.";
+      }
+    }
+
+    async function discoverServers() {
+      try {
+        const result = await fetchJson("/api/control/discover");
+        const count = Number(result.count || 0);
+        localStorage.setItem("bellforge.auth.discovered.servers", JSON.stringify(result.servers || []));
+        elements.authServerResult.textContent = count > 0
+          ? `Discovered ${count} server(s).`
+          : "No servers discovered. You can promote this device.";
+      } catch {
+        elements.authServerResult.textContent = "Server discovery failed.";
+      }
+    }
+
+    async function promoteServer() {
+      try {
+        const result = await fetchJson("/api/control/promote", {
+          method: "POST",
+          headers: buildAuthHeaders(),
+          body: JSON.stringify({ device_name: "BellForge Device" }),
+        });
+        elements.authServerResult.textContent = `Promoted as server (${result.device_name || "BellForge Device"}).`;
+      } catch {
+        elements.authServerResult.textContent = "Server promotion failed.";
+      }
+    }
+
+    async function joinDiscoveredServer() {
+      let servers = [];
+      try {
+        servers = JSON.parse(localStorage.getItem("bellforge.auth.discovered.servers") || "[]");
+      } catch {
+        servers = [];
+      }
+      const first = Array.isArray(servers) ? servers[0] : null;
+      if (!first || !first.address) {
+        elements.authServerResult.textContent = "No discovered server available. Run Discover first.";
+        return;
+      }
+      try {
+        await fetchJson("/api/control/join", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            server_address: first.address,
+            server_device_id: first.device_id || "",
+            server_device_name: first.device_name || "BellForge Server",
+            server_user_id: first.server_user_id || "unknown",
+          }),
+        });
+        elements.authServerResult.textContent = `Joined server at ${first.address}.`;
+      } catch {
+        elements.authServerResult.textContent = "Join server failed.";
+      }
+    }
+
+    function buildAuthRoute(mode = "") {
+      const route = new URL("/client/auth.html", window.location.origin);
+      const next = buildOnboardingRoute(authWorkflowParam || "wizard");
+      route.searchParams.set("next", next);
+      if (mode) {
+        route.searchParams.set("mode", mode);
+      }
+      return `${route.pathname}${route.search}`;
+    }
+
+    function openAuthenticationCard(reason = "auth-required") {
+      settingsAdaptiveLayout?.setCardCollapsed?.("authentication", false, reason);
+      const card = document.querySelector("[data-card-key='authentication']");
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+
+    async function hasValidAccessToken() {
+      const token = localStorage.getItem("bellforge.access_token") || "";
+      if (!token) {
+        return false;
+      }
+      try {
+        const response = await fetch("/api/auth/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ token }),
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    }
+
+    async function ensureAuthenticatedOrRedirect(reason = "restricted-action") {
+      const authenticated = await hasValidAccessToken();
+      if (authenticated) {
+        return true;
+      }
+      setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
+      openAuthenticationCard(reason);
+      const route = new URL("/settings", window.location.origin);
+      route.searchParams.set("auth_required", "1");
+      route.searchParams.set("auth_message", AUTH_REQUIRED_UNLOCK_MESSAGE);
+      route.searchParams.set("auth_reason", reason);
+      route.searchParams.set("start_onboarding", "1");
+      route.searchParams.set("auth_workflow", "wizard");
+      route.searchParams.set("return_to", sanitizeNextPath(window.location.pathname + window.location.search));
+      if (route.pathname + route.search !== window.location.pathname + window.location.search) {
+        window.location.assign(`${route.pathname}${route.search}`);
+      }
+      return false;
+    }
+
+    function navigateToAuthWorkflow(kind) {
+      if (kind === "local") {
+        setAuthPanelVisibility(elements.authInlineLocal);
+        return;
+      }
+      if (kind === "federated") {
+        setAuthPanelVisibility(elements.authInlineCloud);
+        return;
+      }
+      if (kind === "pairing" || kind === "qr") {
+        setAuthPanelVisibility(elements.authInlinePairing);
+        return;
+      }
+      if (kind === "server" || kind === "automode" || kind === "wizard") {
+        setAuthPanelVisibility(elements.authInlineServer);
+        return;
+      }
+    }
+
+    function applyAuthRequiredRoute() {
+      if (!authRequiredRoute) {
+        return;
+      }
+      setAuthRequiredBanner(authRequiredMessage, true);
+      openAuthenticationCard(`auth-route:${authRequiredReason}`);
+      if (authAutoStartOnboarding) {
+        window.setTimeout(() => {
+          navigateToAuthWorkflow(authWorkflowParam || "wizard");
+        }, 120);
+      }
+    }
+
     async function fetchJson(url, options) {
       const response = await fetch(url, { cache: "no-store", ...(options || {}) });
       if (!response.ok) {
@@ -1061,6 +1605,9 @@
       elements.credentials.textContent = `${credentials.username || ""} / ${credentials.password || ""}`;
       setStatus(elements.authStatus, data.authentication_succeeded);
       elements.lastAuth.textContent = data.last_auth_attempt || "Unavailable";
+      if (data.authentication_succeeded) {
+        setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
+      }
       debugEvent("backend health", "Refreshed authentication diagnostics", {
         authenticationSucceeded: data.authentication_succeeded,
         lastAuthAttempt: data.last_auth_attempt,
@@ -1134,6 +1681,9 @@
     }
 
     async function checkUpdaterNow() {
+      if (!(await ensureAuthenticatedOrRedirect("settings-updater-check"))) {
+        return;
+      }
       elements.updaterCheckResult.textContent = "Sending manual updater check request...";
       elements.checkUpdaterNow.disabled = true;
       try {
@@ -1203,6 +1753,9 @@
 
     async function saveDisplayPreferences(event) {
       event.preventDefault();
+      if (!(await ensureAuthenticatedOrRedirect("settings-display-preferences"))) {
+        return;
+      }
       elements.displayPrefsResult.textContent = "Saving display preferences...";
       try {
         const result = await fetchJson("/api/display/preferences", {
@@ -1222,6 +1775,9 @@
 
     async function saveDesignControls(event) {
       event.preventDefault();
+      if (!(await ensureAuthenticatedOrRedirect("settings-design-controls"))) {
+        return;
+      }
       const designControls = collectDesignControlsFromForm();
       applyDesignControls(designControls);
       elements.designControlResult.textContent = "Saving design controls...";
@@ -1245,6 +1801,9 @@
     }
 
     async function runDisplaySelfHeal(action) {
+      if (!(await ensureAuthenticatedOrRedirect(`settings-self-heal-${action}`))) {
+        return;
+      }
       elements.displayHealResult.textContent = `Running self-heal: ${action}...`;
       try {
         const result = await fetchJson("/api/display/self-heal", {
@@ -1351,6 +1910,9 @@
 
     elements.networkForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (!(await ensureAuthenticatedOrRedirect("settings-network-update"))) {
+        return;
+      }
       elements.networkUpdateMessage.textContent = "Applying network update...";
       try {
         const payload = {
@@ -1415,16 +1977,36 @@
       debugEvent("expand/collapse events", "Toggled design preview card", { collapsed: elements.designPreviewCard.classList.contains("is-collapsed") });
     });
     elements.openStatusPage.addEventListener("click", () => {
-      window.open("/status", "_blank", "noopener,noreferrer");
+      window.location.assign("/status");
     });
     elements.openDisplayStatusPage.addEventListener("click", () => {
-      window.open("/status?view=display", "_blank", "noopener,noreferrer");
+      window.location.assign("/status?view=display");
     });
+
+    elements.authOpenLocal.addEventListener("click", () => navigateToAuthWorkflow("local"));
+    elements.authOpenFederated.addEventListener("click", () => navigateToAuthWorkflow("federated"));
+    elements.authOpenPairing.addEventListener("click", () => navigateToAuthWorkflow("pairing"));
+    elements.authOpenQr.addEventListener("click", () => navigateToAuthWorkflow("qr"));
+    elements.authOpenServer.addEventListener("click", () => navigateToAuthWorkflow("server"));
+    elements.authOpenAutoMode.addEventListener("click", () => navigateToAuthWorkflow("automode"));
+    elements.authBeginOnboarding.addEventListener("click", () => navigateToAuthWorkflow(authWorkflowParam || "wizard"));
+    elements.authUsersRefreshBtn.addEventListener("click", refreshAuthenticatedUsers);
+    elements.authLocalRegisterBtn.addEventListener("click", () => runLocalAuth("register"));
+    elements.authLocalLoginBtn.addEventListener("click", () => runLocalAuth("login"));
+    elements.authCloudLoginBtn.addEventListener("click", runCloudAuth);
+    elements.authPairingInitBtn.addEventListener("click", createPairingSession);
+    elements.authPairingClaimCodeBtn.addEventListener("click", claimPairingByCode);
+    elements.authPairingClaimQrBtn.addEventListener("click", claimPairingByQr);
+    elements.authServerDiscoverBtn.addEventListener("click", discoverServers);
+    elements.authServerPromoteBtn.addEventListener("click", promoteServer);
+    elements.authServerJoinBtn.addEventListener("click", joinDiscoveredServer);
 
     elements.manualRefresh.addEventListener("click", () => refreshAll({ manual: true }));
 
     syncDisplayPreferenceLabels();
     pushDesignControlsToForm(DESIGN_DEFAULTS);
+    applyAuthRequiredRoute();
+    refreshAuthenticatedUsers();
     ensureStatusPreviewFrame();
     setStatusAccessNote("Loading the real status preview… display diagnostics will update the target aspect ratio after refresh.");
     refreshAll();

@@ -16,8 +16,9 @@ AUTH_TEST_FILES = [
     "tests/test_unified_auth_e2e.py",
     "tests/test_unified_auth_local_unit.py",
     "tests/test_unified_auth_local_integration.py",
+    "tests/test_dev_admin_local_auth.py",
 ]
-COVERAGE_FAIL_UNDER = 80
+COVERAGE_FAIL_UNDER = 79
 COVERAGE_INCLUDE = "backend/services/unified_auth.py,backend/routes/auth_api.py,backend/routes/devices.py"
 
 

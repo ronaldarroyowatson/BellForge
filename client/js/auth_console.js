@@ -16,9 +16,30 @@ const els = {
 };
 
 let lastResetToken = "";
+let nextPath = "";
 
 function show(value) {
   els.output.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+function resolveNextPath(raw) {
+  if (typeof raw !== "string" || !raw) {
+    return "";
+  }
+  if (!raw.startsWith("/") || raw.startsWith("//")) {
+    return "";
+  }
+  return raw;
+}
+
+function redirectAfterAuthIfNeeded(label) {
+  if (!nextPath) {
+    return;
+  }
+  show(`${label} Redirecting...`);
+  window.setTimeout(() => {
+    window.location.assign(nextPath);
+  }, 180);
 }
 
 async function api(path, method, body, headers = { "Content-Type": "application/json" }) {
@@ -63,6 +84,7 @@ async function cloudLogin() {
   });
   stashTokens(payload);
   show(payload);
+  redirectAfterAuthIfNeeded("Cloud authentication complete.");
 }
 
 async function verifyAccessToken() {
@@ -80,6 +102,7 @@ async function localRegister() {
   });
   stashTokens(payload);
   show(payload);
+  redirectAfterAuthIfNeeded("Local registration complete.");
 }
 
 async function localLogin() {
@@ -90,6 +113,7 @@ async function localLogin() {
   });
   stashTokens(payload);
   show(payload);
+  redirectAfterAuthIfNeeded("Local authentication complete.");
 }
 
 async function localResetRequest() {
@@ -192,6 +216,7 @@ els.tokenRefresh.value = cachedRefresh;
 const authParams = new URLSearchParams(window.location.search);
 const authMode = (authParams.get("mode") || "").toLowerCase();
 const providerParam = (authParams.get("provider") || "").toLowerCase();
+nextPath = resolveNextPath(authParams.get("next") || "");
 
 if (["google", "microsoft", "apple", "github"].includes(providerParam)) {
   els.provider.value = providerParam;

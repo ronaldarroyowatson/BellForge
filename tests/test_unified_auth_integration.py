@@ -219,6 +219,41 @@ class UnifiedAuthIntegrationTests(unittest.TestCase):
         self.assertFalse(report.json()["queued"])
         self.assertEqual(report.json()["reason"], "already-linked")
 
+    def test_auth_status_and_user_deletion_relock_contract(self) -> None:
+        initial_status = self.client.get("/api/auth/status")
+        self.assertEqual(initial_status.status_code, 200)
+        self.assertFalse(initial_status.json()["authentication_succeeded"])
+        self.assertEqual(initial_status.json()["active_user_count"], 0)
+
+        login = self._login("google", "delete-me")
+        headers = {"Authorization": f"Bearer {login['access_token']}"}
+
+        users = self.client.get("/api/auth/users", headers=headers)
+        self.assertEqual(users.status_code, 200)
+        self.assertGreaterEqual(users.json()["count"], 1)
+        user_id = users.json()["users"][0]["id"]
+
+        delete = self.client.post("/api/auth/users/delete", headers=headers, json={"user_id": user_id})
+        self.assertEqual(delete.status_code, 200)
+        self.assertEqual(delete.json()["remaining_active_users"], 0)
+
+        final_status = self.client.get("/api/auth/status")
+        self.assertEqual(final_status.status_code, 200)
+        self.assertFalse(final_status.json()["authentication_succeeded"])
+        self.assertEqual(final_status.json()["active_user_count"], 0)
+
+        delete_again = self.client.post("/api/auth/users/delete", headers=headers, json={"user_id": user_id})
+        self.assertEqual(delete_again.status_code, 200)
+        self.assertEqual(delete_again.json()["remaining_active_users"], 0)
+
+    def test_auth_status_reports_mode_flags_for_hybrid(self) -> None:
+        status = self.client.get("/api/auth/status")
+        self.assertEqual(status.status_code, 200)
+        payload = status.json()
+        self.assertEqual(payload["auth_mode"], "hybrid")
+        self.assertTrue(payload["cloud_enabled"])
+        self.assertTrue(payload["local_enabled"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -149,17 +149,18 @@ def test_backend(client: httpx.Client) -> None:
         fail(f"/display/main — {exc}")
 
     # auth/onboarding surfaces
-    for path in (
-        "/auth",
-        "/onboarding",
-        "/automode",
-        "/client/auth.html",
-        "/client/onboarding.html",
-        "/client/automode.html",
+    # /auth and /onboarding are legacy routes that redirect (307) to /settings
+    for path, expected_code in (
+        ("/auth", 307),
+        ("/onboarding", 307),
+        ("/automode", 200),
+        ("/client/auth.html", 200),
+        ("/client/onboarding.html", 200),
+        ("/client/automode.html", 200),
     ):
         try:
-            r = client.get(f"{BACKEND_BASE}{path}")
-            assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+            r = client.get(f"{BACKEND_BASE}{path}", follow_redirects=False)
+            assert r.status_code == expected_code, f"Expected {expected_code}, got {r.status_code}"
             ok(f"{path} — page delivered")
         except Exception as exc:
             fail(f"{path} — {exc}")

@@ -246,7 +246,7 @@ class UnifiedAuthLocalIntegrationTests(unittest.TestCase):
                 "client_type": "web",
             },
         )
-        self.assertEqual(too_short.status_code, 422)
+        self.assertEqual(too_short.status_code, 400)
 
         too_long = self.client.post(
             "/api/auth/local/register",

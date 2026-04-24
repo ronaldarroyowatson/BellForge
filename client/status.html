@@ -371,10 +371,13 @@
       font-size: clamp(1rem, 1.8vw, 1.25rem);
       line-height: 1.35;
       word-break: break-word;
+      overflow-wrap: anywhere;
       background: var(--accent-soft);
       border: 1px solid #b8d0df;
       border-radius: 16px;
       padding: 12px 14px;
+      max-height: 7.2em;
+      overflow-y: auto;
     }
     .onboarding-action-links {
       display: grid;
@@ -1002,6 +1005,7 @@
     const STATUS_LAYOUT_SETTINGS_KEY = "bellforge.status.layout-settings.v1";
     const STATUS_LAYOUT_DEBUG_KEY = "bellforge.status.layout.debug";
     const ACCESS_TOKEN_KEY = "bellforge.access_token";
+    const AUTH_REQUIRED_UNLOCK_MESSAGE = "Authentication required to unlock editing features.";
     const params = new URLSearchParams(window.location.search);
     const isDisplayView = params.get("view") === "display";
     const isMirrorView = params.get("mirror") === "1";
@@ -1095,6 +1099,43 @@
     let lastSharedStatusLayoutUpdate = "";
     let statusLayoutDebugEnabled = forceStatusLayoutDebug || localStorage.getItem(STATUS_LAYOUT_DEBUG_KEY) === "true";
     let physicalViewport = { width: 1920, height: 1080 };
+
+    function buildAuthRequiredSettingsRoute(reason = "status-edit") {
+      const route = new URL("/settings", window.location.origin);
+      route.searchParams.set("auth_required", "1");
+      route.searchParams.set("auth_message", AUTH_REQUIRED_UNLOCK_MESSAGE);
+      route.searchParams.set("auth_reason", reason);
+      route.searchParams.set("start_onboarding", "1");
+      route.searchParams.set("auth_workflow", "wizard");
+      route.searchParams.set("return_to", window.location.pathname + window.location.search);
+      return `${route.pathname}${route.search}`;
+    }
+
+    function redirectToAuthenticationCard(reason = "status-edit") {
+      const destination = buildAuthRequiredSettingsRoute(reason);
+      window.location.assign(destination);
+    }
+
+    async function enforceOnboardingGate() {
+      if (isDisplayView || isMirrorView || isPreviewEditor) {
+        return;
+      }
+      if (params.get("skip_auth_gate") === "1") {
+        return;
+      }
+      try {
+        const response = await fetch("/api/control/status", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+        const payload = await response.json();
+        if (String(payload.role || "") === "unconfigured") {
+          redirectToAuthenticationCard("device-not-onboarded");
+        }
+      } catch {
+        // Keep status visible when control status cannot be fetched.
+      }
+    }
 
     function debugEvent(channel, message, payload, level = "info") {
       if (!debugClient) {
@@ -1460,6 +1501,32 @@
       applyLayoutSettings({ ...currentSettings, editEnabled: layoutEditorAuthorized && currentSettings.editEnabled });
     }
 
+    async function ensureLayoutEditAuthorized(reason = "status-layout-edit") {
+      if (isPreviewEditor) {
+        return true;
+      }
+      await refreshLayoutEditorAuth();
+      if (layoutEditorAuthorized) {
+        return true;
+      }
+      if (els.layoutEditorStatus) {
+        els.layoutEditorStatus.textContent = AUTH_REQUIRED_UNLOCK_MESSAGE;
+      }
+      redirectToAuthenticationCard(reason);
+      return false;
+    }
+
+    function requireLayoutEditAuthorizationSync(reason = "status-layout-edit") {
+      if (isPreviewEditor || layoutEditorAuthorized) {
+        return true;
+      }
+      if (els.layoutEditorStatus) {
+        els.layoutEditorStatus.textContent = AUTH_REQUIRED_UNLOCK_MESSAGE;
+      }
+      redirectToAuthenticationCard(reason);
+      return false;
+    }
+
     function clamp(value, min, max, fallback = min) {
       const numeric = Number(value);
       if (!Number.isFinite(numeric)) {
@@ -1610,11 +1677,11 @@
       return {
         base,
         settings: `${base}/settings`,
-        auth: `${base}/client/auth.html`,
-        authLocal: `${base}/client/auth.html?mode=local`,
-        authFederated: `${base}/client/auth.html?mode=federated`,
-        onboarding: `${base}/client/onboarding.html`,
-        onboardingWizard: `${base}/client/onboarding.html`,
+        auth: `${base}/settings?auth_required=1&auth_workflow=wizard&start_onboarding=1`,
+        authLocal: `${base}/settings?auth_required=1&auth_workflow=local`,
+        authFederated: `${base}/settings?auth_required=1&auth_workflow=federated`,
+        onboarding: `${base}/settings?auth_required=1&auth_workflow=wizard&start_onboarding=1`,
+        onboardingWizard: `${base}/settings?auth_required=1&auth_workflow=server`,
         automode: `${base}/client/automode.html`,
       };
     }
@@ -1975,10 +2042,9 @@
     advancedDetails.addEventListener("toggle", () => statusAdaptiveLayout.requestLayout("advanced-toggle"));
 
     if (els.layoutEditToggle) {
-      els.layoutEditToggle.addEventListener("click", () => {
+      els.layoutEditToggle.addEventListener("click", async () => {
         const settings = readLayoutSettings();
-        if (!layoutEditorAuthorized && !isPreviewEditor) {
-          els.layoutEditorStatus.textContent = "Authentication required. Sign in on the auth page, then reload this real status page.";
+        if (!(await ensureLayoutEditAuthorized("status-layout-toggle"))) {
           return;
         }
         applyLayoutSettings({ ...settings, editEnabled: !settings.editEnabled });
@@ -1987,6 +2053,9 @@
     }
     if (els.layoutSave) {
       els.layoutSave.addEventListener("click", async () => {
+        if (!(await ensureLayoutEditAuthorized("status-layout-save"))) {
+          return;
+        }
         try {
           saveLayout("status-layout-save-button");
           await persistSharedStatusLayout("status-layout-save-button");
@@ -1999,6 +2068,9 @@
     }
     if (els.layoutAutoArrange) {
       els.layoutAutoArrange.addEventListener("click", () => {
+        if (!requireLayoutEditAuthorizationSync("status-layout-auto-arrange")) {
+          return;
+        }
         console.debug("[BellForge Status Layout] auto arrange", { source: "status-button" });
         statusAdaptiveLayout.autoArrange();
         updateLayoutMetrics();
@@ -2006,6 +2078,9 @@
     }
     if (els.layoutReset) {
       els.layoutReset.addEventListener("click", () => {
+        if (!requireLayoutEditAuthorizationSync("status-layout-reset")) {
+          return;
+        }
         console.debug("[BellForge Status Layout] reset layout", { source: "status-button" });
         statusAdaptiveLayout.resetState("real-status-layout-reset");
         updateLayoutMetrics();
@@ -2013,6 +2088,9 @@
     }
     if (els.layoutMinWidth) {
       els.layoutMinWidth.addEventListener("input", () => {
+        if (!requireLayoutEditAuthorizationSync("status-layout-min-width")) {
+          return;
+        }
         const minCardWidth = Number(els.layoutMinWidth.value);
         console.debug("[BellForge Status Layout] slider change", { control: "minCardWidth", minCardWidth });
         applyLayoutSettings({ ...readLayoutSettings(), minCardWidth });
@@ -2026,6 +2104,9 @@
     }
     if (els.layoutGap) {
       els.layoutGap.addEventListener("input", () => {
+        if (!requireLayoutEditAuthorizationSync("status-layout-gap")) {
+          return;
+        }
         const gap = Number(els.layoutGap.value);
         console.debug("[BellForge Status Layout] slider change", { control: "gap", gap });
         applyLayoutSettings({ ...readLayoutSettings(), gap });

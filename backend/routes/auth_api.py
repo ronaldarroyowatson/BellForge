@@ -37,14 +37,14 @@ class VerifyRequest(BaseModel):
 
 class LocalRegisterRequest(BaseModel):
     email: str = Field(min_length=5, max_length=320)
-    password: str = Field(min_length=10, max_length=256)
+    password: str = Field(min_length=1, max_length=256)
     name: str | None = Field(default=None, max_length=120)
     client_type: str = Field(default="web", min_length=2, max_length=40)
 
 
 class LocalLoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=320)
-    password: str = Field(min_length=10, max_length=256)
+    password: str = Field(min_length=1, max_length=256)
     client_type: str = Field(default="web", min_length=2, max_length=40)
 
 
@@ -54,7 +54,11 @@ class LocalPasswordResetRequest(BaseModel):
 
 class LocalPasswordResetConfirmRequest(BaseModel):
     reset_token: str = Field(min_length=20, max_length=512)
-    new_password: str = Field(min_length=10, max_length=256)
+    new_password: str = Field(min_length=1, max_length=256)
+
+
+class DeleteAuthenticatedUserRequest(BaseModel):
+    user_id: str = Field(min_length=4, max_length=120)
 
 
 def _error_payload(exc: AuthError) -> dict[str, str]:
@@ -74,6 +78,30 @@ def _require_principal(credentials: HTTPAuthorizationCredentials | None = Depend
     if not token:
         raise AuthError(401, "missing_token", "Bearer token is required.")
     return get_auth_service().verify_bellforge_token(token)
+
+
+def user_principal_dependency(credentials: HTTPAuthorizationCredentials | None = Depends(_auth_scheme)) -> TokenPrincipal:
+    from fastapi import HTTPException
+
+    try:
+        principal = _require_principal(credentials)
+        if principal.role != "user":
+            raise AuthError(403, "forbidden", "User token required.")
+        return principal
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+def device_principal_dependency(credentials: HTTPAuthorizationCredentials | None = Depends(_auth_scheme)) -> TokenPrincipal:
+    from fastapi import HTTPException
+
+    try:
+        principal = _require_principal(credentials)
+        if principal.role != "device":
+            raise AuthError(403, "forbidden", "Device token required.")
+        return principal
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
 
 
 @router.post("/auth/login")
@@ -183,25 +211,30 @@ async def auth_local_password_reset_confirm(payload: LocalPasswordResetConfirmRe
         raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
 
 
-def user_principal_dependency(credentials: HTTPAuthorizationCredentials | None = Depends(_auth_scheme)) -> TokenPrincipal:
-    from fastapi import HTTPException
-
+@router.get("/auth/users")
+async def auth_users(principal: TokenPrincipal = Depends(user_principal_dependency)) -> dict[str, Any]:
     try:
-        principal = _require_principal(credentials)
-        if principal.role != "user":
-            raise AuthError(403, "forbidden", "User token required.")
-        return principal
+        users = get_auth_service().list_authenticated_users()
+        return {
+            "users": users,
+            "count": len(users),
+        }
     except AuthError as exc:
+        from fastapi import HTTPException
+
         raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
 
 
-def device_principal_dependency(credentials: HTTPAuthorizationCredentials | None = Depends(_auth_scheme)) -> TokenPrincipal:
-    from fastapi import HTTPException
-
+@router.post("/auth/users/delete")
+async def auth_users_delete(
+    payload: DeleteAuthenticatedUserRequest,
+    principal: TokenPrincipal = Depends(user_principal_dependency),
+) -> dict[str, Any]:
     try:
-        principal = _require_principal(credentials)
-        if principal.role != "device":
-            raise AuthError(403, "forbidden", "Device token required.")
-        return principal
+        return get_auth_service().delete_authenticated_user(principal, payload.user_id)
     except AuthError as exc:
+        from fastapi import HTTPException
+
         raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+

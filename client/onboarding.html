@@ -457,11 +457,15 @@
       const ACCESS_KEY = "bellforge.access_token";
       const REFRESH_KEY = "bellforge.refresh_token";
       const BASE = window.BELLFORGE_SERVER_URL || window.location.origin;
+      const onboardingParams = new URLSearchParams(window.location.search);
+      const workflowParam = (onboardingParams.get("workflow") || "wizard").toLowerCase();
+      const providerParam = (onboardingParams.get("provider") || "").toLowerCase();
+      const returnToParam = onboardingParams.get("return_to") || "/settings";
 
       let currentStep = 1;
       let wizardState = {
         deviceName: "BellForge Display",
-        provider: null,
+        provider: providerParam || null,
         serversFound: [],
         selectedServer: null,
         intendedRole: null, // "server" | "satellite" | "skip"
@@ -477,6 +481,13 @@
         if (!el) return;
         el.textContent = text;
         el.className = `wizard-msg ${type}`;
+      }
+
+      function safeNextPath(path) {
+        if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) {
+          return "/settings";
+        }
+        return path;
       }
 
       function updatePips(step) {
@@ -534,8 +545,23 @@
       /* ── Step 3 ───────────────────────────────────────────────────── */
       document.getElementById("wizStep3Back").addEventListener("click", () => goStep(2));
       document.getElementById("wizOpenAuth").addEventListener("click", () => {
-        window.open(`${BASE}/client/auth.html`, "_blank", "noopener,noreferrer");
-        setMsg("wizMsg3", "Sign in, then return here and click 'I'm Signed In — Check'.", "info");
+        const authUrl = new URL(`${BASE}/client/auth.html`);
+        if (wizardState.provider === "local") {
+          authUrl.searchParams.set("mode", "local");
+        } else if (wizardState.provider) {
+          authUrl.searchParams.set("mode", "federated");
+          authUrl.searchParams.set("provider", wizardState.provider);
+        }
+        const nextUrl = new URL(`${BASE}/client/onboarding.html`);
+        nextUrl.searchParams.set("resume_step", "3");
+        if (wizardState.provider) {
+          nextUrl.searchParams.set("provider", wizardState.provider);
+        }
+        nextUrl.searchParams.set("workflow", workflowParam || "wizard");
+        nextUrl.searchParams.set("return_to", safeNextPath(returnToParam));
+        authUrl.searchParams.set("next", `${nextUrl.pathname}${nextUrl.search}`);
+        setMsg("wizMsg3", "Redirecting to sign-in...", "info");
+        window.location.assign(`${authUrl.pathname}${authUrl.search}`);
       });
       document.getElementById("wizStep3Check").addEventListener("click", async () => {
         const token = getToken();
@@ -683,7 +709,8 @@
       }
 
       document.getElementById("wizGoStatus").addEventListener("click", () => {
-        window.location.href = `${BASE}/status`;
+        const nextPath = safeNextPath(returnToParam || "/status");
+        window.location.assign(nextPath === "/settings" ? `${BASE}/status` : `${BASE}${nextPath}`);
       });
       document.getElementById("wizRestart").addEventListener("click", () => {
         wizardState = { deviceName: "BellForge Display", provider: null, serversFound: [], selectedServer: null, intendedRole: null };
@@ -693,6 +720,18 @@
       /* ── Auto-advance if already signed in ───────────────────────── */
       (async function autoStart() {
         const token = getToken();
+        const resumeStep = Number.parseInt(onboardingParams.get("resume_step") || "0", 10);
+        if (Number.isFinite(resumeStep) && resumeStep >= 1 && resumeStep <= 8) {
+          goStep(resumeStep);
+        }
+
+        if (workflowParam === "pairing" || workflowParam === "qr") {
+          const pairingCard = document.getElementById("pairing-init")?.closest(".card");
+          if (pairingCard) {
+            pairingCard.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }
+
         if (!token) return;
         try {
           const res = await fetch(`${BASE}/api/auth/verify`, {
@@ -701,8 +740,9 @@
             body: JSON.stringify({ token }),
           });
           if (res.ok) {
-            // User is already authenticated; jump to discovery
-            goStep(4);
+            if (workflowParam === "server" || workflowParam === "automode" || workflowParam === "wizard") {
+              goStep(4);
+            }
           }
         } catch {
           // Leave at step 1

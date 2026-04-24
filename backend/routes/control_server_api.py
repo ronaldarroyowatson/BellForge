@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from backend.routes.auth_api import user_principal_dependency
 from backend.services.control_server import ControlServerService, get_control_server_service
-from backend.services.unified_auth import AuthError, TokenPrincipal
+from backend.services.unified_auth import AuthError, TokenPrincipal, get_auth_service
 
 router = APIRouter()
 
@@ -143,6 +143,14 @@ async def control_layout_edit_permission(
     permitted = svc.can_edit_layout(user_id)
     status = svc.get_status()
     role = status.get("role", "unconfigured")
+
+    auth_status = get_auth_service().auth_status()
+    if int(auth_status.get("active_user_count", 0)) <= 0:
+        return {
+            "permitted": False,
+            "role": role,
+            "reason": "No authenticated users exist on this device. Complete authentication onboarding first.",
+        }
 
     if permitted:
         reason = "Authenticated server owner has full layout-edit access."

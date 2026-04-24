@@ -19,8 +19,14 @@ Use this workflow for production bugfix cycles and nightly closeout.
 2. Run auth integrity suite (mandatory for any auth/device/account change):
    - `python tests/run_auth_suite.py --coverage`
    - `npm run test:auth`
+   - `node --test tests/test_auth_onboarding_workflow.js`
+   - `node scripts/run_python.js -m unittest tests.test_unified_auth_integration`
+   - `node scripts/run_python.js -m unittest tests.test_control_permissions_auth_lock`
+   - `node scripts/run_python.js -m unittest tests.test_dev_admin_local_auth`
 3. Run control-server architecture tests (mandatory for any server/satellite role, discovery, onboarding authority, or layout permission change):
    - `python -m pytest tests/test_control_server.py -q`
+   - If the legacy control suite is being migrated, run contract-focused coverage in parallel:
+     - `node scripts/run_python.js -m unittest tests.test_control_permissions_auth_lock`
 2. Run smoke tests:
    - `node scripts/run_python.js tests/smoke_test_windows.py` (dev/Windows)
    - `bash tests/smoke_test.sh` (Pi/system install)

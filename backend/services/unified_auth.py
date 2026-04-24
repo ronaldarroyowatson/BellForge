@@ -85,6 +85,13 @@ def _require_exp_timestamp(payload: dict[str, Any]) -> int:
 
 
 def _validate_local_password(password: str) -> None:
+    allow_weak_dev_passwords = os.getenv("BELLFORGE_AUTH_ALLOW_WEAK_DEV_PASSWORDS", "0") == "1"
+    if allow_weak_dev_passwords:
+        if len(password) < 1:
+            raise AuthError(400, "weak_password", "Password must not be empty.")
+        if len(password) > 256:
+            raise AuthError(400, "weak_password", "Password must not exceed 256 characters.")
+        return
     if len(password) < 10:
         raise AuthError(400, "weak_password", "Password must be at least 10 characters long.")
     if len(password) > 256:
@@ -1348,6 +1355,100 @@ class UnifiedAuthService:
             "org_ids": principal.org_ids,
             "classroom_ids": principal.classroom_ids,
             "expires_at": datetime.fromtimestamp(_require_exp_timestamp(payload), tz=timezone.utc).isoformat(),
+        }
+
+    def list_authenticated_users(self) -> list[dict[str, Any]]:
+        data = self._read()
+        self._cleanup(data)
+        users = []
+        for user in data["users"].values():
+            if not isinstance(user, dict):
+                continue
+            if bool(user.get("revoked", False)):
+                continue
+            users.append(
+                {
+                    "id": str(user.get("id") or ""),
+                    "email": user.get("email"),
+                    "name": user.get("name"),
+                    "provider": user.get("provider"),
+                    "created_at": user.get("created_at"),
+                    "last_login_at": user.get("last_login_at"),
+                    "revoked": bool(user.get("revoked", False)),
+                }
+            )
+        return sorted(users, key=lambda item: str(item.get("last_login_at") or item.get("created_at") or ""), reverse=True)
+
+    def auth_status(self) -> dict[str, Any]:
+        users = self.list_authenticated_users()
+        last_attempt = next((u.get("last_login_at") for u in users if isinstance(u.get("last_login_at"), str)), None)
+        mode = self._auth_mode()
+        return {
+            "timestamp": _utc_iso(),
+            "credentials": {
+                "username": "",
+                "password": "",
+            },
+            "authentication_succeeded": len(users) > 0,
+            "last_auth_attempt": last_attempt,
+            "active_user_count": len(users),
+            "active_users": users,
+            "auth_mode": mode,
+            "cloud_enabled": mode in {"cloud", "hybrid"},
+            "local_enabled": mode in {"local", "hybrid"},
+        }
+
+    def delete_authenticated_user(self, principal: TokenPrincipal, user_id: str) -> dict[str, Any]:
+        if principal.role != "user" or principal.user_id is None:
+            raise AuthError(403, "forbidden", "Only authenticated users can delete authentication records.")
+
+        data = self._read()
+        self._cleanup(data)
+        user = data["users"].get(user_id)
+        if not isinstance(user, dict):
+            raise AuthError(404, "user_not_found", "Authenticated user record not found.")
+
+        if bool(user.get("revoked", False)):
+            return {
+                "ok": True,
+                "deleted_user_id": user_id,
+                "remaining_active_users": len([u for u in data["users"].values() if isinstance(u, dict) and not bool(u.get("revoked", False))]),
+            }
+
+        user["revoked"] = True
+        user["revoked_at"] = _utc_iso()
+
+        local_email = user.get("email")
+        if isinstance(local_email, str):
+            data["local_email_index"].pop(local_email.strip().lower(), None)
+
+        for session_jti, session in data["refresh_sessions"].items():
+            if not isinstance(session, dict):
+                continue
+            if session.get("user_id") != user_id:
+                continue
+            session["revoked"] = True
+            expires_at = session.get("expires_at")
+            if isinstance(expires_at, str):
+                data["revoked_jti"][session_jti] = expires_at
+
+        for device in data["devices"].values():
+            if not isinstance(device, dict):
+                continue
+            if device.get("owner_user_id") != user_id:
+                continue
+            device["revoked"] = True
+            device["status"] = "revoked"
+            device["revoked_reason"] = "owner-authentication-deleted"
+            device["updated_at"] = _utc_iso()
+
+        remaining = len([u for u in data["users"].values() if isinstance(u, dict) and not bool(u.get("revoked", False))])
+        self._write(data)
+        return {
+            "ok": True,
+            "deleted_user_id": user_id,
+            "remaining_active_users": remaining,
+            "edit_lock_active": remaining == 0,
         }
 
 

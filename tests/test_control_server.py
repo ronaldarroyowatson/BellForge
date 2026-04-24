@@ -384,14 +384,14 @@ class TestLayoutEditPermissionEndpoint:
         resp = client.get("/api/control/permissions/layout-edit")
         assert resp.status_code == 401
 
-    def test_unconfigured_permits_any_user(self, app_client, user_token):
+    def test_unconfigured_denies_when_no_authenticated_users_exist(self, app_client, user_token):
         client, svc = app_client
         resp = client.get(
             "/api/control/permissions/layout-edit",
             headers={"Authorization": f"Bearer {user_token}"},
         )
         assert resp.status_code == 200
-        assert resp.json()["permitted"] is True
+        assert resp.json()["permitted"] is False
         assert resp.json()["role"] == "unconfigured"
 
     def test_server_owner_permitted(self, app_client, user_token):

@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.routes import auth_api, broadcast, control_server_api, devices, diagnostics, schedule, update
@@ -156,13 +156,13 @@ async def settings_page() -> FileResponse:
 
 
 @app.get("/onboarding", response_class=FileResponse)
-async def onboarding_page() -> FileResponse:
-    return _serve_client_page("onboarding.html")
+async def onboarding_page() -> RedirectResponse:
+    return RedirectResponse(url="/settings?auth_required=1&auth_workflow=wizard&start_onboarding=1", status_code=307)
 
 
 @app.get("/auth", response_class=FileResponse)
-async def auth_page() -> FileResponse:
-    return _serve_client_page("auth.html")
+async def auth_page() -> RedirectResponse:
+    return RedirectResponse(url="/settings?auth_required=1&auth_workflow=wizard&start_onboarding=1", status_code=307)
 
 
 @app.get("/automode", response_class=FileResponse)
