@@ -376,6 +376,26 @@
       border-radius: 16px;
       padding: 12px 14px;
     }
+    .onboarding-action-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .onboarding-action-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      text-decoration: none;
+      font-weight: 700;
+      color: #0f4467;
+      border: 1px solid #b8d0df;
+      background: #f3f8fb;
+      border-radius: 12px;
+      padding: 9px 10px;
+      min-height: 44px;
+    }
     .url-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -918,8 +938,14 @@
       <div class="onboarding-qr-meta">
         <h2>First-time sign-in</h2>
         <p>Scan this code with your phone to open the exact onboarding page for this device. It includes the active pairing session so setup is as short as possible.</p>
+        <p>Need edit access? Complete auth first (local email/password or federated provider), then run server setup to promote this device or join an existing server.</p>
         <p id="onboardingQrStatus" class="onboarding-qr-status">Preparing onboarding QR...</p>
         <a id="onboardingDirectUrl" class="onboarding-direct-link" href="#" target="_blank" rel="noreferrer">Unavailable</a>
+        <div class="onboarding-action-links">
+          <a id="authLocalUrl" class="onboarding-action-link" href="#" target="_blank" rel="noreferrer">Open Local Auth</a>
+          <a id="authFederatedUrl" class="onboarding-action-link" href="#" target="_blank" rel="noreferrer">Open Federated Auth</a>
+          <a id="onboardingWizardUrl" class="onboarding-action-link" href="#" target="_blank" rel="noreferrer">Open Server Setup Wizard</a>
+        </div>
       </div>
     </section>
 
@@ -1025,6 +1051,9 @@
       onboardingQr: document.getElementById("onboardingQr"),
       onboardingQrStatus: document.getElementById("onboardingQrStatus"),
       onboardingDirectUrl: document.getElementById("onboardingDirectUrl"),
+      authLocalUrl: document.getElementById("authLocalUrl"),
+      authFederatedUrl: document.getElementById("authFederatedUrl"),
+      onboardingWizardUrl: document.getElementById("onboardingWizardUrl"),
       networkStatus: document.getElementById("networkStatus"),
       networkSpeed: document.getElementById("networkSpeed"),
       backendReachable: document.getElementById("backendReachable"),
@@ -1570,7 +1599,10 @@
           base: "Unavailable",
           settings: "Unavailable",
           auth: "Unavailable",
+          authLocal: "Unavailable",
+          authFederated: "Unavailable",
           onboarding: "Unavailable",
+          onboardingWizard: "Unavailable",
           automode: "Unavailable",
         };
       }
@@ -1579,7 +1611,10 @@
         base,
         settings: `${base}/settings`,
         auth: `${base}/client/auth.html`,
+        authLocal: `${base}/client/auth.html?mode=local`,
+        authFederated: `${base}/client/auth.html?mode=federated`,
         onboarding: `${base}/client/onboarding.html`,
+        onboardingWizard: `${base}/client/onboarding.html`,
         automode: `${base}/client/automode.html`,
       };
     }
@@ -1768,6 +1803,9 @@
         setUrl(els.settingsUrl, urls.settings);
         setUrl(els.authUrl, urls.auth);
         setUrl(els.onboardingUrl, urls.onboarding);
+        setUrl(els.authLocalUrl, urls.authLocal);
+        setUrl(els.authFederatedUrl, urls.authFederated);
+        setUrl(els.onboardingWizardUrl, urls.onboardingWizard);
         setUrl(els.automodeUrl, urls.automode);
         await refreshOnboardingCard(data, urls, localIp);
 

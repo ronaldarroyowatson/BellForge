@@ -188,3 +188,22 @@ const cachedAccess = localStorage.getItem("bellforge.access_token") || "";
 const cachedRefresh = localStorage.getItem("bellforge.refresh_token") || "";
 els.tokenAccess.value = cachedAccess;
 els.tokenRefresh.value = cachedRefresh;
+
+const authParams = new URLSearchParams(window.location.search);
+const authMode = (authParams.get("mode") || "").toLowerCase();
+const providerParam = (authParams.get("provider") || "").toLowerCase();
+
+if (["google", "microsoft", "apple", "github"].includes(providerParam)) {
+  els.provider.value = providerParam;
+}
+
+if (authMode === "local") {
+  els.localEmail.focus();
+  show("Local auth mode selected. Use Register/Login with email and password, then promote this device in Session Operations.");
+} else if (authMode === "federated") {
+  if (!providerParam) {
+    els.provider.value = "google";
+  }
+  els.provider.focus();
+  show("Federated auth mode selected. Choose a provider, run Login via Provider, then promote this device in Session Operations.");
+}
