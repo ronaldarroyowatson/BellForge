@@ -25,6 +25,7 @@ tests/logs/
 
 # Generated local runtime state
 config/auth_registry.json
+config/control_server.json
 
 # OS
 .DS_Store
