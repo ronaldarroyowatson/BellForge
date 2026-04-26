@@ -21,6 +21,7 @@ const STATUS_PATH = '/status';
 const SETTINGS_PATH = '/settings';
 const DISPLAY_STATUS_PATH = '/status?view=display';
 const STATUS_LAYOUT_FILE = path.join(REPO_ROOT, 'config', 'status_layout.json');
+const TEST_CONTROL_SERVER_STATE_FILE = path.join(REPO_ROOT, 'tests', 'logs', 'layout-browser', 'test_control_server_state.json');
 const BROWSER_LOG_DIR = path.join(REPO_ROOT, 'tests', 'logs', 'layout-browser');
 const STORAGE_KEYS = [
   'bellforge.status.fibo-cards.v1',
@@ -156,6 +157,11 @@ async function ensureBackend() {
   backendPort = startupPort;
   BASE_URL = buildBaseUrl(startupPort);
 
+  // Write a temporary UNCONFIGURED control server state so the test backend
+  // allows unauthenticated layout saves (can_edit_layout returns True for UNCONFIGURED).
+  fs.mkdirSync(path.dirname(TEST_CONTROL_SERVER_STATE_FILE), { recursive: true });
+  fs.writeFileSync(TEST_CONTROL_SERVER_STATE_FILE, JSON.stringify({ role: 'unconfigured' }), 'utf8');
+
   for (let pass = 0; pass < 3; pass += 1) {
     for (const candidate of pythonCommandCandidates()) {
       try {
@@ -173,6 +179,10 @@ async function ensureBackend() {
         ], {
           cwd: REPO_ROOT,
           stdio: ['ignore', 'pipe', 'pipe'],
+          env: {
+            ...process.env,
+            BELLFORGE_CONTROL_SERVER_STATE_PATH: TEST_CONTROL_SERVER_STATE_FILE,
+          },
         });
 
         let stderr = '';
