@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.services.unified_auth import get_auth_service
+from backend.services.control_server import get_control_server_service
 
 
 class DevAdminLocalAuthTests(unittest.TestCase):
@@ -25,6 +26,7 @@ class DevAdminLocalAuthTests(unittest.TestCase):
         os.environ["BELLFORGE_GOOGLE_CLIENT_ID"] = "unused-in-stub"
         os.environ["BELLFORGE_GOOGLE_JWKS_URL"] = "https://example.invalid/jwks"
         get_auth_service(force_reload=True)
+        get_control_server_service(force_reload=True)
         self.client = TestClient(app)
 
     def tearDown(self) -> None:

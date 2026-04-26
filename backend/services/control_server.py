@@ -425,11 +425,11 @@ _service_instance: ControlServerService | None = None
 _service_lock = threading.Lock()
 
 
-def get_control_server_service(project_root: Path | None = None) -> ControlServerService:
+def get_control_server_service(project_root: Path | None = None, *, force_reload: bool = False) -> ControlServerService:
     global _service_instance
-    if _service_instance is None:
+    if _service_instance is None or force_reload:
         with _service_lock:
-            if _service_instance is None:
+            if _service_instance is None or force_reload:
                 if project_root is None:
                     project_root = Path(__file__).resolve().parent.parent.parent
                 _service_instance = ControlServerService(project_root)

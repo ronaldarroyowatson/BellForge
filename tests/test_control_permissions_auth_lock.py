@@ -9,19 +9,23 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.services.unified_auth import get_auth_service
+from backend.services.control_server import get_control_server_service
 
 
 class ControlPermissionsAuthLockTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.store_path = Path(self.temp_dir.name) / "auth_registry.json"
+        self.control_path = Path(self.temp_dir.name) / "control_server.json"
         self._env_backup = dict(os.environ)
         os.environ["BELLFORGE_AUTH_STORE_PATH"] = str(self.store_path)
+        os.environ["BELLFORGE_CONTROL_SERVER_STATE_PATH"] = str(self.control_path)
         os.environ["BELLFORGE_AUTH_ALLOW_INSECURE_STUB_TOKENS"] = "1"
         os.environ["BELLFORGE_JWT_SECRET"] = "integration-test-secret-0123456789-abcdefghijklmnopqrstuvwxyz"
         os.environ["BELLFORGE_GOOGLE_CLIENT_ID"] = "unused-in-stub"
         os.environ["BELLFORGE_GOOGLE_JWKS_URL"] = "https://example.invalid/jwks"
         get_auth_service(force_reload=True)
+        get_control_server_service(force_reload=True)
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
