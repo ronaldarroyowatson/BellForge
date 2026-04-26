@@ -645,7 +645,14 @@ async function dragCard(target, sourceKey, targetKey) {
       throw new Error(`Unable to find drag handles for ${sourceKey} -> ${targetKey}`);
     }
     const dataTransfer = new DataTransfer();
-    source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }));
+    // Must set data during dragstart for the drop handler to receive it
+    dataTransfer.setData('text/plain', sourceKey);
+    const dragstartEvent = new DragEvent('dragstart', { 
+      bubbles: true, 
+      cancelable: true, 
+      dataTransfer 
+    });
+    source.dispatchEvent(dragstartEvent);
     destination.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }));
     destination.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
     source.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }));
