@@ -604,11 +604,21 @@
         <h2>Authentication</h2>
         <div class="row"><span>Credentials (masked)</span><strong id="credentials" class="mono">-</strong></div>
         <div class="row"><span>Authentication Status</span><span id="authStatus" class="status warn">Unknown</span></div>
+        <div class="row"><span>Authenticated User</span><strong id="authIdentity" class="mono">Unavailable</strong></div>
+        <div class="row"><span>Provider</span><strong id="authProvider" class="mono">Unavailable</strong></div>
+        <div class="row"><span>Token State</span><span id="authTokenState" class="status warn">Unknown</span></div>
+        <div class="row"><span>Token Expiry</span><strong id="authTokenExpiry" class="mono">Unknown</strong></div>
+        <div class="row"><span>2FA State</span><strong id="authTwoFactorState">Unknown</strong></div>
+        <div class="row"><span>Trusted Device</span><span id="authTrustedDeviceState" class="status warn">Unknown</span></div>
+        <div class="row"><span>Server Detection</span><strong id="authServerDetection">No server detected</strong></div>
+        <div class="row"><span>Server Role</span><strong id="authServerRole">Unavailable</strong></div>
         <div class="row"><span>Last Attempt</span><strong id="lastAuth" class="mono">-</strong></div>
+        <p id="authStateMessage" class="auth-inline-result">Authentication required to unlock editing features.</p>
         <p id="authRequiredBanner" class="auth-required-banner" hidden>Authentication required to unlock editing features.</p>
         <div class="auth-workflow-grid">
           <button id="authOpenLocal" class="secondary auth-workflow-btn" type="button">Local Authentication</button>
           <button id="authOpenFederated" class="secondary auth-workflow-btn" type="button">Cloud Authentication</button>
+          <button id="authOpenTotp" class="secondary auth-workflow-btn" type="button">2FA Setup</button>
           <button id="authOpenPairing" class="secondary auth-workflow-btn" type="button">Pairing Code Onboarding</button>
           <button id="authOpenQr" class="secondary auth-workflow-btn" type="button">QR Onboarding</button>
           <button id="authOpenServer" class="secondary auth-workflow-btn" type="button">Server Onboarding</button>
@@ -623,7 +633,7 @@
                 <input id="authLocalEmail" type="email" placeholder="admin@example.com" />
               </label>
               <label>Password
-                <input id="authLocalPassword" type="password" placeholder="minimum 10 characters" />
+                <input id="authLocalPassword" type="password" placeholder="minimum 8 characters" />
               </label>
               <label>Display Name
                 <input id="authLocalName" type="text" placeholder="BellForge Admin" />
@@ -654,12 +664,34 @@
               </label>
             </div>
             <div class="auth-inline-row">
-              <button id="authCloudLoginBtn" type="button">Login Cloud User</button>
+              <button id="authCloudLoginBtn" type="button">Login Cloud User (Stub)</button>
+              <button id="authCloudOAuthBtn" class="secondary" type="button">Sign In via OAuth Redirect</button>
             </div>
             <p id="authCloudResult" class="auth-inline-result"></p>
           </section>
-          <section id="authInlinePairing" class="auth-inline-panel" hidden>
-            <h3>Pairing + QR Onboarding</h3>
+          <section id="authInlineTotp" class="auth-inline-panel" hidden>
+            <h3>Two-Factor Authentication (TOTP)</h3>
+            <div class="auth-inline-row">
+              <button id="authTotpSetupBeginBtn" type="button">Set Up TOTP</button>
+              <button id="authTotpDisableBtn" class="secondary" type="button">Disable TOTP</button>
+              <button id="authTotpStatusBtn" class="secondary" type="button">Check TOTP Status</button>
+            </div>
+            <div id="authTotpSetupArea" hidden>
+              <p id="authTotpQrHint" class="auth-inline-result"></p>
+              <label>Confirm Code (from authenticator app)
+                <input id="authTotpConfirmCode" type="text" placeholder="6-digit code" maxlength="8" />
+              </label>
+              <button id="authTotpConfirmBtn" type="button">Confirm TOTP Setup</button>
+            </div>
+            <div id="authTotpVerifyArea" hidden>
+              <label>Verify TOTP Code
+                <input id="authTotpVerifyCode" type="text" placeholder="6-digit code or backup code" maxlength="16" />
+              </label>
+              <button id="authTotpVerifyBtn" type="button">Verify Code</button>
+            </div>
+            <p id="authTotpResult" class="auth-inline-result"></p>
+          </section>
+          <section id="authInlinePairing" class="auth-inline-panel" hidden>            <h3>Pairing + QR Onboarding</h3>
             <div class="auth-inline-row">
               <button id="authPairingInitBtn" type="button">Create Pairing Session</button>
               <button id="authPairingClaimCodeBtn" class="secondary" type="button">Claim Pairing Code</button>
@@ -879,6 +911,14 @@
     const SETTINGS_LAYOUT_STORAGE_KEY = "bellforge.settings.fibo-cards.v1";
     const STATUS_LAYOUT_COMMAND_KEY = "bellforge.status.layout-command.v1";
     const DESIGN_CONTROLS_LIVE_KEY = "bellforge.design-controls.live.v1";
+    const AUTH_USER_IDENTITY_KEY = "bellforge.auth.user_identity.v1";
+    const AUTH_MACHINE_STATE_KEY = "bellforge.auth.machine_state.v1";
+    const AUTH_STATES = {
+      UNAUTHENTICATED: "unauthenticated",
+      AUTHENTICATING: "authenticating",
+      AUTHENTICATED: "authenticated",
+      ERROR: "error",
+    };
     const DESIGN_DEFAULTS = {
       theme: "warm",
       font_scale: 1.0,
@@ -911,7 +951,16 @@
       networkUpdateMessage: document.getElementById("networkUpdateMessage"),
       credentials: document.getElementById("credentials"),
       authStatus: document.getElementById("authStatus"),
+      authIdentity: document.getElementById("authIdentity"),
+      authProvider: document.getElementById("authProvider"),
+      authTokenState: document.getElementById("authTokenState"),
+      authTokenExpiry: document.getElementById("authTokenExpiry"),
+      authTwoFactorState: document.getElementById("authTwoFactorState"),
+      authTrustedDeviceState: document.getElementById("authTrustedDeviceState"),
+      authServerDetection: document.getElementById("authServerDetection"),
+      authServerRole: document.getElementById("authServerRole"),
       lastAuth: document.getElementById("lastAuth"),
+      authStateMessage: document.getElementById("authStateMessage"),
       authRequiredBanner: document.getElementById("authRequiredBanner"),
       authOpenLocal: document.getElementById("authOpenLocal"),
       authOpenFederated: document.getElementById("authOpenFederated"),
@@ -922,6 +971,7 @@
       authBeginOnboarding: document.getElementById("authBeginOnboarding"),
       authInlineLocal: document.getElementById("authInlineLocal"),
       authInlineCloud: document.getElementById("authInlineCloud"),
+      authInlineTotp: document.getElementById("authInlineTotp"),
       authInlinePairing: document.getElementById("authInlinePairing"),
       authInlineServer: document.getElementById("authInlineServer"),
       authLocalEmail: document.getElementById("authLocalEmail"),
@@ -934,7 +984,20 @@
       authCloudSubject: document.getElementById("authCloudSubject"),
       authCloudEmail: document.getElementById("authCloudEmail"),
       authCloudLoginBtn: document.getElementById("authCloudLoginBtn"),
+      authCloudOAuthBtn: document.getElementById("authCloudOAuthBtn"),
       authCloudResult: document.getElementById("authCloudResult"),
+      authTotpSetupBeginBtn: document.getElementById("authTotpSetupBeginBtn"),
+      authTotpDisableBtn: document.getElementById("authTotpDisableBtn"),
+      authTotpStatusBtn: document.getElementById("authTotpStatusBtn"),
+      authTotpSetupArea: document.getElementById("authTotpSetupArea"),
+      authTotpQrHint: document.getElementById("authTotpQrHint"),
+      authTotpConfirmCode: document.getElementById("authTotpConfirmCode"),
+      authTotpConfirmBtn: document.getElementById("authTotpConfirmBtn"),
+      authTotpVerifyArea: document.getElementById("authTotpVerifyArea"),
+      authTotpVerifyCode: document.getElementById("authTotpVerifyCode"),
+      authTotpVerifyBtn: document.getElementById("authTotpVerifyBtn"),
+      authTotpResult: document.getElementById("authTotpResult"),
+      authOpenTotp: document.getElementById("authOpenTotp"),
       authPairingInitBtn: document.getElementById("authPairingInitBtn"),
       authPairingClaimCodeBtn: document.getElementById("authPairingClaimCodeBtn"),
       authPairingClaimQrBtn: document.getElementById("authPairingClaimQrBtn"),
@@ -1022,7 +1085,117 @@
     let refreshPromise = null;
     let updaterAutoRecoveryAttempted = false;
     let settingsAdaptiveLayout = { recompute() {}, autoArrange() {} };
+    let authMachine = {
+      state: AUTH_STATES.UNAUTHENTICATED,
+      userIdentity: null,
+      reason: "",
+      updatedAt: null,
+    };
     debugClient?.installGlobalObservers({ observeContainer: "#settingsCardGrid" });
+
+    function saveAuthMachineState() {
+      localStorage.setItem(AUTH_MACHINE_STATE_KEY, JSON.stringify(authMachine));
+    }
+
+    function loadAuthMachineState() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(AUTH_MACHINE_STATE_KEY) || "{}");
+        if (parsed && typeof parsed === "object" && typeof parsed.state === "string") {
+          authMachine = {
+            state: parsed.state,
+            userIdentity: parsed.userIdentity && typeof parsed.userIdentity === "object" ? parsed.userIdentity : null,
+            reason: typeof parsed.reason === "string" ? parsed.reason : "",
+            updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null,
+          };
+        }
+      } catch {
+        authMachine = {
+          state: AUTH_STATES.UNAUTHENTICATED,
+          userIdentity: null,
+          reason: "",
+          updatedAt: null,
+        };
+      }
+    }
+
+    function emitAuthEvent(eventName, detail = {}) {
+      window.dispatchEvent(new CustomEvent(eventName, { detail }));
+      debugEvent("authentication state", `Emitted ${eventName}`, detail);
+    }
+
+    function setAuthMachineState(nextState, payload = {}) {
+      const hasIdentity = Object.prototype.hasOwnProperty.call(payload, "userIdentity");
+      authMachine = {
+        state: nextState,
+        userIdentity: hasIdentity ? payload.userIdentity : authMachine.userIdentity,
+        reason: payload.reason || "",
+        updatedAt: new Date().toISOString(),
+      };
+      if (authMachine.userIdentity) {
+        localStorage.setItem(AUTH_USER_IDENTITY_KEY, JSON.stringify(authMachine.userIdentity));
+      } else {
+        localStorage.removeItem(AUTH_USER_IDENTITY_KEY);
+      }
+      saveAuthMachineState();
+      applyAuthMachineToCard();
+    }
+
+    function setAuthDetailMessage(message) {
+      if (!elements.authStateMessage) {
+        return;
+      }
+      elements.authStateMessage.textContent = message || "Authentication required to unlock editing features.";
+    }
+
+    function applyAuthMachineToCard() {
+      const isHealthy = authMachine.state === AUTH_STATES.AUTHENTICATED;
+      setStatus(elements.authStatus, isHealthy ? true : authMachine.state === AUTH_STATES.ERROR ? false : null);
+      const identity = authMachine.userIdentity;
+      elements.authIdentity.textContent = identity
+        ? `${identity.email || identity.name || identity.id || "unknown"}`
+        : "Unavailable";
+      if (elements.authProvider) {
+        const p = identity ? (identity.provider || "unknown") : "Unavailable";
+        const labels = { google: "Google", microsoft: "Microsoft", apple: "Apple", github: "GitHub", local: "Local" };
+        elements.authProvider.textContent = labels[p] || p;
+      }
+      if (authMachine.state === AUTH_STATES.AUTHENTICATING) {
+        setBoolStatusText(elements.authTokenState, null, {
+          true: "Valid",
+          false: "Invalid",
+          unknown: "Validating",
+        });
+      }
+      if (authMachine.state === AUTH_STATES.ERROR && authMachine.reason) {
+        setAuthDetailMessage(`Authentication failed: ${authMachine.reason}`);
+      } else if (authMachine.state === AUTH_STATES.AUTHENTICATING) {
+        setAuthDetailMessage("Authentication is in progress...");
+      } else if (authMachine.state === AUTH_STATES.AUTHENTICATED && identity) {
+        setAuthDetailMessage(`Login successful. Authenticated as: ${identity.email || identity.name || identity.id}. Authentication Healthy.`);
+      } else {
+        setAuthDetailMessage("Authentication required to unlock editing features.");
+      }
+    }
+
+    async function verifyCurrentToken() {
+      const token = localStorage.getItem("bellforge.access_token") || "";
+      if (!token) {
+        return { ok: false, reason: "No access token present.", payload: null };
+      }
+      try {
+        const payload = await fetchJson("/api/auth/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ token }),
+        });
+        return { ok: true, reason: "", payload };
+      } catch (error) {
+        return { ok: false, reason: error.message || "Token verification failed.", payload: null };
+      }
+    }
 
     function debugEvent(channel, message, payload, level = "info") {
       if (!debugClient) {
@@ -1292,7 +1465,7 @@
     }
 
     function setAuthPanelVisibility(target) {
-      const panels = [elements.authInlineLocal, elements.authInlineCloud, elements.authInlinePairing, elements.authInlineServer];
+      const panels = [elements.authInlineLocal, elements.authInlineCloud, elements.authInlineTotp, elements.authInlinePairing, elements.authInlineServer];
       panels.forEach((panel) => {
         if (!panel) return;
         panel.hidden = panel !== target;
@@ -1354,18 +1527,26 @@
         return;
       }
       const endpoint = action === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
+      emitAuthEvent("auth:begin", { method: "local", action, username: email });
+      setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
       try {
+        emitAuthEvent("auth:validate", { method: "local", action, username: email });
         const payload = await fetchJson(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name, client_type: "web" }),
         });
         storeAuthTokens(payload);
-        elements.authLocalResult.textContent = `Local ${action} succeeded.`;
+        const userIdentity = payload.user || { email, name, provider: "local" };
+        emitAuthEvent("auth:success", { method: "local", action, user: userIdentity });
+        setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity, reason: "" });
+        elements.authLocalResult.textContent = `Login successful. Authenticated as: ${userIdentity.email || userIdentity.name || email}.`;
         await refreshAuth();
         await refreshAuthenticatedUsers();
-      } catch {
-        elements.authLocalResult.textContent = `Local ${action} failed.`;
+      } catch (error) {
+        emitAuthEvent("auth:failure", { method: "local", action, reason: error.message || "Credential validation failed." });
+        setAuthMachineState(AUTH_STATES.ERROR, { reason: error.message || "Credential validation failed.", userIdentity: null });
+        elements.authLocalResult.textContent = `Local ${action} failed: ${error.message || "credential validation failed"}.`;
       }
     }
 
@@ -1373,7 +1554,10 @@
       const provider = (elements.authCloudProvider.value || "google").trim().toLowerCase();
       const subject = (elements.authCloudSubject.value || "").trim() || `user-${Date.now()}`;
       const email = (elements.authCloudEmail.value || "").trim() || `${subject}@example.com`;
+      emitAuthEvent("auth:begin", { method: "cloud", provider, username: email });
+      setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
       try {
+        emitAuthEvent("auth:validate", { method: "cloud", provider, username: email });
         const payload = await fetchJson("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1384,11 +1568,113 @@
           }),
         });
         storeAuthTokens(payload);
-        elements.authCloudResult.textContent = "Cloud authentication succeeded.";
+        const userIdentity = payload.user || { email, provider, id: subject };
+        emitAuthEvent("auth:success", { method: "cloud", provider, user: userIdentity });
+        setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity, reason: "" });
+        elements.authCloudResult.textContent = `Login successful. Authenticated as: ${userIdentity.email || userIdentity.name || userIdentity.id}.`;
         await refreshAuth();
         await refreshAuthenticatedUsers();
-      } catch {
-        elements.authCloudResult.textContent = "Cloud authentication failed.";
+      } catch (error) {
+        emitAuthEvent("auth:failure", { method: "cloud", provider, reason: error.message || "Cloud validation failed." });
+        setAuthMachineState(AUTH_STATES.ERROR, { reason: error.message || "Cloud validation failed.", userIdentity: null });
+        elements.authCloudResult.textContent = `Cloud authentication failed: ${error.message || "unknown error"}.`;
+      }
+    }
+
+    async function runOAuthRedirect() {
+      const provider = (elements.authCloudProvider.value || "google").trim().toLowerCase();
+      const redirectUri = `${window.location.origin}/client/auth.html?mode=oauth_callback`;
+      try {
+        elements.authCloudResult.textContent = "Initiating OAuth redirect...";
+        const payload = await fetchJson("/api/auth/oauth/begin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider, redirect_uri: redirectUri, client_type: "web" }),
+        });
+        // Redirect to the authorization URL
+        window.location.assign(payload.authorization_url);
+      } catch (error) {
+        elements.authCloudResult.textContent = `OAuth redirect failed: ${error.message || "provider not configured. Set BELLFORGE_<PROVIDER>_CLIENT_ID env var."}`;
+      }
+    }
+
+    async function totpSetupBegin() {
+      try {
+        const payload = await fetchJson("/api/auth/totp/setup/begin", {
+          method: "POST",
+          headers: buildAuthHeaders(),
+        });
+        if (elements.authTotpSetupArea) elements.authTotpSetupArea.hidden = false;
+        if (elements.authTotpQrHint) {
+          elements.authTotpQrHint.textContent = `Scan this URI in your authenticator app:\n${payload.provisioning_uri}`;
+        }
+        elements.authTotpResult.textContent = "TOTP setup initiated. Scan the provisioning URI and confirm with a code.";
+      } catch (error) {
+        elements.authTotpResult.textContent = `TOTP setup failed: ${error.message}`;
+      }
+    }
+
+    async function totpSetupConfirm() {
+      const code = (elements.authTotpConfirmCode.value || "").trim();
+      if (!code) {
+        elements.authTotpResult.textContent = "Enter the 6-digit code from your authenticator app.";
+        return;
+      }
+      try {
+        const payload = await fetchJson("/api/auth/totp/setup/confirm", {
+          method: "POST",
+          headers: buildAuthHeaders(),
+          body: JSON.stringify({ code }),
+        });
+        if (elements.authTotpSetupArea) elements.authTotpSetupArea.hidden = true;
+        const codes = Array.isArray(payload.backup_codes) ? payload.backup_codes.join(", ") : "";
+        elements.authTotpResult.textContent = `TOTP enabled. Backup codes (save these): ${codes}`;
+        await refreshAuth();
+      } catch (error) {
+        elements.authTotpResult.textContent = `TOTP confirm failed: ${error.message}`;
+      }
+    }
+
+    async function totpVerify() {
+      const code = (elements.authTotpVerifyCode.value || "").trim();
+      if (!code) {
+        elements.authTotpResult.textContent = "Enter a TOTP code or backup code.";
+        return;
+      }
+      try {
+        const payload = await fetchJson("/api/auth/totp/verify", {
+          method: "POST",
+          headers: buildAuthHeaders(),
+          body: JSON.stringify({ code }),
+        });
+        elements.authTotpResult.textContent = `TOTP verified via ${payload.method}.${payload.remaining_backup_codes != null ? ` Backup codes remaining: ${payload.remaining_backup_codes}.` : ""}`;
+      } catch (error) {
+        elements.authTotpResult.textContent = `TOTP verify failed: ${error.message}`;
+      }
+    }
+
+    async function totpDisable() {
+      try {
+        await fetchJson("/api/auth/totp/disable", {
+          method: "POST",
+          headers: buildAuthHeaders(),
+        });
+        elements.authTotpResult.textContent = "TOTP disabled.";
+        await refreshAuth();
+      } catch (error) {
+        elements.authTotpResult.textContent = `TOTP disable failed: ${error.message}`;
+      }
+    }
+
+    async function totpStatus() {
+      try {
+        const payload = await fetchJson("/api/auth/totp/status", {
+          headers: buildAuthHeaders(),
+        });
+        elements.authTotpResult.textContent = `TOTP enabled: ${payload.totp_enabled}. Backup codes remaining: ${payload.backup_codes_remaining}.`;
+        if (elements.authTotpVerifyArea) elements.authTotpVerifyArea.hidden = !payload.totp_enabled;
+      } catch (error) {
+        elements.authTotpResult.textContent = `TOTP status failed: ${error.message}`;
       }
     }
 
@@ -1452,14 +1738,37 @@
 
     async function promoteServer() {
       try {
+        const tokenVerification = await verifyCurrentToken();
+        if (!tokenVerification.ok) {
+          setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason, userIdentity: null });
+          elements.authServerResult.textContent = "Server promotion blocked: authenticate first.";
+          return;
+        }
+
+        const controlStatus = await fetchJson("/api/control/status");
+        if (controlStatus.role === "satellite") {
+          elements.authServerResult.textContent = `Server promotion blocked: server already detected (${controlStatus.server_device_name || "unknown"}).`;
+          return;
+        }
+
+        const discovery = await fetchJson("/api/control/discover");
+        if (Number(discovery.count || 0) > 0 && controlStatus.role !== "server") {
+          elements.authServerResult.textContent = "Server promotion blocked: existing server detected on the network.";
+          elements.authServerDetection.textContent = `Server detected: ${(discovery.servers && discovery.servers[0] && discovery.servers[0].device_name) || "unknown"}`;
+          return;
+        }
+
         const result = await fetchJson("/api/control/promote", {
           method: "POST",
           headers: buildAuthHeaders(),
           body: JSON.stringify({ device_name: "BellForge Device" }),
         });
-        elements.authServerResult.textContent = `Promoted as server (${result.device_name || "BellForge Device"}).`;
-      } catch {
-        elements.authServerResult.textContent = "Server promotion failed.";
+        elements.authServerRole.textContent = "This device is the server";
+        elements.authServerDetection.textContent = `Server detected: ${result.device_name || "BellForge Device"}`;
+        elements.authServerResult.textContent = `This device is the server (${result.device_name || "BellForge Device"}). Layout editing unlocked for authenticated user.`;
+        await refreshAuth();
+      } catch (error) {
+        elements.authServerResult.textContent = `Server promotion failed: ${error.message || "unknown error"}.`;
       }
     }
 
@@ -1511,23 +1820,8 @@
     }
 
     async function hasValidAccessToken() {
-      const token = localStorage.getItem("bellforge.access_token") || "";
-      if (!token) {
-        return false;
-      }
-      try {
-        const response = await fetch("/api/auth/verify", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ token }),
-        });
-        return response.ok;
-      } catch {
-        return false;
-      }
+      const verification = await verifyCurrentToken();
+      return verification.ok;
     }
 
     async function ensureAuthenticatedOrRedirect(reason = "restricted-action") {
@@ -1559,13 +1853,21 @@
         setAuthPanelVisibility(elements.authInlineCloud);
         return;
       }
+      if (kind === "totp" || kind === "2fa") {
+        setAuthPanelVisibility(elements.authInlineTotp);
+        return;
+      }
       if (kind === "pairing" || kind === "qr") {
         setAuthPanelVisibility(elements.authInlinePairing);
         return;
       }
-      if (kind === "server" || kind === "automode" || kind === "wizard") {
+      if (kind === "server" || kind === "automode") {
         setAuthPanelVisibility(elements.authInlineServer);
         return;
+      }
+      if (kind === "wizard") {
+        setAuthPanelVisibility(elements.authInlineLocal);
+        elements.authLocalEmail.focus();
       }
     }
 
@@ -1584,10 +1886,22 @@
 
     async function fetchJson(url, options) {
       const response = await fetch(url, { cache: "no-store", ...(options || {}) });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
       }
-      return response.json();
+      if (!response.ok) {
+        const detail = payload && (payload.detail || payload.error || payload.message);
+        const detailMessage = typeof detail === "string"
+          ? detail
+          : detail && typeof detail === "object"
+            ? (detail.message || detail.error || JSON.stringify(detail))
+            : "";
+        throw new Error(detailMessage || `HTTP ${response.status}`);
+      }
+      return payload || {};
     }
 
     async function refreshNetwork() {
@@ -1603,11 +1917,64 @@
       const data = await fetchJson("/api/auth/status");
       const credentials = data.credentials || {};
       elements.credentials.textContent = `${credentials.username || ""} / ${credentials.password || ""}`;
-      setStatus(elements.authStatus, data.authentication_succeeded);
       elements.lastAuth.textContent = data.last_auth_attempt || "Unavailable";
-      if (data.authentication_succeeded) {
-        setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
+      const users = Array.isArray(data.active_users) ? data.active_users : [];
+      const userIdentity = users[0] || null;
+
+      const tokenVerification = await verifyCurrentToken();
+      setBoolStatusText(elements.authTokenState, tokenVerification.ok, {
+        true: "Valid",
+        false: "Invalid",
+        unknown: "Unknown",
+      });
+      setBoolStatusText(elements.authTrustedDeviceState, tokenVerification.ok, {
+        true: "Trusted",
+        false: "Untrusted",
+        unknown: "Unknown",
+      });
+
+      // Show provider name
+      const providerName = userIdentity ? (userIdentity.provider || "unknown") : "Unavailable";
+      const providerLabels = { google: "Google", microsoft: "Microsoft", apple: "Apple", github: "GitHub", local: "Local" };
+      if (elements.authProvider) {
+        elements.authProvider.textContent = providerLabels[providerName] || providerName;
       }
+
+      // Show token expiry
+      if (elements.authTokenExpiry) {
+        if (tokenVerification.ok && tokenVerification.payload && tokenVerification.payload.expires_at) {
+          const expiresAt = new Date(tokenVerification.payload.expires_at);
+          elements.authTokenExpiry.textContent = expiresAt.toLocaleString();
+        } else {
+          elements.authTokenExpiry.textContent = tokenVerification.ok ? "Valid (expiry unknown)" : "Not available";
+        }
+      }
+
+      elements.authTwoFactorState.textContent = userIdentity && userIdentity.provider && userIdentity.provider !== "local"
+        ? "Provider-managed"
+        : (data.two_factor_state === "enabled" ? "TOTP Enabled" : "Not enabled");
+
+      if (data.authentication_succeeded && userIdentity) {
+        setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity, reason: "" });
+        setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
+      } else if (authMachine.state === AUTH_STATES.AUTHENTICATING) {
+        setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
+      } else {
+        setAuthMachineState(AUTH_STATES.UNAUTHENTICATED, { userIdentity: null, reason: "" });
+      }
+
+      const controlStatus = await fetchJson("/api/control/status");
+      if (controlStatus.role === "server") {
+        elements.authServerDetection.textContent = `Server detected: ${controlStatus.device_name || "BellForge Device"}`;
+        elements.authServerRole.textContent = "This device is the server";
+      } else if (controlStatus.role === "satellite") {
+        elements.authServerDetection.textContent = `Server detected: ${controlStatus.server_device_name || "Unknown server"}`;
+        elements.authServerRole.textContent = "Satellite";
+      } else {
+        elements.authServerDetection.textContent = "No server detected";
+        elements.authServerRole.textContent = "Unconfigured";
+      }
+
       debugEvent("backend health", "Refreshed authentication diagnostics", {
         authenticationSucceeded: data.authentication_succeeded,
         lastAuthAttempt: data.last_auth_attempt,
@@ -1989,11 +2356,21 @@
     elements.authOpenQr.addEventListener("click", () => navigateToAuthWorkflow("qr"));
     elements.authOpenServer.addEventListener("click", () => navigateToAuthWorkflow("server"));
     elements.authOpenAutoMode.addEventListener("click", () => navigateToAuthWorkflow("automode"));
-    elements.authBeginOnboarding.addEventListener("click", () => navigateToAuthWorkflow(authWorkflowParam || "wizard"));
+    elements.authBeginOnboarding.addEventListener("click", () => {
+      emitAuthEvent("auth:begin", { source: "settings-auth-card", action: "begin-onboarding" });
+      navigateToAuthWorkflow("wizard");
+    });
     elements.authUsersRefreshBtn.addEventListener("click", refreshAuthenticatedUsers);
     elements.authLocalRegisterBtn.addEventListener("click", () => runLocalAuth("register"));
     elements.authLocalLoginBtn.addEventListener("click", () => runLocalAuth("login"));
     elements.authCloudLoginBtn.addEventListener("click", runCloudAuth);
+    if (elements.authCloudOAuthBtn) elements.authCloudOAuthBtn.addEventListener("click", runOAuthRedirect);
+    if (elements.authOpenTotp) elements.authOpenTotp.addEventListener("click", () => setAuthPanelVisibility(elements.authInlineTotp));
+    if (elements.authTotpSetupBeginBtn) elements.authTotpSetupBeginBtn.addEventListener("click", totpSetupBegin);
+    if (elements.authTotpConfirmBtn) elements.authTotpConfirmBtn.addEventListener("click", totpSetupConfirm);
+    if (elements.authTotpVerifyBtn) elements.authTotpVerifyBtn.addEventListener("click", totpVerify);
+    if (elements.authTotpDisableBtn) elements.authTotpDisableBtn.addEventListener("click", totpDisable);
+    if (elements.authTotpStatusBtn) elements.authTotpStatusBtn.addEventListener("click", totpStatus);
     elements.authPairingInitBtn.addEventListener("click", createPairingSession);
     elements.authPairingClaimCodeBtn.addEventListener("click", claimPairingByCode);
     elements.authPairingClaimQrBtn.addEventListener("click", claimPairingByQr);
@@ -2005,6 +2382,8 @@
 
     syncDisplayPreferenceLabels();
     pushDesignControlsToForm(DESIGN_DEFAULTS);
+    loadAuthMachineState();
+    applyAuthMachineToCard();
     applyAuthRequiredRoute();
     refreshAuthenticatedUsers();
     ensureStatusPreviewFrame();

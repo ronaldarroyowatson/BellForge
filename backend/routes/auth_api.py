@@ -238,3 +238,171 @@ async def auth_users_delete(
         raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
 
 
+# ---------------------------------------------------------------------------
+# TOTP / 2FA endpoints
+# ---------------------------------------------------------------------------
+
+
+class TotpConfirmRequest(BaseModel):
+    code: str = Field(min_length=4, max_length=16)
+
+
+class TotpVerifyRequest(BaseModel):
+    code: str = Field(min_length=4, max_length=16)
+
+
+@router.post("/auth/totp/setup/begin")
+async def auth_totp_setup_begin(principal: TokenPrincipal = Depends(user_principal_dependency)) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().totp_setup_begin(principal)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+@router.post("/auth/totp/setup/confirm")
+async def auth_totp_setup_confirm(
+    payload: TotpConfirmRequest,
+    principal: TokenPrincipal = Depends(user_principal_dependency),
+) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().totp_setup_confirm(principal, payload.code)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+@router.post("/auth/totp/verify")
+async def auth_totp_verify(
+    payload: TotpVerifyRequest,
+    principal: TokenPrincipal = Depends(user_principal_dependency),
+) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().totp_verify(principal, payload.code)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+@router.post("/auth/totp/disable")
+async def auth_totp_disable(principal: TokenPrincipal = Depends(user_principal_dependency)) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().totp_disable(principal)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+@router.get("/auth/totp/status")
+async def auth_totp_status(principal: TokenPrincipal = Depends(user_principal_dependency)) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().totp_status(principal)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Trusted device token endpoints
+# ---------------------------------------------------------------------------
+
+
+class TrustedDeviceIssueRequest(BaseModel):
+    device_fingerprint: str = Field(min_length=4, max_length=256)
+    renewal_frequency: str = Field(default="monthly", pattern="^(monthly|weekly|daily)$")
+
+
+class TrustedDeviceVerifyRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=10000)
+    device_fingerprint: str = Field(min_length=4, max_length=256)
+
+
+class TrustedDeviceRevokeRequest(BaseModel):
+    device_fingerprint: str = Field(min_length=4, max_length=256)
+
+
+@router.post("/auth/trusted-device/issue")
+async def auth_trusted_device_issue(
+    payload: TrustedDeviceIssueRequest,
+    principal: TokenPrincipal = Depends(user_principal_dependency),
+) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().issue_trusted_device_token(
+            principal,
+            device_fingerprint=payload.device_fingerprint,
+            renewal_frequency=payload.renewal_frequency,
+        )
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+@router.post("/auth/trusted-device/verify")
+async def auth_trusted_device_verify(payload: TrustedDeviceVerifyRequest) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().verify_trusted_device_token(payload.token, payload.device_fingerprint)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+@router.post("/auth/trusted-device/revoke")
+async def auth_trusted_device_revoke(
+    payload: TrustedDeviceRevokeRequest,
+    principal: TokenPrincipal = Depends(user_principal_dependency),
+) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().revoke_trusted_device_token(principal, payload.device_fingerprint)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# OAuth2 PKCE redirect flow endpoints
+# ---------------------------------------------------------------------------
+
+
+class OAuthBeginRequest(BaseModel):
+    provider: str = Field(min_length=2, max_length=32)
+    redirect_uri: str = Field(min_length=10, max_length=2000)
+    client_type: str = Field(default="web", min_length=2, max_length=40)
+
+
+class OAuthCallbackRequest(BaseModel):
+    state: str = Field(min_length=10, max_length=512)
+    code: str = Field(min_length=4, max_length=2000)
+
+
+@router.post("/auth/oauth/begin")
+async def auth_oauth_begin(payload: OAuthBeginRequest) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().oauth_begin(
+            payload.provider,
+            payload.redirect_uri,
+            payload.client_type,
+        )
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+
+@router.post("/auth/oauth/callback")
+async def auth_oauth_callback(payload: OAuthCallbackRequest) -> dict[str, Any]:
+    from fastapi import HTTPException
+
+    try:
+        return get_auth_service().oauth_callback(payload.state, payload.code)
+    except AuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=_error_payload(exc)) from exc
+
+

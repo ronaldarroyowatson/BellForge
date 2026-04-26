@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import importlib
@@ -8,6 +9,7 @@ import os
 import secrets
 import threading
 import time
+import urllib.parse
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -20,6 +22,7 @@ import qrcode.image.svg
 
 jwt = importlib.import_module("jwt")
 InvalidTokenError = getattr(jwt, "InvalidTokenError")
+pyotp = importlib.import_module("pyotp")
 
 
 SUPPORTED_PROVIDERS = {"google", "microsoft", "apple", "github"}
@@ -93,8 +96,8 @@ def _validate_local_password(password: str) -> None:
         if len(password) > 256:
             raise AuthError(400, "weak_password", "Password must not exceed 256 characters.")
         return
-    if len(password) < 10:
-        raise AuthError(400, "weak_password", "Password must be at least 10 characters long.")
+    if len(password) < 8:
+        raise AuthError(400, "weak_password", "Password must be at least 8 characters long.")
     if len(password) > 256:
         raise AuthError(400, "weak_password", "Password must not exceed 256 characters.")
 
@@ -150,6 +153,10 @@ class _JsonAuthStore:
                 "local_users": {},
                 "local_email_index": {},
                 "local_reset_tokens": {},
+                "totp_setups": {},
+                "backup_codes": {},
+                "trusted_devices": {},
+                "oauth_states": {},
                 "automode": {
                     "controllers": {},
                     "pending": {},
@@ -292,6 +299,10 @@ class UnifiedAuthService:
         payload.setdefault("local_users", {})
         payload.setdefault("local_email_index", {})
         payload.setdefault("local_reset_tokens", {})
+        payload.setdefault("totp_setups", {})
+        payload.setdefault("backup_codes", {})
+        payload.setdefault("trusted_devices", {})
+        payload.setdefault("oauth_states", {})
         payload.setdefault("automode", {"controllers": {}, "pending": {}, "history": []})
         payload["automode"].setdefault("controllers", {})
         payload["automode"].setdefault("pending", {})
@@ -329,6 +340,11 @@ class UnifiedAuthService:
             if isinstance(v, dict)
             and not_expired(v, "expires_at")
             and not bool(v.get("used", False))
+        }
+        payload["oauth_states"] = {
+            k: v
+            for k, v in payload.get("oauth_states", {}).items()
+            if isinstance(v, dict) and not_expired(v, "expires_at")
         }
 
     def _auth_mode(self) -> str:
@@ -1353,6 +1369,448 @@ class UnifiedAuthService:
         history = [item for item in data["automode"].get("history", []) if isinstance(item, dict)]
         return sorted(history, key=lambda x: str(x.get("decided_at") or x.get("created_at") or ""), reverse=True)
 
+        self._cleanup(data)
+        history = [item for item in data["automode"].get("history", []) if isinstance(item, dict)]
+        return sorted(history, key=lambda x: str(x.get("decided_at") or x.get("created_at") or ""), reverse=True)
+
+    # ------------------------------------------------------------------
+    # TOTP / 2FA
+    # ------------------------------------------------------------------
+
+    def totp_setup_begin(self, principal: TokenPrincipal) -> dict[str, Any]:
+        """Generate a new TOTP secret and return provisioning URI for QR enrollment."""
+        if principal.role != "user" or principal.user_id is None:
+            raise AuthError(403, "forbidden", "Only users can set up TOTP.")
+
+        data = self._read()
+        self._cleanup(data)
+        user = data["users"].get(principal.user_id)
+        if not isinstance(user, dict):
+            raise AuthError(404, "user_not_found", "User not found.")
+
+        secret = pyotp.random_base32()
+        issuer = os.getenv("BELLFORGE_TOTP_ISSUER", "BellForge")
+        account = str(user.get("email") or user.get("id") or principal.user_id)
+
+        data["totp_setups"][principal.user_id] = {
+            "user_id": principal.user_id,
+            "secret": secret,
+            "confirmed": False,
+            "created_at": _utc_iso(),
+            "expires_at": _utc_iso(_utc_now() + timedelta(minutes=10)),
+        }
+        self._write(data)
+
+        totp = pyotp.TOTP(secret)
+        provisioning_uri = totp.provisioning_uri(name=account, issuer_name=issuer)
+        return {
+            "ok": True,
+            "provisioning_uri": provisioning_uri,
+            "secret": secret,
+            "issuer": issuer,
+            "account": account,
+        }
+
+    def totp_setup_confirm(self, principal: TokenPrincipal, code: str) -> dict[str, Any]:
+        """Confirm TOTP enrollment by validating a live code.  Issues backup codes."""
+        if principal.role != "user" or principal.user_id is None:
+            raise AuthError(403, "forbidden", "Only users can confirm TOTP.")
+
+        data = self._read()
+        self._cleanup(data)
+        setup = data["totp_setups"].get(principal.user_id)
+        if not isinstance(setup, dict):
+            raise AuthError(404, "totp_setup_not_found", "No pending TOTP setup found. Run setup_begin first.")
+
+        expiry_raw = setup.get("expires_at")
+        if not isinstance(expiry_raw, str) or _parse_utc(expiry_raw) <= _utc_now():
+            raise AuthError(401, "totp_setup_expired", "TOTP setup session expired. Restart setup.")
+
+        secret = str(setup.get("secret") or "")
+        totp = pyotp.TOTP(secret)
+        if not totp.verify(code, valid_window=1):
+            raise AuthError(401, "totp_invalid_code", "TOTP code is invalid or expired.")
+
+        # Mark setup as confirmed and store on user record
+        setup["confirmed"] = True
+        user = data["users"].get(principal.user_id)
+        if isinstance(user, dict):
+            user["totp_secret"] = secret
+            user["totp_enabled"] = True
+            user["totp_enabled_at"] = _utc_iso()
+
+        # Generate 8 single-use backup codes
+        raw_codes = [secrets.token_hex(4).upper() for _ in range(8)]
+        hashed_codes = [hashlib.sha256(c.encode()).hexdigest() for c in raw_codes]
+        data["backup_codes"][principal.user_id] = {
+            "user_id": principal.user_id,
+            "codes": hashed_codes,
+            "created_at": _utc_iso(),
+        }
+        self._write(data)
+
+        return {
+            "ok": True,
+            "totp_enabled": True,
+            "backup_codes": raw_codes,
+        }
+
+    def totp_verify(self, principal: TokenPrincipal, code: str) -> dict[str, Any]:
+        """Validate a TOTP code (or single-use backup code) for an authenticated user."""
+        if principal.role != "user" or principal.user_id is None:
+            raise AuthError(403, "forbidden", "Only users can verify TOTP.")
+
+        data = self._read()
+        self._cleanup(data)
+        user = data["users"].get(principal.user_id)
+        if not isinstance(user, dict):
+            raise AuthError(404, "user_not_found", "User not found.")
+
+        if not bool(user.get("totp_enabled", False)):
+            raise AuthError(400, "totp_not_enabled", "TOTP is not enabled for this user.")
+
+        secret = str(user.get("totp_secret") or "")
+        totp = pyotp.TOTP(secret)
+        if totp.verify(code, valid_window=1):
+            return {"ok": True, "method": "totp"}
+
+        # Check backup codes
+        backup_entry = data["backup_codes"].get(principal.user_id)
+        if isinstance(backup_entry, dict):
+            code_hash = hashlib.sha256(code.upper().encode()).hexdigest()
+            remaining = list(backup_entry.get("codes", []))
+            if code_hash in remaining:
+                remaining.remove(code_hash)
+                backup_entry["codes"] = remaining
+                self._write(data)
+                return {"ok": True, "method": "backup_code", "remaining_backup_codes": len(remaining)}
+
+        raise AuthError(401, "totp_invalid_code", "TOTP code or backup code is invalid.")
+
+    def totp_disable(self, principal: TokenPrincipal) -> dict[str, Any]:
+        """Disable TOTP for a user."""
+        if principal.role != "user" or principal.user_id is None:
+            raise AuthError(403, "forbidden", "Only users can disable TOTP.")
+
+        data = self._read()
+        self._cleanup(data)
+        user = data["users"].get(principal.user_id)
+        if not isinstance(user, dict):
+            raise AuthError(404, "user_not_found", "User not found.")
+
+        user["totp_enabled"] = False
+        user.pop("totp_secret", None)
+        data["totp_setups"].pop(principal.user_id, None)
+        data["backup_codes"].pop(principal.user_id, None)
+        self._write(data)
+        return {"ok": True, "totp_enabled": False}
+
+    def totp_status(self, principal: TokenPrincipal) -> dict[str, Any]:
+        """Return TOTP enrollment status for the current user."""
+        if principal.role != "user" or principal.user_id is None:
+            raise AuthError(403, "forbidden", "Only users can check TOTP status.")
+
+        data = self._read()
+        user = data["users"].get(principal.user_id)
+        if not isinstance(user, dict):
+            raise AuthError(404, "user_not_found", "User not found.")
+
+        enabled = bool(user.get("totp_enabled", False))
+        backup_entry = data.get("backup_codes", {}).get(principal.user_id)
+        remaining = len(backup_entry.get("codes", [])) if isinstance(backup_entry, dict) else 0
+
+        return {
+            "totp_enabled": enabled,
+            "backup_codes_remaining": remaining if enabled else 0,
+            "enabled_at": user.get("totp_enabled_at"),
+        }
+
+    # ------------------------------------------------------------------
+    # Trusted device tokens
+    # ------------------------------------------------------------------
+
+    _TRUSTED_DEVICE_RENEWAL_DAYS: dict[str, int] = {
+        "monthly": 30,
+        "weekly": 7,
+        "daily": 1,
+    }
+
+    def issue_trusted_device_token(
+        self,
+        principal: TokenPrincipal,
+        *,
+        device_fingerprint: str,
+        renewal_frequency: str = "monthly",
+    ) -> dict[str, Any]:
+        """Issue a long-lived trusted device token for this user/device combination."""
+        if principal.role != "user" or principal.user_id is None:
+            raise AuthError(403, "forbidden", "Only users can issue trusted device tokens.")
+
+        freq = renewal_frequency if renewal_frequency in self._TRUSTED_DEVICE_RENEWAL_DAYS else "monthly"
+        ttl_days = self._TRUSTED_DEVICE_RENEWAL_DAYS[freq]
+        ttl_seconds = ttl_days * 86400
+
+        data = self._read()
+        self._cleanup(data)
+        user = data["users"].get(principal.user_id)
+        if not isinstance(user, dict):
+            raise AuthError(404, "user_not_found", "User not found.")
+
+        # Revoke any existing active trusted device token for this fingerprint+user
+        td_key = f"{principal.user_id}:{device_fingerprint}"
+        existing = data["trusted_devices"].get(td_key)
+        if isinstance(existing, dict) and not bool(existing.get("revoked", False)):
+            existing["revoked"] = True
+            existing["revoked_at"] = _utc_iso()
+            # Blacklist the old token by its stored JTI
+            old_jti = existing.get("token_jti")
+            if old_jti:
+                old_expires_at = existing.get("expires_at")
+                data["revoked_jti"][old_jti] = old_expires_at if isinstance(old_expires_at, str) else _utc_iso(_utc_now() + timedelta(days=400))
+
+        token_id = str(uuid.uuid4())
+        token = self._issue_token(
+            subject=principal.user_id,
+            role="user",
+            token_type="trusted_device",
+            ttl_seconds=ttl_seconds,
+            user_id=principal.user_id,
+            permissions=_as_list(user.get("permissions")),
+            org_ids=_as_list(user.get("org_ids")),
+            classroom_ids=_as_list(user.get("classroom_ids")),
+            extras={"device_fingerprint": device_fingerprint, "renewal_frequency": freq, "trusted_device_id": token_id},
+        )
+
+        # Decode to capture the JWT's JTI for later revocation
+        import importlib as _il
+        _jwt = _il.import_module("jwt")
+        token_payload = _jwt.decode(token, self._jwt_secret, algorithms=["HS256"], audience="bellforge", issuer=self._jwt_issuer)
+        token_jti = str(token_payload.get("jti") or "")
+
+        expires_at = _utc_iso(_utc_now() + timedelta(seconds=ttl_seconds))
+        data["trusted_devices"][td_key] = {
+            "id": token_id,
+            "user_id": principal.user_id,
+            "device_fingerprint": device_fingerprint,
+            "renewal_frequency": freq,
+            "issued_at": _utc_iso(),
+            "expires_at": expires_at,
+            "token_jti": token_jti,
+            "revoked": False,
+        }
+        self._write(data)
+
+        return {
+            "trusted_device_token": token,
+            "trusted_device_token_expires_in": ttl_seconds,
+            "renewal_frequency": freq,
+            "expires_at": expires_at,
+        }
+
+    def verify_trusted_device_token(self, token: str, device_fingerprint: str) -> dict[str, Any]:
+        """Verify a trusted device token and return status."""
+        payload = self._decode_token(token)
+        if payload.get("typ") != "trusted_device":
+            raise AuthError(401, "invalid_token_type", "Trusted device token required.")
+
+        fp_in_token = str(payload.get("device_fingerprint") or "")
+        if fp_in_token != device_fingerprint:
+            raise AuthError(401, "fingerprint_mismatch", "Token fingerprint does not match device.")
+
+        user_id = str(payload.get("sub") or "")
+        td_key = f"{user_id}:{device_fingerprint}"
+        data = self._read()
+        entry = data["trusted_devices"].get(td_key)
+        if not isinstance(entry, dict) or bool(entry.get("revoked", False)):
+            raise AuthError(401, "trusted_device_revoked", "Trusted device token has been revoked.")
+
+        return {
+            "ok": True,
+            "user_id": user_id,
+            "device_fingerprint": device_fingerprint,
+            "renewal_frequency": entry.get("renewal_frequency", "monthly"),
+            "expires_at": entry.get("expires_at"),
+        }
+
+    def revoke_trusted_device_token(self, principal: TokenPrincipal, device_fingerprint: str) -> dict[str, Any]:
+        """Revoke a trusted device token for this user/device."""
+        if principal.role != "user" or principal.user_id is None:
+            raise AuthError(403, "forbidden", "Only users can revoke trusted device tokens.")
+
+        td_key = f"{principal.user_id}:{device_fingerprint}"
+        data = self._read()
+        entry = data["trusted_devices"].get(td_key)
+        if isinstance(entry, dict):
+            entry["revoked"] = True
+            entry["revoked_at"] = _utc_iso()
+            self._write(data)
+
+        return {"ok": True, "device_fingerprint": device_fingerprint, "revoked": True}
+
+    # ------------------------------------------------------------------
+    # OAuth2 / OIDC redirect flow (PKCE + state)
+    # ------------------------------------------------------------------
+
+    # Provider-specific authorization endpoints
+    _OAUTH_AUTH_ENDPOINTS: dict[str, str] = {
+        "google": "https://accounts.google.com/o/oauth2/v2/auth",
+        "microsoft": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+        "apple": "https://appleid.apple.com/auth/authorize",
+    }
+
+    _OAUTH_TOKEN_ENDPOINTS: dict[str, str] = {
+        "google": "https://oauth2.googleapis.com/token",
+        "microsoft": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "apple": "https://appleid.apple.com/auth/token",
+    }
+
+    _OAUTH_SCOPES: dict[str, str] = {
+        "google": "openid email profile",
+        "microsoft": "openid email profile",
+        "apple": "name email",
+    }
+
+    def oauth_begin(self, provider: str, redirect_uri: str, client_type: str = "web") -> dict[str, Any]:
+        """Build the authorization URL for an OAuth2 PKCE redirect flow."""
+        self._assert_cloud_enabled()
+        provider_norm = provider.strip().lower()
+        if provider_norm not in self._OAUTH_AUTH_ENDPOINTS:
+            raise AuthError(400, "unsupported_provider", f"OAuth redirect not supported for provider: {provider}")
+
+        client_id = os.getenv(f"BELLFORGE_{provider_norm.upper()}_CLIENT_ID", "").strip()
+        if not client_id:
+            raise AuthError(500, "provider_not_configured", f"{provider_norm} client_id is not configured (set BELLFORGE_{provider_norm.upper()}_CLIENT_ID).")
+
+        # PKCE
+        code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
+        code_challenge_digest = hashlib.sha256(code_verifier.encode()).digest()
+        code_challenge = base64.urlsafe_b64encode(code_challenge_digest).rstrip(b"=").decode()
+
+        state = secrets.token_urlsafe(24)
+
+        data = self._read()
+        self._cleanup(data)
+        data["oauth_states"][state] = {
+            "state": state,
+            "provider": provider_norm,
+            "code_verifier": code_verifier,
+            "redirect_uri": redirect_uri,
+            "client_type": client_type,
+            "created_at": _utc_iso(),
+            "expires_at": _utc_iso(_utc_now() + timedelta(minutes=10)),
+        }
+        self._write(data)
+
+        params: dict[str, str] = {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": self._OAUTH_SCOPES[provider_norm],
+            "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+        }
+        if provider_norm == "apple":
+            params["response_mode"] = "form_post"
+
+        auth_url = self._OAUTH_AUTH_ENDPOINTS[provider_norm] + "?" + urllib.parse.urlencode(params)
+        return {
+            "authorization_url": auth_url,
+            "state": state,
+            "provider": provider_norm,
+        }
+
+    def oauth_callback(self, state: str, code: str) -> dict[str, Any]:
+        """Exchange the authorization code for tokens using PKCE."""
+        import httpx
+
+        data = self._read()
+        self._cleanup(data)
+        state_entry = data["oauth_states"].get(state)
+        if not isinstance(state_entry, dict):
+            raise AuthError(401, "invalid_oauth_state", "OAuth state is invalid or expired.")
+
+        expiry_raw = state_entry.get("expires_at")
+        if not isinstance(expiry_raw, str) or _parse_utc(expiry_raw) <= _utc_now():
+            raise AuthError(401, "invalid_oauth_state", "OAuth state has expired.")
+
+        provider = str(state_entry.get("provider") or "")
+        code_verifier = str(state_entry.get("code_verifier") or "")
+        redirect_uri = str(state_entry.get("redirect_uri") or "")
+        client_type = str(state_entry.get("client_type") or "web")
+
+        # Remove the state so it can only be used once
+        del data["oauth_states"][state]
+        self._write(data)
+
+        client_id = os.getenv(f"BELLFORGE_{provider.upper()}_CLIENT_ID", "").strip()
+        client_secret = os.getenv(f"BELLFORGE_{provider.upper()}_CLIENT_SECRET", "").strip()
+        if not client_id:
+            raise AuthError(500, "provider_not_configured", f"{provider} client_id is not configured.")
+
+        token_endpoint = self._OAUTH_TOKEN_ENDPOINTS[provider]
+        form_data: dict[str, str] = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "client_id": client_id,
+            "code_verifier": code_verifier,
+        }
+        if client_secret:
+            form_data["client_secret"] = client_secret
+
+        try:
+            resp = httpx.post(token_endpoint, data=form_data, timeout=15.0)
+            resp.raise_for_status()
+            token_response = resp.json()
+        except Exception as exc:
+            raise AuthError(502, "oauth_token_exchange_failed", f"OAuth token exchange failed: {exc}") from exc
+
+        id_token = token_response.get("id_token")
+        if not id_token:
+            raise AuthError(502, "missing_id_token", "Provider did not return an id_token.")
+
+        # Validate and extract identity
+        principal = self._verifier.verify(provider, id_token)
+        data = self._read()
+        self._cleanup(data)
+        user = self._ensure_user(data, principal)
+        if bool(user.get("revoked", False)):
+            raise AuthError(403, "user_revoked", "User account is revoked.")
+
+        # Store provider tokens on user record (access/refresh tokens from provider)
+        user["provider_access_token"] = token_response.get("access_token")
+        user["provider_refresh_token"] = token_response.get("refresh_token")
+        provider_expires_in = token_response.get("expires_in")
+        if provider_expires_in:
+            user["provider_token_expires_at"] = _utc_iso(_utc_now() + timedelta(seconds=int(provider_expires_in)))
+
+        tokens = self._issue_user_token_pair(user, client_type, provider)
+        refresh_token = tokens["refresh_token"]
+        refresh_payload = jwt.decode(
+            refresh_token,
+            self._jwt_secret,
+            algorithms=["HS256"],
+            audience="bellforge",
+            issuer=self._jwt_issuer,
+        )
+        refresh_jti = str(refresh_payload.get("jti"))
+        data["refresh_sessions"][refresh_jti] = {
+            "jti": refresh_jti,
+            "user_id": user["id"],
+            "created_at": _utc_iso(),
+            "expires_at": _utc_iso(_utc_now() + timedelta(seconds=self._refresh_ttl_seconds)),
+            "client_type": client_type,
+            "revoked": False,
+        }
+        self._write(data)
+
+        return {
+            **tokens,
+            "user": self._serialize_user(user),
+            "provider_token_expires_at": user.get("provider_token_expires_at"),
+        }
+
     def auth_verify(self, token: str) -> dict[str, Any]:
         payload = self._decode_token(token)
         principal = self._principal_from_payload(payload)
@@ -1394,6 +1852,21 @@ class UnifiedAuthService:
         users = self.list_authenticated_users()
         last_attempt = next((u.get("last_login_at") for u in users if isinstance(u.get("last_login_at"), str)), None)
         mode = self._auth_mode()
+        authenticated_user = users[0] if users else None
+        provider = authenticated_user.get("provider") if authenticated_user else None
+
+        # Determine 2FA state
+        if authenticated_user:
+            if provider and provider != "local":
+                two_factor_state = "provider-managed"
+            else:
+                # Check if TOTP is enabled for local user
+                data = self._read()
+                raw_user = data["users"].get(authenticated_user.get("id") or "")
+                two_factor_state = "enabled" if isinstance(raw_user, dict) and bool(raw_user.get("totp_enabled", False)) else "not-enabled"
+        else:
+            two_factor_state = "not-enabled"
+
         return {
             "timestamp": _utc_iso(),
             "credentials": {
@@ -1401,9 +1874,14 @@ class UnifiedAuthService:
                 "password": "",
             },
             "authentication_succeeded": len(users) > 0,
+            "authentication_state": "authenticated" if len(users) > 0 else "unauthenticated",
+            "authentication_health": "Healthy" if len(users) > 0 else "Not Healthy",
             "last_auth_attempt": last_attempt,
             "active_user_count": len(users),
             "active_users": users,
+            "authenticated_user": authenticated_user,
+            "two_factor_state": two_factor_state,
+            "trusted_device_state": "unknown",
             "auth_mode": mode,
             "cloud_enabled": mode in {"cloud", "hybrid"},
             "local_enabled": mode in {"local", "hybrid"},

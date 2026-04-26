@@ -1,0 +1,15 @@
+{
+  "device_id": "4e043562-74be-4654-89ba-fbe64f123119",
+  "device_name": "BellForge Device",
+  "promoted_at": null,
+  "role": "satellite",
+  "server_info": {
+    "address": "192.168.2.180:8000",
+    "device_name": "BellForge Server",
+    "discovered_at": "2026-04-26T02:06:03.487030+00:00",
+    "server_device_id": "srv-1",
+    "server_user_id": "owner-1"
+  },
+  "server_user_id": null,
+  "updated_at": "2026-04-26T02:06:03.487030+00:00"
+}

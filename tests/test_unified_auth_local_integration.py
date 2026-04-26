@@ -76,6 +76,97 @@ class UnifiedAuthLocalIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(heartbeat.status_code, 200)
 
+    def test_local_login_failure_does_not_authenticate(self) -> None:
+        _ = self.client.post(
+            "/api/auth/local/register",
+            json={
+                "email": "invalid-pass@example.com",
+                "password": "valid-password-123",
+                "name": "Invalid Pass",
+                "client_type": "web",
+            },
+        )
+
+        failed = self.client.post(
+            "/api/auth/local/login",
+            json={
+                "email": "invalid-pass@example.com",
+                "password": "not-the-password",
+                "client_type": "web",
+            },
+        )
+        self.assertEqual(failed.status_code, 401)
+
+        status = self.client.get("/api/auth/status")
+        self.assertEqual(status.status_code, 200)
+        payload = status.json()
+        self.assertTrue(payload["authentication_succeeded"])
+        self.assertEqual(payload["authentication_state"], "authenticated")
+        self.assertEqual(payload["authentication_health"], "Healthy")
+        self.assertEqual(payload["active_user_count"], 1)
+
+    def test_auth_status_reports_authenticated_identity_fields(self) -> None:
+        _ = self.client.post(
+            "/api/auth/local/register",
+            json={
+                "email": "identity@example.com",
+                "password": "identity-password-123",
+                "name": "Identity User",
+                "client_type": "web",
+            },
+        )
+
+        status = self.client.get("/api/auth/status")
+        self.assertEqual(status.status_code, 200)
+        payload = status.json()
+        self.assertTrue(payload["authentication_succeeded"])
+        self.assertEqual(payload["authentication_state"], "authenticated")
+        self.assertEqual(payload["authentication_health"], "Healthy")
+        self.assertIsInstance(payload["authenticated_user"], dict)
+        self.assertEqual(payload["authenticated_user"]["email"], "identity@example.com")
+        self.assertEqual(payload["two_factor_state"], "not-enabled")
+
+    def test_local_user_login_users_refresh_and_server_promotion_contract(self) -> None:
+        email = "rarroyo-watson@tulsaacademy.org"
+        password = "password"
+
+        register = self.client.post(
+            "/api/auth/local/register",
+            json={
+                "email": email,
+                "password": password,
+                "name": "admin",
+                "client_type": "web",
+            },
+        )
+        self.assertEqual(register.status_code, 200)
+
+        login = self.client.post(
+            "/api/auth/local/login",
+            json={
+                "email": email,
+                "password": password,
+                "client_type": "web",
+            },
+        )
+        self.assertEqual(login.status_code, 200)
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        users = self.client.get("/api/auth/users", headers=headers)
+        self.assertEqual(users.status_code, 200)
+        self.assertGreaterEqual(users.json()["count"], 1)
+        self.assertTrue(any((u.get("email") == email) for u in users.json()["users"]))
+
+        promote = self.client.post(
+            "/api/control/promote",
+            headers=headers,
+            json={"device_name": "BellForge Device"},
+        )
+        self.assertEqual(promote.status_code, 200)
+        payload = promote.json()
+        self.assertEqual(payload["role"], "server")
+        self.assertEqual(payload.get("authenticated_user"), login.json()["user"]["id"])
+
     def test_refresh_replay_attack_is_blocked(self) -> None:
         login = self.client.post(
             "/api/auth/login",

@@ -298,11 +298,14 @@ class ControlServerService:
         }
         if state.role == DeviceRole.SERVER:
             result["server_user_id"] = state.server_user_id
+            result["authenticated_user"] = state.server_user_id
+            result["server_uuid"] = state.device_id
             result["promoted_at"] = state.promoted_at
         if state.role == DeviceRole.SATELLITE and state.server_info:
             result["server_address"] = state.server_info.address
             result["server_device_name"] = state.server_info.device_name
             result["server_device_id"] = state.server_info.server_device_id
+            result["server_uuid"] = state.server_info.server_device_id
             result["server_user_id"] = state.server_info.server_user_id
             result["server_discovered_at"] = state.server_info.discovered_at
         return result

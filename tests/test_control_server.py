@@ -18,6 +18,7 @@ Run with:
 """
 
 import json
+import os
 import socket
 import threading
 import time
@@ -41,14 +42,16 @@ def _read_state(path: Path) -> dict:
 
 def _make_service(tmp_path: Path):
     """Return a fresh ControlServerService backed by tmp_path."""
-    from backend.services.control_server import ControlServerService, _StateStore, _UdpBroadcaster
-    store = _StateStore(str(tmp_path))
+    from backend.services.control_server import ControlServerService, _StateStore
+    state_path = tmp_path / "config" / "control_server.json"
+    store = _StateStore(state_path)
     # Broadcaster is not started in tests — pass a no-op broadcaster
     broadcaster = MagicMock()
     broadcaster.start = MagicMock()
     svc = ControlServerService.__new__(ControlServerService)
     svc._store = store
     svc._broadcaster = broadcaster
+    svc._state_lock = threading.Lock()
     svc._project_root = str(tmp_path)
     return svc
 
@@ -66,29 +69,29 @@ class TestDeviceRole:
 class TestStateStore:
     def test_load_default_when_no_file(self, tmp_path):
         from backend.services.control_server import _StateStore, DeviceRole
-        store = _StateStore(str(tmp_path))
-        state = store.load()
+        store = _StateStore(tmp_path / "config" / "control_server.json")
+        state = store.read()
         assert state.role == DeviceRole.UNCONFIGURED
 
     def test_save_and_load_roundtrip(self, tmp_path):
         from backend.services.control_server import _StateStore, ControlServerState, DeviceRole
-        store = _StateStore(str(tmp_path))
-        state = store.load()
+        store = _StateStore(tmp_path / "config" / "control_server.json")
+        state = store.read()
         state.role = DeviceRole.SERVER
         state.device_name = "TestDevice"
         state.server_user_id = "user-abc"
-        store.save(state)
+        store.write(state)
 
-        loaded = store.load()
+        loaded = store.read()
         assert loaded.role == DeviceRole.SERVER
         assert loaded.device_name == "TestDevice"
         assert loaded.server_user_id == "user-abc"
 
     def test_state_file_location(self, tmp_path):
         from backend.services.control_server import _StateStore
-        store = _StateStore(str(tmp_path))
-        state = store.load()
-        store.save(state)
+        store = _StateStore(tmp_path / "config" / "control_server.json")
+        state = store.read()
+        store.write(state)
         state_file = tmp_path / "config" / "control_server.json"
         assert state_file.exists()
 
@@ -111,6 +114,21 @@ class TestControlServerServiceBasic:
         status = svc.get_status()
         assert status["role"] == "server"
         assert status["device_name"] == "MyDevice"
+
+    def test_promote_exposes_server_identity_metadata(self, tmp_path):
+        svc = _make_service(tmp_path)
+        status = svc.promote_to_server("user-owner", "BellForge Server")
+        assert status["role"] == "server"
+        assert status["authenticated_user"] == "user-owner"
+        assert status["server_user_id"] == "user-owner"
+        assert isinstance(status.get("server_uuid"), str)
+        assert status.get("server_uuid")
+
+    def test_promote_starts_broadcasting_presence(self, tmp_path):
+        svc = _make_service(tmp_path)
+        svc._start_broadcaster = MagicMock()
+        svc.promote_to_server("user-owner", "BellForge Server")
+        svc._start_broadcaster.assert_called_once()
 
     def test_join_as_satellite(self, tmp_path):
         svc = _make_service(tmp_path)
@@ -257,6 +275,11 @@ def app_client(tmp_path):
     import importlib
     import backend.services.control_server as cs_mod
     import backend.routes.control_server_api as api_mod
+    from backend.services.unified_auth import get_auth_service
+
+    auth_store_backup = os.environ.get("BELLFORGE_AUTH_STORE_PATH")
+    os.environ["BELLFORGE_AUTH_STORE_PATH"] = str(tmp_path / "auth_registry.json")
+    get_auth_service(force_reload=True)
 
     # Patch the singleton so each test gets a clean service
     svc = _make_service(tmp_path)
@@ -265,6 +288,11 @@ def app_client(tmp_path):
             from backend.main import app
             with TestClient(app) as client:
                 yield client, svc
+    if auth_store_backup is None:
+        os.environ.pop("BELLFORGE_AUTH_STORE_PATH", None)
+    else:
+        os.environ["BELLFORGE_AUTH_STORE_PATH"] = auth_store_backup
+    get_auth_service(force_reload=True)
 
 
 @pytest.fixture()
@@ -279,10 +307,16 @@ def user_token():
     payload = {
         "sub": "test-user-1",
         "user_id": "test-user-1",
+        "aud": "bellforge",
         "iss": issuer,
         "iat": now,
         "exp": now + 3600,
-        "token_type": "user_access",
+        "jti": str(uuid.uuid4()),
+        "typ": "user_access",
+        "role": "user",
+        "permissions": ["layout:edit"],
+        "org_ids": [],
+        "classroom_ids": [],
     }
     return pyjwt.encode(payload, secret, algorithm="HS256")
 
@@ -321,6 +355,21 @@ class TestControlPromoteEndpoint:
         )
         assert resp.status_code == 200
         assert resp.json()["role"] == "server"
+
+    def test_promote_returns_server_metadata(self, app_client, user_token):
+        client, svc = app_client
+        resp = client.post(
+            "/api/control/promote",
+            json={"device_name": "TestDevice"},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert payload["role"] == "server"
+        assert payload["authenticated_user"] == "test-user-1"
+        assert payload["server_user_id"] == "test-user-1"
+        assert isinstance(payload.get("server_uuid"), str)
+        assert payload.get("server_uuid")
 
     def test_promote_missing_device_name(self, app_client, user_token):
         client, svc = app_client
@@ -396,14 +445,25 @@ class TestLayoutEditPermissionEndpoint:
 
     def test_server_owner_permitted(self, app_client, user_token):
         client, svc = app_client
+        register = client.post(
+            "/api/auth/local/register",
+            json={
+                "email": "owner@test.example",
+                "password": "owner-password-123",
+                "name": "Owner",
+                "client_type": "web",
+            },
+        )
+        assert register.status_code == 200
+        owner_token = register.json()["access_token"]
         client.post(
             "/api/control/promote",
             json={"device_name": "TestDevice"},
-            headers={"Authorization": f"Bearer {user_token}"},
+            headers={"Authorization": f"Bearer {owner_token}"},
         )
         resp = client.get(
             "/api/control/permissions/layout-edit",
-            headers={"Authorization": f"Bearer {user_token}"},
+            headers={"Authorization": f"Bearer {owner_token}"},
         )
         assert resp.status_code == 200
         assert resp.json()["permitted"] is True
