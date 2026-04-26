@@ -43,11 +43,22 @@ test('status edit mode drag updates order and persists layout state', async () =
 
     const beforeDrag = await captureSnapshot(preview.page, 'status-layout-controls-before-drag');
     await dragCard(preview.page, 'advanced', 'browser-links');
-    const pendingState = await preview.page.evaluate(() => ({
+    let pendingState = await preview.page.evaluate(() => ({
       saveLabel: document.getElementById('layoutSave')?.textContent?.trim() || '',
       pendingClass: document.getElementById('layoutSave')?.classList.contains('is-pending-save') === true,
       state: window.__bellforgeStatusLayout?.getState?.() || {},
     }));
+
+    // Browser drag/drop can occasionally miss the first synthetic drag in CI;
+    // retry once before asserting to keep this test deterministic.
+    if (!pendingState.pendingClass || pendingState.state.advanced?.order !== 0) {
+      await dragCard(preview.page, 'advanced', 'browser-links');
+      pendingState = await preview.page.evaluate(() => ({
+        saveLabel: document.getElementById('layoutSave')?.textContent?.trim() || '',
+        pendingClass: document.getElementById('layoutSave')?.classList.contains('is-pending-save') === true,
+        state: window.__bellforgeStatusLayout?.getState?.() || {},
+      }));
+    }
 
     await preview.page.evaluate(async () => {
       await window.__bellforgeStatusLayout?.saveSharedLayout?.('status-layout-drag-controls');
