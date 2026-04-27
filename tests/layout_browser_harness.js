@@ -458,7 +458,17 @@ async function captureSnapshot(target, kind) {
     const round = (value) => Math.round(value * 100) / 100;
     let debugInspector = null;
     try {
-      const response = await fetch('/api/debug/inspect?lines=120', { cache: 'no-store' });
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), 2000)
+        : null;
+      const response = await fetch('/api/debug/inspect?lines=120', {
+        cache: 'no-store',
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      if (timeoutId != null) {
+        clearTimeout(timeoutId);
+      }
       if (response.ok) {
         debugInspector = await response.json();
       }

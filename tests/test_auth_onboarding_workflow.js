@@ -255,7 +255,8 @@ test('settings cloud auth surfaces error code when provider is not configured', 
   const context = await suite.newContext({ width: 1280, height: 720 });
 
   try {
-    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=cloud', 'settings-cloud-auth-error-code', { allowEmpty: true });
+    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=federated', 'settings-cloud-auth-error-code', { allowEmpty: true });
+    await settings.page.waitForSelector('#authInlineCloud', { state: 'visible', timeout: 30000 });
     await settings.page.waitForSelector('#authCloudProvider', { state: 'visible', timeout: 30000 });
 
     await settings.page.selectOption('#authCloudProvider', 'microsoft');
