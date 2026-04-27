@@ -128,7 +128,7 @@ class UnifiedAuthLocalIntegrationTests(unittest.TestCase):
 
     def test_local_user_login_users_refresh_and_server_promotion_contract(self) -> None:
         email = "rarroyo-watson@tulsaacademy.org"
-        password = "password"
+        password = "admin-pass-123"
 
         register = self.client.post(
             "/api/auth/local/register",

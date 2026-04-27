@@ -181,6 +181,42 @@
       color: #325067;
       word-break: break-word;
     }
+    .auth-password-helper {
+      margin-top: 8px;
+      border: 1px solid #d5dfe8;
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 8px;
+    }
+    .auth-password-helper p {
+      margin: 0 0 6px;
+      font-size: 0.8rem;
+      color: #325067;
+      font-weight: 600;
+    }
+    .auth-password-helper ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 4px;
+    }
+    .auth-password-helper li {
+      font-size: 0.78rem;
+      color: #7b1f1f;
+    }
+    .auth-password-helper li::before {
+      content: "[ ] ";
+      color: #7b1f1f;
+      font-weight: 700;
+    }
+    .auth-password-helper li.is-met {
+      color: #1d5e33;
+    }
+    .auth-password-helper li.is-met::before {
+      content: "[x] ";
+      color: #1d5e33;
+    }
     .auth-user-list {
       margin: 8px 0 0;
       display: grid;
@@ -639,6 +675,14 @@
                 <input id="authLocalName" type="text" placeholder="BellForge Admin" />
               </label>
             </div>
+            <div id="authLocalPasswordRequirements" class="auth-password-helper" aria-live="polite">
+              <p>Password checklist</p>
+              <ul>
+                <li data-rule="min-length">At least 8 characters (required)</li>
+                <li data-rule="has-letter">Contains a letter (recommended)</li>
+                <li data-rule="has-number">Contains a number (recommended)</li>
+              </ul>
+            </div>
             <div class="auth-inline-row">
               <button id="authLocalRegisterBtn" type="button">Register Local User</button>
               <button id="authLocalLoginBtn" class="secondary" type="button">Login Local User</button>
@@ -976,6 +1020,7 @@
       authInlineServer: document.getElementById("authInlineServer"),
       authLocalEmail: document.getElementById("authLocalEmail"),
       authLocalPassword: document.getElementById("authLocalPassword"),
+      authLocalPasswordRequirements: document.getElementById("authLocalPasswordRequirements"),
       authLocalName: document.getElementById("authLocalName"),
       authLocalRegisterBtn: document.getElementById("authLocalRegisterBtn"),
       authLocalLoginBtn: document.getElementById("authLocalLoginBtn"),
@@ -1518,12 +1563,22 @@
       }
     }
 
+    let localRegisterMinPasswordLength = 10;
+
     async function runLocalAuth(action) {
       const email = (elements.authLocalEmail.value || "").trim();
       const password = elements.authLocalPassword.value || "";
       const name = (elements.authLocalName.value || "").trim();
+      renderLocalPasswordChecklist(password);
       if (!email || !password) {
         elements.authLocalResult.textContent = "Email and password are required.";
+        return;
+      }
+      if (action === "register" && password.length < localRegisterMinPasswordLength) {
+        const message = `Password must be at least ${localRegisterMinPasswordLength} characters for local registration.`;
+        emitAuthEvent("auth:failure", { method: "local", action, reason: message });
+        setAuthMachineState(AUTH_STATES.ERROR, { reason: message, userIdentity: null });
+        elements.authLocalResult.textContent = `${message} Try a longer password, then register again.`;
         return;
       }
       const endpoint = action === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
@@ -1544,9 +1599,26 @@
         await refreshAuth();
         await refreshAuthenticatedUsers();
       } catch (error) {
-        emitAuthEvent("auth:failure", { method: "local", action, reason: error.message || "Credential validation failed." });
-        setAuthMachineState(AUTH_STATES.ERROR, { reason: error.message || "Credential validation failed.", userIdentity: null });
-        elements.authLocalResult.textContent = `Local ${action} failed: ${error.message || "credential validation failed"}.`;
+        const baseReason = error.message || "Credential validation failed.";
+        const errorCode = typeof error.code === "string" ? error.code : "";
+        const normalizedReason = String(baseReason).toLowerCase();
+        const hint = action === "login" && normalizedReason.includes("invalid email or password")
+          ? " If this is a new account, register first and ensure the registration password meets the minimum length policy."
+          : action === "register" && errorCode === "weak_password"
+            ? " Use a longer password that satisfies the checklist."
+          : "";
+        const reason = `${baseReason}${hint}`;
+        if (action === "register" && errorCode === "weak_password") {
+          const backendMinLength = extractMinPasswordLengthFromMessage(baseReason);
+          if (backendMinLength && backendMinLength !== localRegisterMinPasswordLength) {
+            localRegisterMinPasswordLength = backendMinLength;
+            renderLocalPasswordChecklist(password);
+          }
+        }
+        emitAuthEvent("auth:failure", { method: "local", action, reason });
+        setAuthMachineState(AUTH_STATES.ERROR, { reason, userIdentity: null });
+        const codeSuffix = errorCode ? ` [code: ${errorCode}]` : "";
+        elements.authLocalResult.textContent = `Local ${action} failed${codeSuffix}: ${reason}.`;
       }
     }
 
@@ -1575,9 +1647,12 @@
         await refreshAuth();
         await refreshAuthenticatedUsers();
       } catch (error) {
-        emitAuthEvent("auth:failure", { method: "cloud", provider, reason: error.message || "Cloud validation failed." });
-        setAuthMachineState(AUTH_STATES.ERROR, { reason: error.message || "Cloud validation failed.", userIdentity: null });
-        elements.authCloudResult.textContent = `Cloud authentication failed: ${error.message || "unknown error"}.`;
+        const cloudErrorCode = typeof error.code === "string" ? error.code : "";
+        const cloudReason = error.message || "Cloud validation failed.";
+        const cloudCodeSuffix = cloudErrorCode ? ` [code: ${cloudErrorCode}]` : "";
+        emitAuthEvent("auth:failure", { method: "cloud", provider, reason: cloudReason });
+        setAuthMachineState(AUTH_STATES.ERROR, { reason: cloudReason, userIdentity: null });
+        elements.authCloudResult.textContent = `Cloud authentication failed${cloudCodeSuffix}: ${cloudReason}.`;
       }
     }
 
@@ -1899,9 +1974,48 @@
           : detail && typeof detail === "object"
             ? (detail.message || detail.error || JSON.stringify(detail))
             : "";
-        throw new Error(detailMessage || `HTTP ${response.status}`);
+        const error = new Error(detailMessage || `HTTP ${response.status}`);
+        error.status = response.status;
+        if (detail && typeof detail === "object" && typeof detail.error === "string") {
+          error.code = detail.error;
+        } else if (payload && typeof payload.error === "string") {
+          error.code = payload.error;
+        }
+        throw error;
       }
       return payload || {};
+    }
+
+    function extractMinPasswordLengthFromMessage(message) {
+      const match = String(message || "").match(/at least\s+(\d+)\s+characters/i);
+      if (!match) {
+        return null;
+      }
+      const parsed = Number.parseInt(match[1], 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    }
+
+    function renderLocalPasswordChecklist(passwordValue) {
+      const checklist = elements.authLocalPasswordRequirements;
+      if (!checklist) {
+        return;
+      }
+      const password = String(passwordValue || "");
+      const rules = {
+        "min-length": password.length >= localRegisterMinPasswordLength,
+        "has-letter": /[A-Za-z]/.test(password),
+        "has-number": /\d/.test(password),
+      };
+      Object.entries(rules).forEach(([rule, met]) => {
+        const item = checklist.querySelector(`[data-rule="${rule}"]`);
+        if (!item) {
+          return;
+        }
+        if (rule === "min-length") {
+          item.textContent = `At least ${localRegisterMinPasswordLength} characters (required)`;
+        }
+        item.classList.toggle("is-met", Boolean(met));
+      });
     }
 
     async function refreshNetwork() {
@@ -2363,6 +2477,7 @@
     elements.authUsersRefreshBtn.addEventListener("click", refreshAuthenticatedUsers);
     elements.authLocalRegisterBtn.addEventListener("click", () => runLocalAuth("register"));
     elements.authLocalLoginBtn.addEventListener("click", () => runLocalAuth("login"));
+    elements.authLocalPassword.addEventListener("input", () => renderLocalPasswordChecklist(elements.authLocalPassword.value || ""));
     elements.authCloudLoginBtn.addEventListener("click", runCloudAuth);
     if (elements.authCloudOAuthBtn) elements.authCloudOAuthBtn.addEventListener("click", runOAuthRedirect);
     if (elements.authOpenTotp) elements.authOpenTotp.addEventListener("click", () => setAuthPanelVisibility(elements.authInlineTotp));
@@ -2382,6 +2497,7 @@
 
     syncDisplayPreferenceLabels();
     pushDesignControlsToForm(DESIGN_DEFAULTS);
+    renderLocalPasswordChecklist(elements.authLocalPassword.value || "");
     loadAuthMachineState();
     applyAuthMachineToCard();
     applyAuthRequiredRoute();

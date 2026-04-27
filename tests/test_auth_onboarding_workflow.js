@@ -78,6 +78,55 @@ test('settings auth card local workflow does not open duplicate tabs', async () 
   }
 });
 
+test('settings local register blocks short passwords before sending request', async () => {
+  const context = await suite.newContext({ width: 1280, height: 720 });
+
+  try {
+    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=local', 'settings-auth-local-short-password-validation', { allowEmpty: true });
+    await settings.page.waitForSelector('#authLocalEmail', { state: 'visible', timeout: 30000 });
+
+    let registerRequestCount = 0;
+    settings.page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().includes('/api/auth/local/register')) {
+        registerRequestCount += 1;
+      }
+    });
+
+    const nonce = Date.now();
+    await settings.page.fill('#authLocalEmail', `shortpass-${nonce}@example.com`);
+    await settings.page.fill('#authLocalPassword', 'short');
+    await settings.page.fill('#authLocalName', `Short Pass ${nonce}`);
+
+    const requirementStateBefore = await settings.page.evaluate(() => {
+      const minLength = document.querySelector('#authLocalPasswordRequirements [data-rule="min-length"]');
+      return {
+        exists: Boolean(minLength),
+        met: Boolean(minLength?.classList.contains('is-met')),
+      };
+    });
+    assert.equal(requirementStateBefore.exists, true, 'Password requirements checklist should be visible in local auth panel');
+    assert.equal(requirementStateBefore.met, false, 'Min-length requirement should be unmet for short password input');
+
+    await settings.page.click('#authLocalRegisterBtn');
+
+    await settings.page.waitForFunction(() => {
+      const text = document.getElementById('authLocalResult')?.textContent || '';
+      return /at least 10 characters/i.test(text);
+    }, { timeout: 30000 });
+
+    await settings.page.fill('#authLocalPassword', 'long-enough-password-123');
+    const requirementStateAfter = await settings.page.evaluate(() => {
+      const minLength = document.querySelector('#authLocalPasswordRequirements [data-rule="min-length"]');
+      return Boolean(minLength?.classList.contains('is-met'));
+    });
+    assert.equal(requirementStateAfter, true, 'Min-length requirement should be marked met after long-enough password input');
+
+    assert.equal(registerRequestCount, 0, 'Short password must be blocked client-side before calling local register API');
+  } finally {
+    await context.close();
+  }
+});
+
 test('settings authentication card supports login to promotion to layout-unlock flow', async () => {
   const context = await suite.newContext({ width: 1280, height: 720 });
 
@@ -176,7 +225,7 @@ test('regular settings local login refreshes users and can promote server withou
     const nonce = Date.now();
     const email = `regular-${nonce}@example.com`;
     await settings.page.fill('#authLocalEmail', email);
-    await settings.page.fill('#authLocalPassword', 'password');
+    await settings.page.fill('#authLocalPassword', 'admin-pass-123');
     await settings.page.fill('#authLocalName', 'admin');
     await settings.page.click('#authLocalRegisterBtn');
 
@@ -197,6 +246,40 @@ test('regular settings local login refreshes users and can promote server withou
       const text = document.getElementById('authServerResult')?.textContent || '';
       return text.includes('This device is the server');
     }, { timeout: 30000 });
+  } finally {
+    await context.close();
+  }
+});
+
+test('settings cloud auth surfaces error code when provider is not configured', async () => {
+  const context = await suite.newContext({ width: 1280, height: 720 });
+
+  try {
+    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=cloud', 'settings-cloud-auth-error-code', { allowEmpty: true });
+    await settings.page.waitForSelector('#authCloudProvider', { state: 'visible', timeout: 30000 });
+
+    await settings.page.selectOption('#authCloudProvider', 'microsoft');
+    const nonce = Date.now();
+    await settings.page.fill('#authCloudSubject', `scienceteacher-${nonce}`);
+    await settings.page.fill('#authCloudEmail', `scienceteacher-${nonce}@example.com`);
+
+    await settings.page.click('#authCloudLoginBtn');
+
+    await settings.page.waitForFunction(() => {
+      const text = document.getElementById('authCloudResult')?.textContent || '';
+      return text.toLowerCase().includes('cloud') && (
+        text.toLowerCase().includes('failed') ||
+        text.toLowerCase().includes('error') ||
+        text.toLowerCase().includes('not configured')
+      );
+    }, { timeout: 30000 });
+
+    const resultText = await settings.page.locator('#authCloudResult').innerText();
+    assert.match(
+      resultText,
+      /\[code:\s*provider_not_configured\]/i,
+      `Cloud auth result must include error code when provider is not configured; got: "${resultText}"`,
+    );
   } finally {
     await context.close();
   }

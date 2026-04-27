@@ -1,0 +1,88 @@
+{
+  "servers": {
+
+    // ---------------------------------------------------------------
+    // GROUP 1 � No manual setup required. Connect immediately.
+    // ---------------------------------------------------------------
+
+    // filesystem: read/write workspace files directly
+    // Covers: version.json, manifest.json, schedule.json, config/, client/, backend/
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "f:/Projects/BellForge"
+      ]
+    },
+
+    // git: full git operations aligned with the bugfix workflow
+    // Covers: status, diff, log, add, commit, push � all against main
+    "git": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-git",
+        "--repository",
+        "f:/Projects/BellForge"
+      ]
+    },
+
+    // fetch: HTTP requests to any URL
+    // Covers: Pi backend at 192.168.2.180:8000 (/api/version, /health, etc.)
+    //         and raw GitHub URLs used by the updater
+    "fetch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch"
+      ]
+    },
+
+    // openapi-auth: exposes BellForge backend OpenAPI endpoints (including /api/auth/*) as MCP tools
+    // Covers: auth login/refresh/logout/verify and local auth workflows in backend.routes.auth_api
+    // Requires: backend running locally on http://127.0.0.1:8000
+    "openapi-auth": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@ivotoby/openapi-mcp-server"
+      ],
+      "env": {
+        "API_BASE_URL": "http://127.0.0.1:8000",
+        "OPENAPI_SPEC_PATH": "http://127.0.0.1:8000/openapi.json",
+        "SERVER_NAME": "bellforge-auth-openapi",
+        "VERBOSE": "false"
+      }
+    },
+
+    // playwright: browser automation for kiosk + layout testing
+    // Covers: running / debugging the full test:layout:browser suite visually
+    //         (Playwright is already a devDependency in package.json)
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
+    },
+
+    // ---------------------------------------------------------------
+    // GROUP 2 � Login required (uses your existing GitHub Copilot auth).
+    // ---------------------------------------------------------------
+
+    // github: Official GitHub MCP server (Copilot-authenticated HTTP endpoint)
+    // Covers: repo management, releases, verifying origin/main, raw file reads
+    // Setup: Click "Start" in the MCP panel � signs in via your GitHub Copilot session.
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    }
+
+  }
+}

@@ -96,8 +96,8 @@ def _validate_local_password(password: str) -> None:
         if len(password) > 256:
             raise AuthError(400, "weak_password", "Password must not exceed 256 characters.")
         return
-    if len(password) < 8:
-        raise AuthError(400, "weak_password", "Password must be at least 8 characters long.")
+    if len(password) < 10:
+        raise AuthError(400, "weak_password", "Password must be at least 10 characters long.")
     if len(password) > 256:
         raise AuthError(400, "weak_password", "Password must not exceed 256 characters.")
 
