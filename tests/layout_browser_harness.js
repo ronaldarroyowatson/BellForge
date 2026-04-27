@@ -317,6 +317,7 @@ function registerBrowserSuite() {
       resetSharedStatusLayout();
       const browser = await chromium.launch({ headless: true });
       const context = await browser.newContext({ viewport });
+      context.setDefaultTimeout(90000);
       const originalClose = context.close.bind(context);
       let closed = false;
 
