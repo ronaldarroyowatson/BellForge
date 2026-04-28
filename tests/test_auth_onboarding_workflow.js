@@ -127,6 +127,111 @@ test('settings local register blocks short passwords before sending request', as
   }
 });
 
+test('settings local register auto-logins when account already exists', async () => {
+  const context = await suite.newContext({ width: 1280, height: 720 });
+
+  try {
+    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=local', 'settings-auth-local-register-existing-fallback', { allowEmpty: true });
+    await settings.page.waitForSelector('#authLocalEmail', { state: 'visible', timeout: 30000 });
+
+    const nonce = Date.now();
+    const email = `existing-fallback-${nonce}@example.com`;
+    const password = `existing-fallback-${nonce}-password`;
+
+    await settings.page.fill('#authLocalEmail', email);
+    await settings.page.fill('#authLocalPassword', password);
+    await settings.page.fill('#authLocalName', `Existing Fallback ${nonce}`);
+    await settings.page.click('#authLocalRegisterBtn');
+
+    await settings.page.waitForFunction(() => {
+      const text = document.getElementById('authLocalResult')?.textContent || '';
+      return text.toLowerCase().includes('login successful');
+    }, { timeout: 30000 });
+
+    await settings.page.evaluate(() => {
+      localStorage.removeItem('bellforge.access_token');
+      localStorage.removeItem('bellforge.refresh_token');
+    });
+
+    await settings.page.fill('#authLocalPassword', password);
+    await settings.page.click('#authLocalRegisterBtn');
+
+    await settings.page.waitForFunction(() => {
+      const text = document.getElementById('authLocalResult')?.textContent || '';
+      return text.toLowerCase().includes('local account already existed') && text.toLowerCase().includes('logged in as');
+    }, { timeout: 30000 });
+
+    await settings.page.waitForFunction(() => {
+      const authStatus = document.getElementById('authStatus')?.textContent?.trim() || '';
+      const tokenState = document.getElementById('authTokenState')?.textContent?.trim() || '';
+      return authStatus === 'Healthy' && tokenState === 'Valid';
+    }, { timeout: 30000 });
+
+    const state = await settings.page.evaluate(() => ({
+      authStatus: document.getElementById('authStatus')?.textContent?.trim() || '',
+      tokenState: document.getElementById('authTokenState')?.textContent?.trim() || '',
+      identity: document.getElementById('authIdentity')?.textContent?.trim() || '',
+    }));
+
+    assert.equal(state.authStatus, 'Healthy', 'Auto-login fallback did not restore healthy auth status');
+    assert.equal(state.tokenState, 'Valid', 'Auto-login fallback did not restore a valid token state');
+    assert.match(state.identity, new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'Auto-login fallback did not preserve expected identity');
+  } finally {
+    await context.close();
+  }
+});
+
+test('settings keeps identity/provider visible when token is invalid but local user exists', async () => {
+  const context = await suite.newContext({ width: 1280, height: 720 });
+
+  try {
+    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=local', 'settings-auth-invalid-token-identity-preserved', { allowEmpty: true });
+    await settings.page.waitForSelector('#authLocalEmail', { state: 'visible', timeout: 30000 });
+
+    const nonce = Date.now();
+    const email = `invalid-token-identity-${nonce}@example.com`;
+    const password = `invalid-token-identity-${nonce}-password`;
+
+    await settings.page.fill('#authLocalEmail', email);
+    await settings.page.fill('#authLocalPassword', password);
+    await settings.page.fill('#authLocalName', `Invalid Token Identity ${nonce}`);
+    await settings.page.click('#authLocalRegisterBtn');
+
+    await settings.page.waitForFunction(() => {
+      const authStatus = document.getElementById('authStatus')?.textContent?.trim() || '';
+      const tokenState = document.getElementById('authTokenState')?.textContent?.trim() || '';
+      return authStatus === 'Healthy' && tokenState === 'Valid';
+    }, { timeout: 30000 });
+
+    await settings.page.evaluate(() => {
+      localStorage.setItem('bellforge.access_token', 'expired.invalid.token');
+      localStorage.setItem('bellforge.refresh_token', 'revoked.invalid.refresh.token');
+    });
+
+    await settings.page.click('#manualRefresh');
+
+    await settings.page.waitForFunction(() => {
+      const tokenState = document.getElementById('authTokenState')?.textContent?.trim() || '';
+      const message = document.getElementById('authStateMessage')?.textContent?.trim() || '';
+      return tokenState === 'Invalid' && /authentication failed|authentication required/i.test(message);
+    }, { timeout: 30000 });
+
+    const state = await settings.page.evaluate(() => ({
+      identity: document.getElementById('authIdentity')?.textContent?.trim() || '',
+      provider: document.getElementById('authProvider')?.textContent?.trim() || '',
+      tokenExpiry: document.getElementById('authTokenExpiry')?.textContent?.trim() || '',
+      message: document.getElementById('authStateMessage')?.textContent?.trim() || '',
+    }));
+
+    assert.match(state.identity, new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'Identity should remain visible from auth status even when token is invalid');
+    assert.equal(state.provider, 'Local', 'Provider should remain visible as Local when token is invalid');
+    assert.equal(state.tokenExpiry, 'Not available', 'Token expiry should report unavailable when token verification fails');
+    assert.match(state.message, /authentication failed|authentication required/i, 'Auth state message should indicate the token/session failure state');
+  } finally {
+    await context.close();
+  }
+});
+
 test('settings auth card clears stale authenticating state when token verification fails', async () => {
   const context = await suite.newContext({ width: 1280, height: 720 });
 

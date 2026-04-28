@@ -1,7 +1,7 @@
 {
   "version": "0.1.83",
-  "released_at": "2026-04-28T20:05:39Z",
+  "released_at": "2026-04-28T20:46:25Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "Harden settings local-auth session recovery and onboarding-to-returning-login transitions, with live Pi auth-path validation workflow evidence"
+  "notes": "Fix local register reliability with existing-account auto-login fallback, preserve auth identity metadata on token failure, and unblock explicit device promotion"
 }

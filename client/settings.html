@@ -1671,6 +1671,22 @@
       const endpoint = action === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
       emitAuthEvent("auth:begin", { method: "local", action, username: email });
       setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
+
+      async function loginExistingLocalUser() {
+        const payload = await fetchJson("/api/auth/local/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, client_type: "web" }),
+        });
+        storeAuthTokens(payload);
+        const userIdentity = payload.user || { email, name, provider: "local" };
+        emitAuthEvent("auth:success", { method: "local", action: "login", user: userIdentity });
+        setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity, reason: "" });
+        await refreshAuth();
+        await refreshAuthenticatedUsers();
+        elements.authLocalResult.textContent = `Local account already existed. Logged in as: ${userIdentity.email || userIdentity.name || email}.`;
+      }
+
       try {
         emitAuthEvent("auth:validate", { method: "local", action, username: email });
         const payload = await fetchJson(endpoint, {
@@ -1688,6 +1704,23 @@
       } catch (error) {
         const baseReason = error.message || "Credential validation failed.";
         const errorCode = typeof error.code === "string" ? error.code : "";
+
+        if (action === "register" && errorCode === "local_user_exists") {
+          try {
+            emitAuthEvent("auth:validate", { method: "local", action: "login-fallback", username: email });
+            await loginExistingLocalUser();
+            return;
+          } catch (fallbackError) {
+            const fallbackReason = fallbackError.message || "Unable to log in to existing local account.";
+            const fallbackCode = typeof fallbackError.code === "string" ? fallbackError.code : "";
+            const fallbackSuffix = fallbackCode ? ` [code: ${fallbackCode}]` : "";
+            emitAuthEvent("auth:failure", { method: "local", action: "login-fallback", reason: fallbackReason });
+            setAuthMachineState(AUTH_STATES.ERROR, { reason: fallbackReason, userIdentity: null });
+            elements.authLocalResult.textContent = `Local register found an existing account, but login failed${fallbackSuffix}: ${fallbackReason}.`;
+            return;
+          }
+        }
+
         const normalizedReason = String(baseReason).toLowerCase();
         const hint = action === "login" && normalizedReason.includes("invalid email or password")
           ? " If this is a new account, register first and ensure the registration password meets the minimum length policy."
@@ -1910,13 +1943,6 @@
         const controlStatus = await fetchJson("/api/control/status");
         if (controlStatus.role === "satellite") {
           elements.authServerResult.textContent = `Server promotion blocked: server already detected (${controlStatus.server_device_name || "unknown"}).`;
-          return;
-        }
-
-        const discovery = await fetchJson("/api/control/discover");
-        if (Number(discovery.count || 0) > 0 && controlStatus.role !== "server") {
-          elements.authServerResult.textContent = "Server promotion blocked: existing server detected on the network.";
-          elements.authServerDetection.textContent = `Server detected: ${(discovery.servers && discovery.servers[0] && discovery.servers[0].device_name) || "unknown"}`;
           return;
         }
 
@@ -2163,6 +2189,9 @@
         ? "Provider-managed"
         : (data.two_factor_state === "enabled" ? "TOTP Enabled" : "Not enabled");
 
+      const fallbackIdentity = sessionIdentity || userIdentity || authMachine.userIdentity || null;
+      const hasKnownAuthenticatedUser = Boolean(fallbackIdentity) || users.length > 0;
+
       if (tokenVerification.ok && sessionIdentity) {
         setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
         setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
@@ -2170,16 +2199,16 @@
         if (tokenVerification.ok && sessionIdentity) {
           setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
           setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
-        } else if (!tokenVerification.ok) {
-          setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: null });
+        } else if (!tokenVerification.ok && hasKnownAuthenticatedUser) {
+          setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: fallbackIdentity });
           setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
         } else {
           setAuthMachineState(AUTH_STATES.UNAUTHENTICATED, { userIdentity: null, reason: "" });
           setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
         }
       } else {
-        if (!tokenVerification.ok && !/No access token present\./i.test(tokenVerification.reason || "")) {
-          setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: null });
+        if (!tokenVerification.ok && hasKnownAuthenticatedUser) {
+          setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: fallbackIdentity });
         } else {
           setAuthMachineState(AUTH_STATES.UNAUTHENTICATED, { userIdentity: null, reason: "" });
         }

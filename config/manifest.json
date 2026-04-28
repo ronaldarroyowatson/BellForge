@@ -1,6 +1,6 @@
 {
   "version": "0.1.83",
-  "generated_at": "2026-04-28T20:05:39Z",
+  "generated_at": "2026-04-28T20:46:25Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -143,8 +143,8 @@
       "size": 32539
     },
     "client/settings.html": {
-      "sha256": "72130788ccda757c02ace8bf84745e466c0085348784bf99848d021af636e2af",
-      "size": 117170
+      "sha256": "62014591a4428d78a408278f621bee9428d574a95413027108117680119d3293",
+      "size": 118709
     },
     "client/status.html": {
       "sha256": "f664a03da2e669183f1f98e523f482da5d8676da9e50e3ab3688afa1011da5e5",
@@ -175,8 +175,13 @@
       "size": 906
     },
     "config/version.json": {
+<<<<<<< HEAD
       "sha256": "707ad4d3f92bab364f42b7f111bdb3e63bee672ffb3802dfbbe94f06a6b62aa7",
       "size": 285
+=======
+      "sha256": "8bc3e6473fa886f0af759401349455a1692a93a3d38a5b17b165123dbc241e48",
+      "size": 304
+>>>>>>> e136c53 (fix(auth): stabilize local auth status and promotion flow)
     },
     "scripts/bellforge": {
       "sha256": "a5d97361843e7655c4e48dca1d6a2f00cee30fe752aeaef5dd1061f89bf13455",
