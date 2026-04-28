@@ -1130,6 +1130,7 @@
     let refreshPromise = null;
     let updaterAutoRecoveryAttempted = false;
     let settingsAdaptiveLayout = { recompute() {}, autoArrange() {} };
+    let tokenVerificationPromise = null;
     let authMachine = {
       state: AUTH_STATES.UNAUTHENTICATED,
       userIdentity: null,
@@ -1160,6 +1161,17 @@
           reason: "",
           updatedAt: null,
         };
+      }
+
+      const storedAccessToken = localStorage.getItem("bellforge.access_token") || "";
+      if (authMachine.state === AUTH_STATES.AUTHENTICATING && !storedAccessToken) {
+        authMachine = {
+          state: AUTH_STATES.ERROR,
+          userIdentity: null,
+          reason: "No access token present.",
+          updatedAt: new Date().toISOString(),
+        };
+        saveAuthMachineState();
       }
     }
 
@@ -1223,22 +1235,79 @@
     }
 
     async function verifyCurrentToken() {
-      const token = localStorage.getItem("bellforge.access_token") || "";
-      if (!token) {
-        return { ok: false, reason: "No access token present.", payload: null };
+      if (tokenVerificationPromise) {
+        return tokenVerificationPromise;
       }
+
+      tokenVerificationPromise = (async () => {
+        const token = localStorage.getItem("bellforge.access_token") || "";
+        if (!token) {
+          return { ok: false, reason: "No access token present.", payload: null };
+        }
+
+        const verifyToken = async (accessToken) => {
+          const payload = await fetchJson("/api/auth/verify", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ token: accessToken }),
+          });
+          return payload;
+        };
+
+        try {
+          const payload = await verifyToken(token);
+          return { ok: true, reason: "", payload };
+        } catch (error) {
+          const reason = error.message || "Token verification failed.";
+          const refreshToken = localStorage.getItem("bellforge.refresh_token") || "";
+          const shouldAttemptRefresh = refreshToken
+            && /expired|invalid token|token verification failed/i.test(reason);
+          if (!shouldAttemptRefresh) {
+            return { ok: false, reason, payload: null };
+          }
+
+          try {
+            const refreshed = await fetchJson("/api/auth/refresh", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ refresh_token: refreshToken }),
+            });
+            storeAuthTokens(refreshed);
+          } catch (refreshError) {
+            localStorage.removeItem("bellforge.access_token");
+            localStorage.removeItem("bellforge.refresh_token");
+            return {
+              ok: false,
+              reason: refreshError.message || reason,
+              payload: null,
+            };
+          }
+
+          const repairedToken = localStorage.getItem("bellforge.access_token") || "";
+          if (!repairedToken) {
+            return { ok: false, reason: "No access token present.", payload: null };
+          }
+
+          try {
+            const payload = await verifyToken(repairedToken);
+            return { ok: true, reason: "", payload };
+          } catch (verifyError) {
+            return {
+              ok: false,
+              reason: verifyError.message || "Token verification failed after refresh.",
+              payload: null,
+            };
+          }
+        }
+      })();
+
       try {
-        const payload = await fetchJson("/api/auth/verify", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ token }),
-        });
-        return { ok: true, reason: "", payload };
-      } catch (error) {
-        return { ok: false, reason: error.message || "Token verification failed.", payload: null };
+        return await tokenVerificationPromise;
+      } finally {
+        tokenVerificationPromise = null;
       }
     }
 
@@ -1509,6 +1578,19 @@
       return headers;
     }
 
+    function applyLocalAuthMode(hasRegisteredLocalUser) {
+      const returningLocalUser = Boolean(hasRegisteredLocalUser);
+      if (elements.authBeginOnboarding) {
+        elements.authBeginOnboarding.hidden = returningLocalUser;
+      }
+      if (elements.authLocalLoginBtn) {
+        elements.authLocalLoginBtn.classList.toggle("secondary", !returningLocalUser);
+      }
+      if (elements.authLocalRegisterBtn) {
+        elements.authLocalRegisterBtn.classList.toggle("secondary", returningLocalUser);
+      }
+    }
+
     function setAuthPanelVisibility(target) {
       const panels = [elements.authInlineLocal, elements.authInlineCloud, elements.authInlineTotp, elements.authInlinePairing, elements.authInlineServer];
       panels.forEach((panel) => {
@@ -1520,6 +1602,11 @@
 
     async function refreshAuthenticatedUsers() {
       try {
+        const verification = await verifyCurrentToken();
+        if (!verification.ok) {
+          elements.authUsersResult.textContent = "Unable to load authenticated users. Sign in first.";
+          return;
+        }
         const data = await fetchJson("/api/auth/users", {
           headers: buildAuthHeaders(),
         });
@@ -2034,8 +2121,16 @@
       elements.lastAuth.textContent = data.last_auth_attempt || "Unavailable";
       const users = Array.isArray(data.active_users) ? data.active_users : [];
       const userIdentity = users[0] || null;
+      const hasRegisteredLocalUser = users.some((user) => String(user?.provider || "").toLowerCase() === "local");
+      applyLocalAuthMode(hasRegisteredLocalUser);
 
       const tokenVerification = await verifyCurrentToken();
+      const verifiedUserId = tokenVerification.ok && typeof tokenVerification.payload?.user_id === "string"
+        ? tokenVerification.payload.user_id
+        : "";
+      const sessionIdentity = verifiedUserId
+        ? (users.find((user) => String(user?.id || "") === verifiedUserId) || authMachine.userIdentity || userIdentity)
+        : (tokenVerification.ok ? (authMachine.userIdentity || userIdentity) : null);
       setBoolStatusText(elements.authTokenState, tokenVerification.ok, {
         true: "Valid",
         false: "Invalid",
@@ -2068,13 +2163,27 @@
         ? "Provider-managed"
         : (data.two_factor_state === "enabled" ? "TOTP Enabled" : "Not enabled");
 
-      if (data.authentication_succeeded && userIdentity) {
-        setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity, reason: "" });
+      if (tokenVerification.ok && sessionIdentity) {
+        setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
         setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
       } else if (authMachine.state === AUTH_STATES.AUTHENTICATING) {
-        setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
+        if (tokenVerification.ok && sessionIdentity) {
+          setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
+          setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
+        } else if (!tokenVerification.ok) {
+          setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: null });
+          setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
+        } else {
+          setAuthMachineState(AUTH_STATES.UNAUTHENTICATED, { userIdentity: null, reason: "" });
+          setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
+        }
       } else {
-        setAuthMachineState(AUTH_STATES.UNAUTHENTICATED, { userIdentity: null, reason: "" });
+        if (!tokenVerification.ok && !/No access token present\./i.test(tokenVerification.reason || "")) {
+          setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: null });
+        } else {
+          setAuthMachineState(AUTH_STATES.UNAUTHENTICATED, { userIdentity: null, reason: "" });
+        }
+        setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
       }
 
       const controlStatus = await fetchJson("/api/control/status");

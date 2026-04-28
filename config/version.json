@@ -1,7 +1,7 @@
 {
-  "version": "0.1.81",
-  "released_at": "2026-04-28T17:12:00Z",
+  "version": "0.1.82",
+  "released_at": "2026-04-28T19:57:56Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "Fix local-auth edit unlock by recovering orphaned control-server ownership and isolating auth integration test control state"
+  "notes": "Harden settings local-auth session recovery and onboarding-to-returning-login transitions, with live Pi auth-path validation workflow evidence"
 }

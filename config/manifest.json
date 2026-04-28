@@ -1,6 +1,6 @@
 {
-  "version": "0.1.81",
-  "generated_at": "2026-04-28T17:12:01Z",
+  "version": "0.1.82",
+  "generated_at": "2026-04-28T19:57:57Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -143,8 +143,8 @@
       "size": 32539
     },
     "client/settings.html": {
-      "sha256": "eb93ac80ee5bb9eb671f8106c2a72593dd15136ad9331e42a3f93c6ff7d639e9",
-      "size": 112430
+      "sha256": "72130788ccda757c02ace8bf84745e466c0085348784bf99848d021af636e2af",
+      "size": 117170
     },
     "client/status.html": {
       "sha256": "f664a03da2e669183f1f98e523f482da5d8676da9e50e3ab3688afa1011da5e5",
@@ -175,7 +175,7 @@
       "size": 906
     },
     "config/version.json": {
-      "sha256": "33bec3f10cc4496d782f83e7b68f35edfb06e07a6871ff9231908cf2e90c7972",
+      "sha256": "1091d51a08936c854ef989fb6c1b9693298af87853e9cf6c76a5275051297201",
       "size": 267
     },
     "scripts/bellforge": {
@@ -241,6 +241,10 @@
     "scripts/install_service.sh": {
       "sha256": "999dd3d0c7446c7d0aaa40918b1122a11a8adb640190f8b51e68a6f629cf40b3",
       "size": 3359
+    },
+    "scripts/pi_auth_e2e_check.ps1": {
+      "sha256": "757f414187a0a2253ac7230969b6329217f6eee5fd37e9147df67c513d508abe",
+      "size": 4931
     },
     "scripts/pi_remote_triage.ps1": {
       "sha256": "8eb46b431d7b6e583f02db2b39656c6425ece23baa540070c7e2225d7a9bc244",

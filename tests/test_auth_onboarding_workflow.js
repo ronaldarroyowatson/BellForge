@@ -127,6 +127,144 @@ test('settings local register blocks short passwords before sending request', as
   }
 });
 
+test('settings auth card clears stale authenticating state when token verification fails', async () => {
+  const context = await suite.newContext({ width: 1280, height: 720 });
+
+  try {
+    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=local', 'settings-auth-stale-authenticating-recovery', { allowEmpty: true });
+
+    await settings.page.evaluate(() => {
+      localStorage.setItem('bellforge.auth.machine_state.v1', JSON.stringify({
+        state: 'authenticating',
+        userIdentity: { email: 'rarroyo-watson@tulsaacademy.org', provider: 'local' },
+        reason: '',
+        updatedAt: new Date().toISOString(),
+      }));
+      localStorage.removeItem('bellforge.access_token');
+      localStorage.removeItem('bellforge.refresh_token');
+    });
+
+    await settings.page.reload({ waitUntil: 'domcontentloaded' });
+
+    await settings.page.waitForFunction(() => {
+      const statusText = document.getElementById('authStateMessage')?.textContent || '';
+      const tokenState = document.getElementById('authTokenState')?.textContent || '';
+      const stored = JSON.parse(localStorage.getItem('bellforge.auth.machine_state.v1') || '{}');
+      return !/in progress/i.test(statusText)
+        && !/validating/i.test(tokenState)
+        && stored.state !== 'authenticating';
+    }, { timeout: 30000 });
+
+    const authCardState = await settings.page.evaluate(() => ({
+      statusMessage: document.getElementById('authStateMessage')?.textContent?.trim() || '',
+      tokenState: document.getElementById('authTokenState')?.textContent?.trim() || '',
+        machine: JSON.parse(localStorage.getItem('bellforge.auth.machine_state.v1') || '{}'),
+    }));
+
+    assert.doesNotMatch(authCardState.statusMessage, /in progress/i, 'Authentication card remained in in-progress state after token verification failed');
+    assert.doesNotMatch(authCardState.tokenState, /validating/i, 'Authentication token state remained validating after token verification failed');
+    assert.notEqual(authCardState.machine.state, 'authenticating', 'Auth machine persisted stale authenticating state');
+  } finally {
+    await context.close();
+  }
+});
+
+test('settings refresh recovers from invalid access token via refresh token', async () => {
+  const context = await suite.newContext({ width: 1280, height: 720 });
+
+  try {
+    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=local', 'settings-auth-refresh-token-recovery', { allowEmpty: true });
+    await settings.page.waitForSelector('#authLocalEmail', { state: 'visible', timeout: 30000 });
+
+    const nonce = Date.now();
+    const email = `refresh-recovery-${nonce}@example.com`;
+    const password = `refresh-recovery-${nonce}-password`;
+
+    await settings.page.fill('#authLocalEmail', email);
+    await settings.page.fill('#authLocalPassword', password);
+    await settings.page.fill('#authLocalName', `Refresh Recovery ${nonce}`);
+    await settings.page.click('#authLocalRegisterBtn');
+
+    await settings.page.waitForFunction(() => {
+      const authStatus = document.getElementById('authStatus')?.textContent?.trim() || '';
+      const tokenState = document.getElementById('authTokenState')?.textContent?.trim() || '';
+      return authStatus === 'Healthy' && tokenState === 'Valid';
+    }, { timeout: 30000 });
+
+    await settings.page.evaluate(() => {
+      localStorage.setItem('bellforge.access_token', 'expired.invalid.token');
+    });
+
+    await settings.page.click('#authUsersRefreshBtn');
+
+    await settings.page.waitForFunction(() => {
+      const accessToken = localStorage.getItem('bellforge.access_token') || '';
+      const authStatus = document.getElementById('authStatus')?.textContent?.trim() || '';
+      const tokenState = document.getElementById('authTokenState')?.textContent?.trim() || '';
+      return accessToken !== 'expired.invalid.token' && authStatus === 'Healthy' && tokenState === 'Valid';
+    }, { timeout: 30000 });
+
+    const tokenState = await settings.page.evaluate(() => ({
+      accessToken: localStorage.getItem('bellforge.access_token') || '',
+      refreshToken: localStorage.getItem('bellforge.refresh_token') || '',
+      authStatus: document.getElementById('authStatus')?.textContent?.trim() || '',
+      authTokenState: document.getElementById('authTokenState')?.textContent?.trim() || '',
+    }));
+
+    assert.notEqual(tokenState.accessToken, 'expired.invalid.token', 'Access token was not repaired from refresh token flow');
+    assert.ok(tokenState.refreshToken.length > 0, 'Refresh token should still be present after token recovery');
+    assert.equal(tokenState.authStatus, 'Healthy', 'Auth status did not recover after token refresh');
+    assert.equal(tokenState.authTokenState, 'Valid', 'Token state did not recover after token refresh');
+  } finally {
+    await context.close();
+  }
+});
+
+test('settings switches local auth to returning-login mode when local account exists', async () => {
+  const context = await suite.newContext({ width: 1280, height: 720 });
+
+  try {
+    const settings = await openPage(context, '/settings?auth_required=1&start_onboarding=1&auth_workflow=local', 'settings-auth-returning-login-mode', { allowEmpty: true });
+    await settings.page.waitForSelector('#authLocalEmail', { state: 'visible', timeout: 30000 });
+
+    const nonce = Date.now();
+    await settings.page.fill('#authLocalEmail', `returning-mode-${nonce}@example.com`);
+    await settings.page.fill('#authLocalPassword', `returning-mode-${nonce}-password`);
+    await settings.page.fill('#authLocalName', `Returning Mode ${nonce}`);
+    await settings.page.click('#authLocalRegisterBtn');
+
+    await settings.page.waitForFunction(() => {
+      const text = document.getElementById('authLocalResult')?.textContent || '';
+      return text.toLowerCase().includes('login successful');
+    }, { timeout: 30000 });
+
+    await settings.page.evaluate(() => {
+      localStorage.removeItem('bellforge.access_token');
+      localStorage.removeItem('bellforge.refresh_token');
+    });
+
+    await settings.page.reload({ waitUntil: 'domcontentloaded' });
+
+    await settings.page.waitForFunction(() => {
+      const onboarding = document.getElementById('authBeginOnboarding');
+      const loginBtn = document.getElementById('authLocalLoginBtn');
+      return Boolean(onboarding) && Boolean(loginBtn)
+        && onboarding.hidden === true
+        && !loginBtn.classList.contains('secondary');
+    }, { timeout: 30000 });
+
+    const uiState = await settings.page.evaluate(() => ({
+      onboardingHidden: Boolean(document.getElementById('authBeginOnboarding')?.hidden),
+      loginIsPrimary: !document.getElementById('authLocalLoginBtn')?.classList.contains('secondary'),
+    }));
+
+    assert.equal(uiState.onboardingHidden, true, 'Onboarding CTA should hide when local returning-login mode is active');
+    assert.equal(uiState.loginIsPrimary, true, 'Login button should be promoted to primary action for returning local users');
+  } finally {
+    await context.close();
+  }
+});
+
 test('settings authentication card supports login to promotion to layout-unlock flow', async () => {
   const context = await suite.newContext({ width: 1280, height: 720 });
 

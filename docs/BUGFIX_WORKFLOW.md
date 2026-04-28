@@ -79,7 +79,12 @@ Recommended local hook setup:
 5. Run live Pi lifecycle tests after rollout apply/reboot is confirmed:
    - `BELLFORGE_PI_HOST=192.168.2.180 BELLFORGE_PI_SSH_KEY_PATH=<path-to-private-key> bash tests/live_pi_lifecycle.sh`
    - This must pass after the Pi has applied `X.Y.Z` and returned from reboot.
-6. Automatic post-push enforcement on `main`:
+6. Run live Pi auth-path lifecycle validation after rollout apply/reboot is confirmed:
+   - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pi_auth_e2e_check.ps1 -BaseUrl http://192.168.2.180:8000 -Email <test-email> -Password <test-password> -Name <display-name>`
+   - This flow must prove local register/login, token verification, layout-edit permission checks, server promotion, returning login, local-auth delete, and post-delete login failure.
+   - For first-closeout auth incidents, run the command with the incident account first (for example `rarroyo-watson@tulsaacademy.org`) before running a throwaway test account.
+   - If incident-account login fails with `local_user_exists` plus `invalid_credentials`, do not close silently: record the account-recovery blocker and attach the successful throwaway-account run evidence.
+7. Automatic post-push enforcement on `main`:
     - `.github/workflows/release.yml` now runs the full layout DOM suite, debug unit tests, auth suite, release publication, and then the live Pi rollout verifier automatically after each push to `main`.
     - The post-push verifier must confirm, in order:
        - published version detected on the Pi
