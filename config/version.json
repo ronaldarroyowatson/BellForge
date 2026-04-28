@@ -1,6 +1,6 @@
 {
-  "version": "0.1.83",
-  "released_at": "2026-04-28T20:46:25Z",
+  "version": "0.1.84",
+  "released_at": "2026-04-28T20:48:13Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
   "notes": "Fix local register reliability with existing-account auto-login fallback, preserve auth identity metadata on token failure, and unblock explicit device promotion"
