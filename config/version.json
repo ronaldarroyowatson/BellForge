@@ -1,6 +1,6 @@
 {
-  "version": "0.1.82",
-  "released_at": "2026-04-28T19:57:56Z",
+  "version": "0.1.83",
+  "released_at": "2026-04-28T20:05:39Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
   "notes": "Harden settings local-auth session recovery and onboarding-to-returning-login transitions, with live Pi auth-path validation workflow evidence"
