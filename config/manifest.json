@@ -1,6 +1,6 @@
 {
-  "version": "0.1.79",
-  "generated_at": "2026-04-28T13:36:49Z",
+  "version": "0.1.81",
+  "generated_at": "2026-04-28T17:12:01Z",
   "files": {
     "backend/__init__.py": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -27,8 +27,8 @@
       "size": 1761
     },
     "backend/routes/control_server_api.py": {
-      "sha256": "906db8fffeec49c1c53c9f1324bf426ca784471d630380cf6fb79c7ae316e553",
-      "size": 5995
+      "sha256": "be563b1f73eee1e423c057069cb2c7f3614210916a6ef4ea9801be4c46d438e0",
+      "size": 7000
     },
     "backend/routes/devices.py": {
       "sha256": "3f5c35f2d092fe76f013ca70c07d903fde933c80b69e79e1b7c5652a8e51571c",
@@ -175,8 +175,8 @@
       "size": 906
     },
     "config/version.json": {
-      "sha256": "7f680d1e581ecfee5a23e471a85b58da647d59b799810872442f793acff67037",
-      "size": 328
+      "sha256": "33bec3f10cc4496d782f83e7b68f35edfb06e07a6871ff9231908cf2e90c7972",
+      "size": 267
     },
     "scripts/bellforge": {
       "sha256": "a5d97361843e7655c4e48dca1d6a2f00cee30fe752aeaef5dd1061f89bf13455",
