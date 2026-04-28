@@ -38,10 +38,11 @@ DEPLOYABLE_DIRS: list[Path] = [
 SKIP_SUFFIXES = {".pyc", ".pyo", ".DS_Store", ".swp", ".swo"}
 SKIP_NAMES    = {"__pycache__", ".git", ".mypy_cache", ".ruff_cache"}
 SKIP_RELATIVE = {
-    "config/manifest.json",   # Prevent recursive self-hash churn.
-    "config/settings.json",   # Device-local secrets and options.
-    "config/client.env",      # Device-local client endpoint override.
-    "config/auth_registry.json",  # Generated runtime auth state; not a published release artifact.
+    "config/manifest.json",        # Prevent recursive self-hash churn.
+    "config/settings.json",        # Device-local secrets and options.
+    "config/client.env",           # Device-local client endpoint override.
+    "config/auth_registry.json",   # Generated runtime auth state; not a published release artifact.
+    "config/control_server.json",  # Device-local server/satellite role config; gitignored and not a published artifact.
 }
 
 TEXT_SUFFIXES = {".py", ".html", ".js", ".json", ".service", ".env", ".md", ".txt", ".css", ".sh", ".ps1"}
