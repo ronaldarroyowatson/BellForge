@@ -140,17 +140,37 @@ async def control_layout_edit_permission(
     """
     user_id = principal.user_id or principal.subject
     svc = _svc()
-    permitted = svc.can_edit_layout(user_id)
     status = svc.get_status()
     role = status.get("role", "unconfigured")
 
     auth_status = get_auth_service().auth_status()
+    active_users = auth_status.get("active_users") if isinstance(auth_status.get("active_users"), list) else []
+    active_user_ids = {
+        str(user.get("id"))
+        for user in active_users
+        if isinstance(user, dict) and isinstance(user.get("id"), str) and user.get("id")
+    }
+
     if int(auth_status.get("active_user_count", 0)) <= 0:
         return {
             "permitted": False,
             "role": role,
             "reason": "No authenticated users exist on this device. Complete authentication onboarding first.",
         }
+
+    # If server ownership points to a missing user, recover deterministically by
+    # reassigning ownership to the currently authenticated user.
+    if role == "server":
+        server_owner_id = status.get("server_user_id")
+        if isinstance(server_owner_id, str) and server_owner_id and server_owner_id not in active_user_ids:
+            recovered = svc.promote_to_server(user_id=user_id, device_name=str(status.get("device_name") or "BellForge Device"))
+            return {
+                "permitted": True,
+                "role": recovered.get("role", "server"),
+                "reason": "Recovered stale server ownership and granted layout-edit access to the authenticated user.",
+            }
+
+    permitted = svc.can_edit_layout(user_id)
 
     if permitted:
         reason = "Authenticated server owner has full layout-edit access."

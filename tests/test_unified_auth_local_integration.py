@@ -9,6 +9,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from backend.main import app
+from backend.services.control_server import get_control_server_service
 from backend.services.unified_auth import get_auth_service
 
 
@@ -16,8 +17,10 @@ class UnifiedAuthLocalIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.store_path = Path(self.temp_dir.name) / "auth_registry.json"
+        self.control_state_path = Path(self.temp_dir.name) / "control_server.json"
         self._env_backup = dict(os.environ)
         os.environ["BELLFORGE_AUTH_STORE_PATH"] = str(self.store_path)
+        os.environ["BELLFORGE_CONTROL_SERVER_STATE_PATH"] = str(self.control_state_path)
         os.environ["BELLFORGE_AUTH_ALLOW_INSECURE_STUB_TOKENS"] = "1"
         os.environ["BELLFORGE_AUTH_EXPOSE_RESET_TOKEN"] = "1"
         os.environ["BELLFORGE_AUTH_MODE"] = "hybrid"
@@ -25,12 +28,68 @@ class UnifiedAuthLocalIntegrationTests(unittest.TestCase):
         os.environ["BELLFORGE_GOOGLE_CLIENT_ID"] = "unused-in-stub"
         os.environ["BELLFORGE_GOOGLE_JWKS_URL"] = "https://example.invalid/jwks"
         get_auth_service(force_reload=True)
+        get_control_server_service(force_reload=True)
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
         os.environ.clear()
         os.environ.update(self._env_backup)
+        get_control_server_service(force_reload=True)
+        get_auth_service(force_reload=True)
         self.temp_dir.cleanup()
+
+    def test_orphaned_server_owner_is_recovered_by_authenticated_local_user(self) -> None:
+        self.control_state_path.write_text(
+            """
+{
+  "role": "server",
+  "device_id": "device-under-test",
+  "device_name": "BellForge Device",
+  "server_user_id": "orphaned-owner-id",
+  "server_info": null,
+  "promoted_at": "2026-04-01T00:00:00+00:00",
+  "updated_at": "2026-04-01T00:00:00+00:00"
+}
+""".strip(),
+            encoding="utf-8",
+        )
+
+        email = "rarroyo-watson@tulsaacademy.org"
+        password = "Buckm!n!ster1"
+        display_name = "admin"
+
+        register = self.client.post(
+            "/api/auth/local/register",
+            json={
+                "email": email,
+                "password": password,
+                "name": display_name,
+                "client_type": "web",
+            },
+        )
+        self.assertEqual(register.status_code, 200)
+
+        login = self.client.post(
+            "/api/auth/local/login",
+            json={
+                "email": email,
+                "password": password,
+                "client_type": "web",
+            },
+        )
+        self.assertEqual(login.status_code, 200)
+
+        user_id = login.json()["user"]["id"]
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        permission = self.client.get("/api/control/permissions/layout-edit", headers=headers)
+        self.assertEqual(permission.status_code, 200)
+        self.assertTrue(permission.json()["permitted"])
+
+        status = self.client.get("/api/control/status")
+        self.assertEqual(status.status_code, 200)
+        self.assertEqual(status.json()["role"], "server")
+        self.assertEqual(status.json()["server_user_id"], user_id)
 
     def test_full_local_login_flow_and_device_access(self) -> None:
         register = self.client.post(
