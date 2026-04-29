@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Switch Branch → Cloud Auth Fix",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/branch-toggle.sh",
+        "cloud"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "Switch Branch → Main",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/branch-toggle.sh",
+        "main"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "none",
+      "problemMatcher": []
+    }
+  ]
+}

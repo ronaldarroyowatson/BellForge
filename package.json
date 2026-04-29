@@ -12,6 +12,7 @@
   },
   "scripts": {
     "test": "npm run test:layout && npm run test:auth",
+    "test:branch-toggle": "node --test tests/test_branch_toggle.js",
     "test:layout": "node --test tests/test_layout_engine.js && npm run test:layout:browser",
     "test:layout:browser": "node --test tests/test_layout_browser.js && node --test tests/test_default_layout.js && node --test tests/test_adaptive_reflow.js && node --test tests/test_spacing_and_overlap.js && node --test tests/test_autolayout_behavior.js && node --test tests/test_manual_drag_and_drop.js && node --test tests/test_preview_status_sync.js && node --test tests/test_layout_null_sets.js && node --test tests/test_layout_corrupt_data.js && node --test tests/test_layout_extreme_values.js && node --test tests/test_status_layout_controls.js && node --test tests/test_status_preview_live_sync.js && node --test tests/test_auth_onboarding_workflow.js",
     "verify:pi-rollout": "node scripts/verify_pi_bugfix_rollout.js",

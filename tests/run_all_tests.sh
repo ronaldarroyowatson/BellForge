@@ -22,6 +22,7 @@ run_test() {
 }
 
 print_info "Running BellForge pre-deployment test sequence"
+run_test "${SCRIPT_DIR}/test_branch_toggle.sh"
 run_test "${SCRIPT_DIR}/test_install.sh"
 run_test "${SCRIPT_DIR}/test_repair.sh"
 run_test "${SCRIPT_DIR}/test_uninstall.sh"

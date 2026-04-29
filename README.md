@@ -137,6 +137,13 @@ Prepare a release:
 bash scripts/prepare_release.sh
 ```
 
+Switch branches without sudo (CLI):
+
+```bash
+bash ./branch-toggle.sh cloud
+bash ./branch-toggle.sh main
+```
+
 ## Architecture Snapshot
 
 ```text
@@ -162,6 +169,7 @@ Services restart (or reboot) -> display continues with new version
 - [Agent Context](docs/CONTEXT.md)
 - [Deployment Guide](docs/deployment.md)
 - [Debugging Guide](docs/debugging.md)
+- [Branch Switching Guide](docs/BRANCH_SWITCHING.md)
 
 ## Roadmap Summary
 

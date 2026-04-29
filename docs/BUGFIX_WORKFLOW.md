@@ -11,6 +11,8 @@ Use this workflow for production bugfix cycles and nightly closeout.
 ## 2. Verify the Fix
 
 1. Run targeted tests for changed areas.
+    - For branch synchronization or checkout tooling changes, run:
+       - `npm run test:branch-toggle`
 2. Run browser-driven layout verification for any layout, card, token, collapse/expand, drag-and-drop, or real display verification change:
    - `npm run test:layout`
    - This starts or reuses the real backend on `http://127.0.0.1:8000`, opens the real Status page, Settings page, and display output in a headless browser, exercises collapse/expand, resize, drag-and-drop, and shared layout commands, then writes DOM geometry and console artifacts under `tests/logs/layout-browser/`.
