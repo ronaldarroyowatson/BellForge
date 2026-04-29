@@ -1439,8 +1439,8 @@
         updateLayoutActionButtons();
         return;
       }
-      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY) || "";
-      if (!accessToken) {
+      let activeToken = localStorage.getItem(ACCESS_TOKEN_KEY) || "";
+      if (!activeToken) {
         layoutEditorAuthorized = false;
         els.layoutEditor.classList.add("is-visible");
         els.layoutEditorStatus.textContent = "Sign in on the auth page to unlock edit mode on this real status page.";
@@ -1448,14 +1448,63 @@
         return;
       }
       try {
-        const response = await fetch("/api/auth/verify", {
+        let response = await fetch("/api/auth/verify", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${activeToken}`,
           },
-          body: JSON.stringify({ token: accessToken }),
+          body: JSON.stringify({ token: activeToken }),
         });
+        // If the token is expired, attempt a silent refresh before giving up.
+        if (!response.ok) {
+          const refreshToken = localStorage.getItem("bellforge.refresh_token") || "";
+          let refreshed = false;
+          if (refreshToken) {
+            try {
+              const errBody = await response.json().catch(() => null);
+              const errCode = String(errBody?.detail?.error || "");
+              if (response.status === 401 || /expired/i.test(errCode)) {
+                const currentStoredRefresh = localStorage.getItem("bellforge.refresh_token") || "";
+                const refreshResp = await fetch("/api/auth/refresh", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ refresh_token: currentStoredRefresh || refreshToken }),
+                });
+                if (refreshResp.ok) {
+                  const refreshedPayload = await refreshResp.json();
+                  if (refreshedPayload.access_token) {
+                    localStorage.setItem("bellforge.access_token", refreshedPayload.access_token);
+                    activeToken = refreshedPayload.access_token;
+                  }
+                  if (refreshedPayload.refresh_token) {
+                    localStorage.setItem("bellforge.refresh_token", refreshedPayload.refresh_token);
+                  }
+                  // Re-verify with the new token.
+                  response = await fetch("/api/auth/verify", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${activeToken}`,
+                    },
+                    body: JSON.stringify({ token: activeToken }),
+                  });
+                  refreshed = response.ok;
+                }
+              }
+            } catch {
+              // Refresh attempt failed — fall through to the !response.ok handler.
+            }
+          }
+          if (!refreshed && !response.ok) {
+            layoutEditorAuthorized = false;
+            els.layoutEditor.classList.add("is-visible");
+            els.layoutEditorStatus.textContent = "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
+            const currentSettings = readLayoutSettings();
+            applyLayoutSettings({ ...currentSettings, editEnabled: false });
+            return;
+          }
+        }
         if (!response.ok) {
           layoutEditorAuthorized = false;
           els.layoutEditor.classList.add("is-visible");
@@ -1468,7 +1517,7 @@
         let permReason = "";
         try {
           const permResponse = await fetch("/api/control/permissions/layout-edit", {
-            headers: { Authorization: `Bearer ${accessToken}` },
+            headers: { Authorization: `Bearer ${activeToken}` },
           });
           if (permResponse.ok) {
             const perm = await permResponse.json();
@@ -2136,6 +2185,15 @@
     setInterval(() => refreshSharedStatusLayout({ reason: "poll" }), REMOTE_LAYOUT_POLL_MS);
     setInterval(refresh, REFRESH_MS);
     setInterval(refreshLayoutEditorAuth, REFRESH_MS);
+    // Re-check auth immediately whenever the access token is stored by another tab
+    // (e.g. the user just logged in on the settings page).  Without this, the status
+    // page only re-checks on the 10-second interval, leaving a window where any
+    // button or drag interaction would trigger an unnecessary "auth required" redirect.
+    window.addEventListener("storage", (e) => {
+      if (e.key === ACCESS_TOKEN_KEY && e.newValue && !isDisplayView) {
+        refreshLayoutEditorAuth();
+      }
+    });
     setInterval(() => {
       statusAdaptiveLayout.requestLayout("interval-refresh");
       updateLayoutMetrics();

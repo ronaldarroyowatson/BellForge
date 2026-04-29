@@ -1,7 +1,7 @@
 {
-  "version": "0.1.89",
-  "released_at": "2026-04-29T18:20:00Z",
+  "version": "0.1.90",
+  "released_at": "2026-04-29T19:05:24Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "fix: re-check layout-edit permissions every 10 s on status page so edit features unlock automatically after authentication/promotion without a page reload"
+  "notes": "fix: prevent token wipe on concurrent refresh across tabs; status page now refreshes expired tokens and responds instantly to cross-tab login"
 }
