@@ -2135,6 +2135,7 @@
     setInterval(refreshDisplayPreferences, REFRESH_MS);
     setInterval(() => refreshSharedStatusLayout({ reason: "poll" }), REMOTE_LAYOUT_POLL_MS);
     setInterval(refresh, REFRESH_MS);
+    setInterval(refreshLayoutEditorAuth, REFRESH_MS);
     setInterval(() => {
       statusAdaptiveLayout.requestLayout("interval-refresh");
       updateLayoutMetrics();

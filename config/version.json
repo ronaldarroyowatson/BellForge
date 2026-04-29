@@ -1,7 +1,7 @@
 {
-  "version": "0.1.88",
-  "released_at": "2026-04-29T17:17:23Z",
+  "version": "0.1.89",
+  "released_at": "2026-04-29T18:20:00Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "fix: run PBKDF2 password hashing in thread pool to unblock event loop on Raspberry Pi; add authOperationInFlight guard to prevent premature auth-state reset during in-flight registration"
+  "notes": "fix: re-check layout-edit permissions every 10 s on status page so edit features unlock automatically after authentication/promotion without a page reload"
 }
