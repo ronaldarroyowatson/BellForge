@@ -1,7 +1,7 @@
 {
-  "version": "0.1.86",
-  "released_at": "2026-04-29T16:23:49Z",
+  "version": "0.1.87",
+  "released_at": "2026-04-29T16:34:15Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "Fix local register reliability with existing-account auto-login fallback, preserve auth identity metadata on token failure, and unblock explicit device promotion"
+  "notes": "auth-fix-cloud: add is_returning_user flag to login responses, has_registered_users to auth_status, fix cloud re-auth after account deletion, add comprehensive auth test suite"
 }
