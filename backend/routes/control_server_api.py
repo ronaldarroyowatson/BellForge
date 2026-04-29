@@ -12,6 +12,7 @@ GET  /api/control/permissions/layout-edit — Whether the calling user may edit 
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -20,6 +21,8 @@ from pydantic import BaseModel, Field
 from backend.routes.auth_api import user_principal_dependency
 from backend.services.control_server import ControlServerService, get_control_server_service
 from backend.services.unified_auth import AuthError, TokenPrincipal, get_auth_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -158,16 +161,28 @@ async def control_layout_edit_permission(
             "reason": "No authenticated users exist on this device. Complete authentication onboarding first.",
         }
 
-    # If server ownership points to a missing user, recover deterministically by
-    # reassigning ownership to the currently authenticated user.
+    # Recover server ownership whenever the currently-authenticated user is not
+    # the registered owner.  This covers two cases:
+    #   (a) The old owner's record was deleted/revoked (original recovery).
+    #   (b) The old owner's record still exists as a "zombie" (e.g. the user
+    #       cleared localStorage between sessions without formally logging out)
+    #       while the new session belongs to a different registered user.
+    # For a single-admin home device this is always the correct behaviour; a
+    # future multi-user model would need explicit role grants instead.
     if role == "server":
         server_owner_id = status.get("server_user_id")
-        if isinstance(server_owner_id, str) and server_owner_id and server_owner_id not in active_user_ids:
+        if isinstance(server_owner_id, str) and server_owner_id and server_owner_id != user_id:
+            logger.warning(
+                "Server ownership transferred: previous_owner=%s new_owner=%s device=%s",
+                server_owner_id,
+                user_id,
+                status.get("device_name", "BellForge Device"),
+            )
             recovered = svc.promote_to_server(user_id=user_id, device_name=str(status.get("device_name") or "BellForge Device"))
             return {
                 "permitted": True,
                 "role": recovered.get("role", "server"),
-                "reason": "Recovered stale server ownership and granted layout-edit access to the authenticated user.",
+                "reason": "Transferred server ownership to the authenticated user.",
             }
 
     permitted = svc.can_edit_layout(user_id)

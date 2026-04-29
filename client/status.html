@@ -136,6 +136,23 @@
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      align-items: center;
+    }
+    .layout-editor__back-link {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(215, 200, 181, 0.9);
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--accent);
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .layout-editor__back-link:hover {
+      background: rgba(255, 255, 255, 0.95);
     }
     .layout-editor__actions button.is-pending-save {
       box-shadow: 0 0 0 2px rgba(19, 79, 120, 0.22);
@@ -834,6 +851,7 @@
           <p>Edits apply to the real status page only. Drag title bars to reorder cards when edit mode is enabled.</p>
         </div>
         <div class="layout-editor__actions">
+          <a id="backToSettings" href="/settings" class="layout-editor__back-link secondary">← Settings</a>
           <button id="layoutEditToggle" type="button">Enable Edit Mode</button>
           <button id="layoutSave" type="button">Save Layout</button>
           <button id="layoutAutoArrange" type="button">Auto Arrange</button>
@@ -1094,6 +1112,7 @@
     };
     const layoutAutoSaveEnabled = true;
     let layoutEditorAuthorized = false;
+    let refreshLayoutEditorAuthInFlight = false;
     let statusAdaptiveLayout = null;
     let pendingSharedStatusSave = false;
     let lastSharedStatusLayoutUpdate = "";
@@ -1439,64 +1458,98 @@
         updateLayoutActionButtons();
         return;
       }
-      let activeToken = localStorage.getItem(ACCESS_TOKEN_KEY) || "";
-      if (!activeToken) {
-        layoutEditorAuthorized = false;
-        els.layoutEditor.classList.add("is-visible");
-        els.layoutEditorStatus.textContent = "Sign in on the auth page to unlock edit mode on this real status page.";
-        applyLayoutSettings({ ...readLayoutSettings(), editEnabled: false });
+      // Prevent concurrent invocations (e.g. the 10-s interval firing while a
+      // previous check is still awaiting network responses).  Multiple in-flight
+      // refreshes with a rotating-refresh token scheme cause a race that makes
+      // layoutEditorAuthorized oscillate every few seconds.
+      if (refreshLayoutEditorAuthInFlight) {
         return;
       }
+      refreshLayoutEditorAuthInFlight = true;
       try {
-        let response = await fetch("/api/auth/verify", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${activeToken}`,
-          },
-          body: JSON.stringify({ token: activeToken }),
-        });
-        // If the token is expired, attempt a silent refresh before giving up.
-        if (!response.ok) {
-          const refreshToken = localStorage.getItem("bellforge.refresh_token") || "";
-          let refreshed = false;
-          if (refreshToken) {
-            try {
-              const errBody = await response.json().catch(() => null);
-              const errCode = String(errBody?.detail?.error || "");
-              if (response.status === 401 || /expired/i.test(errCode)) {
-                const currentStoredRefresh = localStorage.getItem("bellforge.refresh_token") || "";
-                const refreshResp = await fetch("/api/auth/refresh", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ refresh_token: currentStoredRefresh || refreshToken }),
-                });
-                if (refreshResp.ok) {
-                  const refreshedPayload = await refreshResp.json();
-                  if (refreshedPayload.access_token) {
-                    localStorage.setItem("bellforge.access_token", refreshedPayload.access_token);
-                    activeToken = refreshedPayload.access_token;
-                  }
-                  if (refreshedPayload.refresh_token) {
-                    localStorage.setItem("bellforge.refresh_token", refreshedPayload.refresh_token);
-                  }
-                  // Re-verify with the new token.
-                  response = await fetch("/api/auth/verify", {
+        let activeToken = localStorage.getItem(ACCESS_TOKEN_KEY) || "";
+        if (!activeToken) {
+          layoutEditorAuthorized = false;
+          els.layoutEditor.classList.add("is-visible");
+          els.layoutEditorStatus.textContent = "Sign in on the auth page to unlock edit mode on this real status page.";
+          applyLayoutSettings({ ...readLayoutSettings(), editEnabled: false });
+          return;
+        }
+        try {
+          let response = await fetch("/api/auth/verify", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${activeToken}`,
+            },
+            body: JSON.stringify({ token: activeToken }),
+          });
+          // If the token is expired, attempt a silent refresh before giving up.
+          if (!response.ok) {
+            const refreshToken = localStorage.getItem("bellforge.refresh_token") || "";
+            let refreshed = false;
+            if (refreshToken) {
+              try {
+                const errBody = await response.json().catch(() => null);
+                const errCode = String(errBody?.detail?.error || "");
+                if (response.status === 401 || /expired/i.test(errCode)) {
+                  const currentStoredRefresh = localStorage.getItem("bellforge.refresh_token") || "";
+                  const refreshResp = await fetch("/api/auth/refresh", {
                     method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: `Bearer ${activeToken}`,
-                    },
-                    body: JSON.stringify({ token: activeToken }),
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refresh_token: currentStoredRefresh || refreshToken }),
                   });
-                  refreshed = response.ok;
+                  if (refreshResp.ok) {
+                    const refreshedPayload = await refreshResp.json();
+                    if (refreshedPayload.access_token) {
+                      localStorage.setItem("bellforge.access_token", refreshedPayload.access_token);
+                      activeToken = refreshedPayload.access_token;
+                    }
+                    if (refreshedPayload.refresh_token) {
+                      localStorage.setItem("bellforge.refresh_token", refreshedPayload.refresh_token);
+                    }
+                    // Re-verify with the new token.
+                    response = await fetch("/api/auth/verify", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${activeToken}`,
+                      },
+                      body: JSON.stringify({ token: activeToken }),
+                    });
+                    refreshed = response.ok;
+                  } else {
+                    // Refresh failed; check if another concurrent call already stored fresh tokens.
+                    const laterRefresh = localStorage.getItem("bellforge.refresh_token") || "";
+                    const laterAccess = localStorage.getItem("bellforge.access_token") || "";
+                    if (laterRefresh && laterRefresh !== (currentStoredRefresh || refreshToken) && laterAccess) {
+                      activeToken = laterAccess;
+                      response = await fetch("/api/auth/verify", {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${activeToken}`,
+                        },
+                        body: JSON.stringify({ token: activeToken }),
+                      });
+                      refreshed = response.ok;
+                    }
+                  }
                 }
+              } catch {
+                // Refresh attempt failed — fall through to the !response.ok handler.
               }
-            } catch {
-              // Refresh attempt failed — fall through to the !response.ok handler.
+            }
+            if (!refreshed && !response.ok) {
+              layoutEditorAuthorized = false;
+              els.layoutEditor.classList.add("is-visible");
+              els.layoutEditorStatus.textContent = "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
+              const currentSettings = readLayoutSettings();
+              applyLayoutSettings({ ...currentSettings, editEnabled: false });
+              return;
             }
           }
-          if (!refreshed && !response.ok) {
+          if (!response.ok) {
             layoutEditorAuthorized = false;
             els.layoutEditor.classList.add("is-visible");
             els.layoutEditorStatus.textContent = "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
@@ -1504,50 +1557,44 @@
             applyLayoutSettings({ ...currentSettings, editEnabled: false });
             return;
           }
-        }
-        if (!response.ok) {
+          // Token is valid — additionally check server authority.
+          let permReason = "";
+          try {
+            const permResponse = await fetch("/api/control/permissions/layout-edit", {
+              headers: { Authorization: `Bearer ${activeToken}` },
+            });
+            if (permResponse.ok) {
+              const perm = await permResponse.json();
+              layoutEditorAuthorized = perm.permitted === true;
+              permReason = perm.reason || "";
+            } else {
+              // Endpoint returned error — deny to be safe.
+              layoutEditorAuthorized = false;
+              permReason = "Permission check failed.";
+            }
+          } catch {
+            // Network error on permission check — deny to be safe.
+            layoutEditorAuthorized = false;
+            permReason = "Could not reach permission service.";
+          }
+          els.layoutEditor.classList.add("is-visible");
+          if (layoutEditorAuthorized) {
+            els.layoutEditorStatus.textContent = "Authenticated. Edit mode can reorder cards and tune masonry spacing on the real page immediately.";
+          } else {
+            els.layoutEditorStatus.textContent = permReason
+              ? `Layout editing is not permitted: ${permReason} Visit the setup wizard to configure server authority.`
+              : "Layout editing is locked. This device does not have control-server authority. Visit the setup wizard to configure this device.";
+          }
+        } catch {
           layoutEditorAuthorized = false;
           els.layoutEditor.classList.add("is-visible");
           els.layoutEditorStatus.textContent = "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
-          const currentSettings = readLayoutSettings();
-          applyLayoutSettings({ ...currentSettings, editEnabled: false });
-          return;
         }
-        // Token is valid — additionally check server authority.
-        let permReason = "";
-        try {
-          const permResponse = await fetch("/api/control/permissions/layout-edit", {
-            headers: { Authorization: `Bearer ${activeToken}` },
-          });
-          if (permResponse.ok) {
-            const perm = await permResponse.json();
-            layoutEditorAuthorized = perm.permitted === true;
-            permReason = perm.reason || "";
-          } else {
-            // Endpoint returned error — deny to be safe.
-            layoutEditorAuthorized = false;
-            permReason = "Permission check failed.";
-          }
-        } catch {
-          // Network error on permission check — deny to be safe.
-          layoutEditorAuthorized = false;
-          permReason = "Could not reach permission service.";
-        }
-        els.layoutEditor.classList.add("is-visible");
-        if (layoutEditorAuthorized) {
-          els.layoutEditorStatus.textContent = "Authenticated. Edit mode can reorder cards and tune masonry spacing on the real page immediately.";
-        } else {
-          els.layoutEditorStatus.textContent = permReason
-            ? `Layout editing is not permitted: ${permReason} Visit the setup wizard to configure server authority.`
-            : "Layout editing is locked. This device does not have control-server authority. Visit the setup wizard to configure this device.";
-        }
-      } catch {
-        layoutEditorAuthorized = false;
-        els.layoutEditor.classList.add("is-visible");
-        els.layoutEditorStatus.textContent = "Stored login token is missing or invalid. Re-authenticate to unlock edit mode.";
+        const currentSettings = readLayoutSettings();
+        applyLayoutSettings({ ...currentSettings, editEnabled: layoutEditorAuthorized && currentSettings.editEnabled });
+      } finally {
+        refreshLayoutEditorAuthInFlight = false;
       }
-      const currentSettings = readLayoutSettings();
-      applyLayoutSettings({ ...currentSettings, editEnabled: layoutEditorAuthorized && currentSettings.editEnabled });
     }
 
     async function ensureLayoutEditAuthorized(reason = "status-layout-edit") {

@@ -1,7 +1,7 @@
 {
-  "version": "0.1.90",
-  "released_at": "2026-04-29T19:05:24Z",
+  "version": "0.1.91",
+  "released_at": "2026-04-29T20:42:19Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "fix: prevent token wipe on concurrent refresh across tabs; status page now refreshes expired tokens and responds instantly to cross-tab login"
+  "notes": "fix: stale server ownership blocks editing; add in-flight guard for layout auth refresh cycling; add Back to Settings button; improve settings auth banner"
 }
