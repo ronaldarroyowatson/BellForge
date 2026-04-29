@@ -1,7 +1,7 @@
 {
-  "version": "0.1.87",
-  "released_at": "2026-04-29T16:34:15Z",
+  "version": "0.1.88",
+  "released_at": "2026-04-29T17:17:23Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "auth-fix-cloud: add is_returning_user flag to login responses, has_registered_users to auth_status, fix cloud re-auth after account deletion, add comprehensive auth test suite"
+  "notes": "fix: run PBKDF2 password hashing in thread pool to unblock event loop on Raspberry Pi; add authOperationInFlight guard to prevent premature auth-state reset during in-flight registration"
 }

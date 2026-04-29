@@ -1131,6 +1131,7 @@
     let updaterAutoRecoveryAttempted = false;
     let settingsAdaptiveLayout = { recompute() {}, autoArrange() {} };
     let tokenVerificationPromise = null;
+    let authOperationInFlight = false;
     let authMachine = {
       state: AUTH_STATES.UNAUTHENTICATED,
       userIdentity: null,
@@ -1670,6 +1671,7 @@
       }
       const endpoint = action === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
       emitAuthEvent("auth:begin", { method: "local", action, username: email });
+      authOperationInFlight = true;
       setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
 
       async function loginExistingLocalUser() {
@@ -1739,6 +1741,8 @@
         setAuthMachineState(AUTH_STATES.ERROR, { reason, userIdentity: null });
         const codeSuffix = errorCode ? ` [code: ${errorCode}]` : "";
         elements.authLocalResult.textContent = `Local ${action} failed${codeSuffix}: ${reason}.`;
+      } finally {
+        authOperationInFlight = false;
       }
     }
 
@@ -1747,6 +1751,7 @@
       const subject = (elements.authCloudSubject.value || "").trim() || `user-${Date.now()}`;
       const email = (elements.authCloudEmail.value || "").trim() || `${subject}@example.com`;
       emitAuthEvent("auth:begin", { method: "cloud", provider, username: email });
+      authOperationInFlight = true;
       setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
       try {
         emitAuthEvent("auth:validate", { method: "cloud", provider, username: email });
@@ -1773,6 +1778,8 @@
         emitAuthEvent("auth:failure", { method: "cloud", provider, reason: cloudReason });
         setAuthMachineState(AUTH_STATES.ERROR, { reason: cloudReason, userIdentity: null });
         elements.authCloudResult.textContent = `Cloud authentication failed${cloudCodeSuffix}: ${cloudReason}.`;
+      } finally {
+        authOperationInFlight = false;
       }
     }
 
@@ -2202,7 +2209,11 @@
         } else if (!tokenVerification.ok && hasKnownAuthenticatedUser) {
           setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: fallbackIdentity });
           setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
-        } else {
+        } else if (!authOperationInFlight) {
+          // Only reset to unauthenticated if no auth operation is actively in-flight.
+          // When PBKDF2 hashing runs in a background thread the server stays responsive,
+          // so this refresh can fire and find no token yet — we must not clobber the
+          // AUTHENTICATING state the user is waiting on.
           setAuthMachineState(AUTH_STATES.UNAUTHENTICATED, { userIdentity: null, reason: "" });
           setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
         }
