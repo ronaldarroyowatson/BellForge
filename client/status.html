@@ -87,14 +87,14 @@
         linear-gradient(180deg, #f8f2e8 0%, #efe5d8 100%);
     }
     .wrap {
-      max-width: 1240px;
+      max-width: 100%;
       margin: 0 auto;
       padding: calc(24px * var(--bf-ui-scale));
     }
     .layout-editor {
       display: none;
       margin: 0 auto;
-      max-width: 1240px;
+      max-width: 100%;
       padding: calc(16px * var(--bf-ui-scale)) calc(24px * var(--bf-ui-scale)) 0;
     }
     .layout-editor.is-visible {
@@ -437,13 +437,11 @@
       color: #0f4467;
       text-decoration: none;
       font-family: "Consolas", "Cascadia Mono", monospace;
-      font-size: clamp(0.95rem, 1.3vw, 1.2rem);
-      line-height: 1.25;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      word-break: normal;
-      overflow-wrap: normal;
+      font-size: clamp(0.9rem, 1.1vw, 1.1rem);
+      line-height: 1.35;
+      white-space: normal;
+      overflow-wrap: break-word;
+      word-break: break-all;
       background: var(--accent-soft);
       border: 1px solid #b8d0df;
       border-radius: 16px;
@@ -1677,6 +1675,23 @@
               allowGrow: true,
             };
           }
+          // For the real display (Pi kiosk) use the physical screen dimensions so
+          // column count reflects what will actually be rendered on the monitor.
+          // For the browser-based edit mode use the actual container/window width so
+          // the preview matches the user's viewport instead of the Pi's 1920 px screen.
+          if (!isDisplayView) {
+            const editWidth = context.containerWidth || context.windowWidth || physicalViewport.width;
+            return {
+              source: "editor-browser",
+              baseWidth: physicalViewport.width,
+              baseHeight: physicalViewport.height,
+              availableWidth: editWidth,
+              availableHeight: context.windowHeight,
+              layoutWidth: Math.max(editWidth, readLayoutSettings().minCardWidth),
+              layoutHeight: Math.max(context.containerHeight || context.windowHeight || 0, 1),
+              allowGrow: true,
+            };
+          }
           return {
             source: "physical-display",
             baseWidth: physicalViewport.width,
@@ -1773,18 +1788,28 @@
       return {
         base,
         settings: `${base}/settings`,
-        auth: `${base}/settings?auth_required=1&auth_workflow=wizard&start_onboarding=1`,
-        authLocal: `${base}/settings?auth_required=1&auth_workflow=local`,
-        authFederated: `${base}/settings?auth_required=1&auth_workflow=federated`,
-        onboarding: `${base}/settings?auth_required=1&auth_workflow=wizard&start_onboarding=1`,
-        onboardingWizard: `${base}/settings?auth_required=1&auth_workflow=server`,
+        auth: `${base}/settings`,
+        authLocal: `${base}/settings`,
+        authFederated: `${base}/settings`,
+        onboarding: `${base}/settings`,
+        onboardingWizard: `${base}/settings`,
         automode: `${base}/client/automode.html`,
       };
     }
 
     function setUrl(el, value) {
-      el.textContent = value;
-      el.href = value === "Unavailable" ? "#" : value;
+      if (!el) return;
+      if (!value || value === "Unavailable") {
+        el.textContent = "Unavailable";
+        el.href = "#";
+        el.title = "";
+        return;
+      }
+      // Display the URL without the protocol scheme and without query parameters
+      // so the text fits in a narrow card and is easy to type on another device.
+      const display = value.replace(/^https?:\/\//, "").split("?")[0];
+      el.textContent = display;
+      el.href = value;
       el.title = value;
     }
 

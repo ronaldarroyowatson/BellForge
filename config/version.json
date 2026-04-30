@@ -1,7 +1,7 @@
 {
-  "version": "0.1.91",
-  "released_at": "2026-04-29T20:42:19Z",
+  "version": "0.1.92",
+  "released_at": "2026-04-30T14:34:34Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "fix: stale server ownership blocks editing; add in-flight guard for layout auth refresh cycling; add Back to Settings button; improve settings auth banner"
+  "notes": "fix: status layout fills full monitor width; edit mode uses correct viewport; drag-and-drop on card body; URLs show short form; return-to-editing link always works"
 }

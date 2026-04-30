@@ -2242,29 +2242,23 @@
 
       if (tokenVerification.ok && sessionIdentity) {
         setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
-        // When the user was redirected here from the status page, show a clear success
-        // message with a link back rather than the generic "server authority" banner.
-        if (authRequiredRoute && authReturnTo && authReturnTo !== "/settings") {
-          setAuthRequiredBanner("Authentication confirmed.", true, true);
-          if (elements.authReturnToLink) {
-            elements.authReturnToLink.href = authReturnTo;
-            elements.authReturnToLink.hidden = false;
-          }
-        } else {
-          // No redirect context — keep the banner hidden (auth is fine).
-          setAuthRequiredBanner("", false);
+        // Always show a "↩ Return to editing" link when auth is confirmed so the
+        // user can navigate back to the status editor without hunting for the URL.
+        // Use the redirect return_to when present; fall back to /status.
+        const returnDest = (authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status";
+        setAuthRequiredBanner("Authentication confirmed.", true, true);
+        if (elements.authReturnToLink) {
+          elements.authReturnToLink.href = returnDest;
+          elements.authReturnToLink.hidden = false;
         }
       } else if (authMachine.state === AUTH_STATES.AUTHENTICATING) {
         if (tokenVerification.ok && sessionIdentity) {
           setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
-          if (authRequiredRoute && authReturnTo && authReturnTo !== "/settings") {
-            setAuthRequiredBanner("Authentication confirmed.", true, true);
-            if (elements.authReturnToLink) {
-              elements.authReturnToLink.href = authReturnTo;
-              elements.authReturnToLink.hidden = false;
-            }
-          } else {
-            setAuthRequiredBanner("", false);
+          const returnDest = (authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status";
+          setAuthRequiredBanner("Authentication confirmed.", true, true);
+          if (elements.authReturnToLink) {
+            elements.authReturnToLink.href = returnDest;
+            elements.authReturnToLink.hidden = false;
           }
         } else if (!tokenVerification.ok && hasKnownAuthenticatedUser) {
           setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: fallbackIdentity });
@@ -2710,6 +2704,12 @@
     loadAuthMachineState();
     applyAuthMachineToCard();
     applyAuthRequiredRoute();
+    // Pre-set the return link href synchronously so early clicks go to the right
+    // destination even before the async token verification completes.
+    if (elements.authReturnToLink) {
+      const earlyReturnDest = (authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status";
+      elements.authReturnToLink.href = earlyReturnDest;
+    }
     refreshAuthenticatedUsers();
     ensureStatusPreviewFrame();
     setStatusAccessNote("Loading the real status preview… display diagnostics will update the target aspect ratio after refresh.");

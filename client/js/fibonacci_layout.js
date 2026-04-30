@@ -696,6 +696,13 @@
       handle.setAttribute("draggable", "true");
       handle.classList.add("is-layout-editable");
       card.classList.add("is-layout-editable");
+      // Also register dragover and drop on the card body so the user can drop
+      // on any part of the card, not only the titlebar.
+      if (!card.dataset.dragDropAttached) {
+        card.addEventListener("dragover", binding.dragover);
+        card.addEventListener("drop", binding.drop);
+        card.dataset.dragDropAttached = "true";
+      }
     }
 
     function disableDragHandle(handle, card) {
@@ -705,6 +712,11 @@
         handle.removeEventListener("dragend", binding.dragend);
         handle.removeEventListener("dragover", binding.dragover);
         handle.removeEventListener("drop", binding.drop);
+      }
+      if (binding && card.dataset.dragDropAttached) {
+        card.removeEventListener("dragover", binding.dragover);
+        card.removeEventListener("drop", binding.drop);
+        delete card.dataset.dragDropAttached;
       }
       delete handle.dataset.dragControllerAttached;
       handle.setAttribute("draggable", "false");
