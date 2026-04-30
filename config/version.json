@@ -1,7 +1,7 @@
 {
-  "version": "0.1.92",
-  "released_at": "2026-04-30T14:34:34Z",
+  "version": "0.1.93",
+  "released_at": "2026-04-30T15:15:46Z",
   "min_updater_version": "1.0.0",
   "reboot_required": false,
-  "notes": "fix: status layout fills full monitor width; edit mode uses correct viewport; drag-and-drop on card body; URLs show short form; return-to-editing link always works"
+  "notes": "fix: revert editor viewport to use physicalViewport so edit preview matches real Pi monitor; isPreviewEditor iframe keeps container-width"
 }

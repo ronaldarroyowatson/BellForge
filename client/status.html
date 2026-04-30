@@ -1675,23 +1675,10 @@
               allowGrow: true,
             };
           }
-          // For the real display (Pi kiosk) use the physical screen dimensions so
-          // column count reflects what will actually be rendered on the monitor.
-          // For the browser-based edit mode use the actual container/window width so
-          // the preview matches the user's viewport instead of the Pi's 1920 px screen.
-          if (!isDisplayView) {
-            const editWidth = context.containerWidth || context.windowWidth || physicalViewport.width;
-            return {
-              source: "editor-browser",
-              baseWidth: physicalViewport.width,
-              baseHeight: physicalViewport.height,
-              availableWidth: editWidth,
-              availableHeight: context.windowHeight,
-              layoutWidth: Math.max(editWidth, readLayoutSettings().minCardWidth),
-              layoutHeight: Math.max(context.containerHeight || context.windowHeight || 0, 1),
-              allowGrow: true,
-            };
-          }
+          // Both the Pi kiosk (isDisplayView) and the browser-based editor must use
+          // the physical display dimensions for layout calculation so that column
+          // counts match on both sides.  The editor is a preview of what the Pi will
+          // show, not a preview of the current browser window.
           return {
             source: "physical-display",
             baseWidth: physicalViewport.width,
