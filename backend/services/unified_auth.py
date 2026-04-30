@@ -475,12 +475,16 @@ class UnifiedAuthService:
 
         if user_id and user_id in users:
             user = users[user_id]
-            user["email"] = principal.email or user.get("email")
-            user["name"] = principal.name or user.get("name")
-            user["picture"] = principal.picture or user.get("picture")
-            user["email_verified"] = principal.email_verified
-            user["last_login_at"] = _utc_iso()
-            return user
+            # If the existing record was deleted/revoked, discard it and create a fresh account.
+            if bool(user.get("revoked", False)):
+                del provider_index[key]
+            else:
+                user["email"] = principal.email or user.get("email")
+                user["name"] = principal.name or user.get("name")
+                user["picture"] = principal.picture or user.get("picture")
+                user["email_verified"] = principal.email_verified
+                user["last_login_at"] = _utc_iso()
+                return user
 
         user_id = str(uuid.uuid4())
         user = {
@@ -510,6 +514,16 @@ class UnifiedAuthService:
         principal = self._verifier.verify(provider, id_token)
         data = self._read()
         self._cleanup(data)
+
+        # Detect returning user before _ensure_user updates last_login_at.
+        existing_user_id = data["provider_index"].get(f"{principal.provider}:{principal.subject}")
+        is_returning_user = bool(
+            existing_user_id
+            and existing_user_id in data["users"]
+            and not data["users"][existing_user_id].get("revoked", False)
+            and data["users"][existing_user_id].get("last_login_at") is not None
+        )
+
         user = self._ensure_user(data, principal)
         if bool(user.get("revoked", False)):
             raise AuthError(403, "user_revoked", "User account is revoked.")
@@ -541,6 +555,7 @@ class UnifiedAuthService:
         return {
             **tokens,
             "user": self._serialize_user(user),
+            "is_returning_user": is_returning_user,
         }
 
     def local_register(self, email: str, password: str, name: str | None, client_type: str) -> dict[str, Any]:
@@ -600,7 +615,7 @@ class UnifiedAuthService:
             "revoked": False,
         }
         self._write(data)
-        return {**tokens, "user": self._serialize_user(user)}
+        return {**tokens, "user": self._serialize_user(user), "is_returning_user": False}
 
     def local_login(self, email: str, password: str, client_type: str) -> dict[str, Any]:
         self._assert_local_enabled()
@@ -653,7 +668,7 @@ class UnifiedAuthService:
             "revoked": False,
         }
         self._write(data)
-        return {**tokens, "user": self._serialize_user(user)}
+        return {**tokens, "user": self._serialize_user(user), "is_returning_user": True}
 
     def local_password_reset_request(self, email: str) -> dict[str, Any]:
         self._assert_local_enabled()
@@ -1867,6 +1882,11 @@ class UnifiedAuthService:
         else:
             two_factor_state = "not-enabled"
 
+        # has_registered_users indicates whether any users have ever been registered on this device.
+        # When True, the UI should show a simplified login form instead of full onboarding.
+        data = self._read()
+        has_registered_users = len(data.get("users", {})) > 0
+
         return {
             "timestamp": _utc_iso(),
             "credentials": {
@@ -1885,6 +1905,7 @@ class UnifiedAuthService:
             "auth_mode": mode,
             "cloud_enabled": mode in {"cloud", "hybrid"},
             "local_enabled": mode in {"local", "hybrid"},
+            "has_registered_users": has_registered_users,
         }
 
     def delete_authenticated_user(self, principal: TokenPrincipal, user_id: str) -> dict[str, Any]:
@@ -1910,6 +1931,14 @@ class UnifiedAuthService:
         local_email = user.get("email")
         if isinstance(local_email, str):
             data["local_email_index"].pop(local_email.strip().lower(), None)
+
+        # Remove provider_index entry for cloud users so they can re-authenticate
+        # after deletion without hitting the "user_revoked" error.
+        user_provider = user.get("provider")
+        user_provider_subject = user.get("provider_subject")
+        if user_provider and user_provider != "local" and user_provider_subject:
+            pkey = f"{user_provider}:{user_provider_subject}"
+            data["provider_index"].pop(pkey, None)
 
         for session_jti, session in data["refresh_sessions"].items():
             if not isinstance(session, dict):

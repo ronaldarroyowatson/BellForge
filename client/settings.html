@@ -124,7 +124,7 @@
       line-height: 1.4;
     }
     .auth-required-banner {
-      margin: 10px 0 12px;
+      margin: 10px 0 4px;
       border: 1px solid #dcb47a;
       border-radius: 10px;
       background: #fff7e8;
@@ -132,6 +132,27 @@
       padding: 9px 11px;
       font-size: 0.88rem;
       line-height: 1.4;
+    }
+    .auth-required-banner.is-success {
+      border-color: #7cbf91;
+      background: #edf9f1;
+      color: #185e30;
+    }
+    .auth-return-link {
+      display: inline-flex;
+      align-items: center;
+      margin: 0 0 12px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid #7cbf91;
+      background: #edf9f1;
+      color: #185e30;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .auth-return-link:hover {
+      background: #d8f3e3;
     }
     .auth-workflow-grid {
       display: grid;
@@ -651,6 +672,7 @@
         <div class="row"><span>Last Attempt</span><strong id="lastAuth" class="mono">-</strong></div>
         <p id="authStateMessage" class="auth-inline-result">Authentication required to unlock editing features.</p>
         <p id="authRequiredBanner" class="auth-required-banner" hidden>Authentication required to unlock editing features.</p>
+        <a id="authReturnToLink" class="auth-return-link" hidden href="/settings">↩ Return to editing</a>
         <div class="auth-workflow-grid">
           <button id="authOpenLocal" class="secondary auth-workflow-btn" type="button">Local Authentication</button>
           <button id="authOpenFederated" class="secondary auth-workflow-btn" type="button">Cloud Authentication</button>
@@ -1006,6 +1028,7 @@
       lastAuth: document.getElementById("lastAuth"),
       authStateMessage: document.getElementById("authStateMessage"),
       authRequiredBanner: document.getElementById("authRequiredBanner"),
+      authReturnToLink: document.getElementById("authReturnToLink"),
       authOpenLocal: document.getElementById("authOpenLocal"),
       authOpenFederated: document.getElementById("authOpenFederated"),
       authOpenPairing: document.getElementById("authOpenPairing"),
@@ -1131,6 +1154,7 @@
     let updaterAutoRecoveryAttempted = false;
     let settingsAdaptiveLayout = { recompute() {}, autoArrange() {} };
     let tokenVerificationPromise = null;
+    let authOperationInFlight = false;
     let authMachine = {
       state: AUTH_STATES.UNAUTHENTICATED,
       userIdentity: null,
@@ -1277,6 +1301,23 @@
             });
             storeAuthTokens(refreshed);
           } catch (refreshError) {
+            // Before removing tokens, check if another tab already performed a
+            // successful refresh while this one was in-flight.  The rotating-refresh
+            // scheme revokes each token after one use, so a concurrent refresh by
+            // another tab would cause this one to receive a "revoked" error even
+            // though fresh tokens are now sitting in localStorage.
+            const currentStoredRefresh = localStorage.getItem("bellforge.refresh_token") || "";
+            if (currentStoredRefresh && currentStoredRefresh !== refreshToken) {
+              const latestAccess = localStorage.getItem("bellforge.access_token") || "";
+              if (latestAccess) {
+                try {
+                  const payload = await verifyToken(latestAccess);
+                  return { ok: true, reason: "", payload };
+                } catch {
+                  // New token is also invalid — fall through to failure handling.
+                }
+              }
+            }
             localStorage.removeItem("bellforge.access_token");
             localStorage.removeItem("bellforge.refresh_token");
             return {
@@ -1543,12 +1584,13 @@
       return path;
     }
 
-    function setAuthRequiredBanner(message, visible = true) {
+    function setAuthRequiredBanner(message, visible = true, isSuccess = false) {
       if (!elements.authRequiredBanner) {
         return;
       }
       elements.authRequiredBanner.textContent = message || AUTH_REQUIRED_UNLOCK_MESSAGE;
       elements.authRequiredBanner.hidden = !visible;
+      elements.authRequiredBanner.classList.toggle("is-success", Boolean(isSuccess));
     }
 
     function buildOnboardingRoute(workflow = "wizard") {
@@ -1670,6 +1712,7 @@
       }
       const endpoint = action === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
       emitAuthEvent("auth:begin", { method: "local", action, username: email });
+      authOperationInFlight = true;
       setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
 
       async function loginExistingLocalUser() {
@@ -1739,6 +1782,8 @@
         setAuthMachineState(AUTH_STATES.ERROR, { reason, userIdentity: null });
         const codeSuffix = errorCode ? ` [code: ${errorCode}]` : "";
         elements.authLocalResult.textContent = `Local ${action} failed${codeSuffix}: ${reason}.`;
+      } finally {
+        authOperationInFlight = false;
       }
     }
 
@@ -1747,6 +1792,7 @@
       const subject = (elements.authCloudSubject.value || "").trim() || `user-${Date.now()}`;
       const email = (elements.authCloudEmail.value || "").trim() || `${subject}@example.com`;
       emitAuthEvent("auth:begin", { method: "cloud", provider, username: email });
+      authOperationInFlight = true;
       setAuthMachineState(AUTH_STATES.AUTHENTICATING, { reason: "" });
       try {
         emitAuthEvent("auth:validate", { method: "cloud", provider, username: email });
@@ -1773,6 +1819,8 @@
         emitAuthEvent("auth:failure", { method: "cloud", provider, reason: cloudReason });
         setAuthMachineState(AUTH_STATES.ERROR, { reason: cloudReason, userIdentity: null });
         elements.authCloudResult.textContent = `Cloud authentication failed${cloudCodeSuffix}: ${cloudReason}.`;
+      } finally {
+        authOperationInFlight = false;
       }
     }
 
@@ -2194,15 +2242,32 @@
 
       if (tokenVerification.ok && sessionIdentity) {
         setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
-        setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
+        // Always show a "↩ Return to editing" link when auth is confirmed so the
+        // user can navigate back to the status editor without hunting for the URL.
+        // Use the redirect return_to when present; fall back to /status.
+        const returnDest = sanitizeNextPath((authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status");
+        setAuthRequiredBanner("Authentication confirmed.", true, true);
+        if (elements.authReturnToLink) {
+          elements.authReturnToLink.href = returnDest;
+          elements.authReturnToLink.hidden = false;
+        }
       } else if (authMachine.state === AUTH_STATES.AUTHENTICATING) {
         if (tokenVerification.ok && sessionIdentity) {
           setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
-          setAuthRequiredBanner("Authentication healthy. Edit features unlocked when server authority permits.", true);
+          const returnDest = sanitizeNextPath((authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status");
+          setAuthRequiredBanner("Authentication confirmed.", true, true);
+          if (elements.authReturnToLink) {
+            elements.authReturnToLink.href = returnDest;
+            elements.authReturnToLink.hidden = false;
+          }
         } else if (!tokenVerification.ok && hasKnownAuthenticatedUser) {
           setAuthMachineState(AUTH_STATES.ERROR, { reason: tokenVerification.reason || "Token verification failed.", userIdentity: fallbackIdentity });
           setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
-        } else {
+        } else if (!authOperationInFlight) {
+          // Only reset to unauthenticated if no auth operation is actively in-flight.
+          // When PBKDF2 hashing runs in a background thread the server stays responsive,
+          // so this refresh can fire and find no token yet — we must not clobber the
+          // AUTHENTICATING state the user is waiting on.
           setAuthMachineState(AUTH_STATES.UNAUTHENTICATED, { userIdentity: null, reason: "" });
           setAuthRequiredBanner(AUTH_REQUIRED_UNLOCK_MESSAGE, true);
         }
@@ -2639,6 +2704,12 @@
     loadAuthMachineState();
     applyAuthMachineToCard();
     applyAuthRequiredRoute();
+    // Pre-set the return link href synchronously so early clicks go to the right
+    // destination even before the async token verification completes.
+    if (elements.authReturnToLink) {
+      const earlyReturnDest = sanitizeNextPath((authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status");
+      elements.authReturnToLink.href = earlyReturnDest;
+    }
     refreshAuthenticatedUsers();
     ensureStatusPreviewFrame();
     setStatusAccessNote("Loading the real status preview… display diagnostics will update the target aspect ratio after refresh.");

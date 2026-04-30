@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header
@@ -161,12 +162,17 @@ async def auth_verify(
 
 @router.post("/auth/local/register")
 async def auth_local_register(payload: LocalRegisterRequest) -> dict[str, Any]:
+    # _hash_local_password (200k PBKDF2 iterations) blocks the event loop on slow
+    # hardware (Raspberry Pi).  Running the whole service call in a thread keeps the
+    # server responsive and prevents the request from appearing to hang.
     try:
-        return get_auth_service().local_register(
-            email=payload.email,
-            password=payload.password,
-            name=payload.name,
-            client_type=payload.client_type,
+        svc = get_auth_service()
+        return await asyncio.to_thread(
+            svc.local_register,
+            payload.email,
+            payload.password,
+            payload.name,
+            payload.client_type,
         )
     except AuthError as exc:
         from fastapi import HTTPException
@@ -176,11 +182,14 @@ async def auth_local_register(payload: LocalRegisterRequest) -> dict[str, Any]:
 
 @router.post("/auth/local/login")
 async def auth_local_login(payload: LocalLoginRequest) -> dict[str, Any]:
+    # _verify_local_password (200k PBKDF2 iterations) is equally expensive.
     try:
-        return get_auth_service().local_login(
-            email=payload.email,
-            password=payload.password,
-            client_type=payload.client_type,
+        svc = get_auth_service()
+        return await asyncio.to_thread(
+            svc.local_login,
+            payload.email,
+            payload.password,
+            payload.client_type,
         )
     except AuthError as exc:
         from fastapi import HTTPException
@@ -200,10 +209,13 @@ async def auth_local_password_reset_request(payload: LocalPasswordResetRequest) 
 
 @router.post("/auth/local/password-reset/confirm")
 async def auth_local_password_reset_confirm(payload: LocalPasswordResetConfirmRequest) -> dict[str, Any]:
+    # _hash_local_password is called here too — run off-thread.
     try:
-        return get_auth_service().local_password_reset_confirm(
-            reset_token=payload.reset_token,
-            new_password=payload.new_password,
+        svc = get_auth_service()
+        return await asyncio.to_thread(
+            svc.local_password_reset_confirm,
+            payload.reset_token,
+            payload.new_password,
         )
     except AuthError as exc:
         from fastapi import HTTPException
