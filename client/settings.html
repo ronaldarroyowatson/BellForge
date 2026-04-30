@@ -2245,7 +2245,7 @@
         // Always show a "↩ Return to editing" link when auth is confirmed so the
         // user can navigate back to the status editor without hunting for the URL.
         // Use the redirect return_to when present; fall back to /status.
-        const returnDest = (authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status";
+        const returnDest = sanitizeNextPath((authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status");
         setAuthRequiredBanner("Authentication confirmed.", true, true);
         if (elements.authReturnToLink) {
           elements.authReturnToLink.href = returnDest;
@@ -2254,7 +2254,7 @@
       } else if (authMachine.state === AUTH_STATES.AUTHENTICATING) {
         if (tokenVerification.ok && sessionIdentity) {
           setAuthMachineState(AUTH_STATES.AUTHENTICATED, { userIdentity: sessionIdentity, reason: "" });
-          const returnDest = (authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status";
+          const returnDest = sanitizeNextPath((authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status");
           setAuthRequiredBanner("Authentication confirmed.", true, true);
           if (elements.authReturnToLink) {
             elements.authReturnToLink.href = returnDest;
@@ -2707,7 +2707,7 @@
     // Pre-set the return link href synchronously so early clicks go to the right
     // destination even before the async token verification completes.
     if (elements.authReturnToLink) {
-      const earlyReturnDest = (authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status";
+      const earlyReturnDest = sanitizeNextPath((authReturnTo && authReturnTo !== "/settings") ? authReturnTo : "/status");
       elements.authReturnToLink.href = earlyReturnDest;
     }
     refreshAuthenticatedUsers();
